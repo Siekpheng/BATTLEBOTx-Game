@@ -808,32 +808,50 @@
 
     /* Small screens / Phones responsive adjustments */
     @media (max-width: 768px) {
+      /* Clean compact HUD on mobile */
+      #btn-cam-down,
+      #btn-cam-up,
+      #btn-toggle-touch {
+        display: none !important;
+      }
       .hud-top-bar {
-        top: 8px;
-        gap: 6px;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        gap: 8px;
         max-width: 96vw;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: center;
       }
       .hud-icon-btn {
-        padding: 5px 9px;
-        font-size: 0.72rem;
+        padding: 6px 12px;
+        font-size: 0.78rem;
       }
       .timer-pill {
-        padding: 5px 12px;
-        font-size: 0.92rem;
+        padding: 6px 14px;
+        font-size: 0.95rem;
       }
+
+      /* Compact Referee & Fire banners */
+      #flip-warning-container {
+        top: calc(52px + env(safe-area-inset-top, 0px)) !important;
+        transform: translateX(-50%) scale(0.85) !important;
+      }
+      #fire-warning-container {
+        top: calc(100px + env(safe-area-inset-top, 0px)) !important;
+        transform: translateX(-50%) scale(0.85) !important;
+      }
+
+      /* Safe area insets for notched phones & iPhone home bar */
       .controls-bottom {
-        bottom: 12px;
-        left: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+        left: calc(12px + env(safe-area-inset-left, 0px)) !important;
       }
       .touch-slider-steer {
-        bottom: 12px;
-        right: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+        right: calc(12px + env(safe-area-inset-right, 0px)) !important;
       }
       .mobile-action-bar {
-        right: 12px;
-        bottom: 110px;
+        right: calc(12px + env(safe-area-inset-right, 0px)) !important;
+        bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important;
       }
       .throttle-track {
         width: 66px !important;
@@ -848,6 +866,29 @@
         height: 52px !important;
         font-size: 0.95rem !important;
       }
+
+      /* HIDE MASSIVE DESKTOP KEYBOARD HINTS ON MOBILE */
+      #hint-controls-text,
+      #desktop-controls-hint > div:last-child {
+        display: none !important;
+      }
+      .desktop-hint {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .weapon-rpm-wrap {
+        background: rgba(14, 20, 31, 0.85);
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        width: 140px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      }
+
       .modal-box {
         max-width: 96vw !important;
         max-height: 90vh !important;
@@ -867,6 +908,19 @@
       }
       .bot-card-sub {
         font-size: 0.58rem !important;
+      }
+    }
+
+    @keyframes rotatePhoneAnim {
+      0% { transform: rotate(0deg); }
+      30% { transform: rotate(-90deg); }
+      70% { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    @media (orientation: landscape) {
+      #portrait-rotate-modal {
+        display: none !important;
       }
     }
 
@@ -1067,7 +1121,23 @@
   <div id="canvas-container"></div>
   <div id="damage-vignette"></div>
   <div id="mobile-rotate-banner" class="mobile-rotate-banner hidden">
-    <span>📱 Turn phone to Landscape & Tap here for Fullscreen ⛶</span>
+    <span>📱 Turn phone to Landscape for Full Screen Battle ⛶</span>
+  </div>
+
+  <!-- PORTRAIT ROTATION & IPHONE FULLSCREEN MODAL -->
+  <div id="portrait-rotate-modal" class="overlay-screen hidden" style="z-index: 99999; text-align: center;">
+    <div class="modal-box" style="max-width: 360px; padding: 22px 18px; border-color: rgba(56, 189, 248, 0.45); backdrop-filter: blur(14px);">
+      <div style="font-size: 3rem; margin-bottom: 8px; animation: rotatePhoneAnim 2s infinite ease-in-out;">📲</div>
+      <h2 style="font-size: 1.25rem; color: #38bdf8; margin-bottom: 8px;">ROTATE TO LANDSCAPE</h2>
+      <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
+        For the full-screen arena view & comfortable dual thumb controls, please rotate your phone horizontally.
+      </p>
+      <div style="background: rgba(2, 132, 199, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 10px; font-size: 0.78rem; color: #93c5fd; line-height: 1.4; margin-bottom: 14px; text-align: left;">
+        💡 <strong>iPhone Safari Tip:</strong> Rotating to landscape collapses the URL bar into full screen! Or tap Share (⎋) ➔ <strong>"Add to Home Screen"</strong> to play with zero browser bars like a native app.
+      </div>
+      <button class="action-btn" id="btn-force-fullscreen-rotate" type="button" style="margin-bottom: 8px;">⛶ Go Fullscreen Now</button>
+      <button class="action-btn secondary" id="btn-dismiss-portrait" type="button" style="font-size: 0.86rem; padding: 9px;">Play in Portrait Anyway</button>
+    </div>
   </div>
 
   <!-- MAIN MENU OVERLAY -->
@@ -4002,23 +4072,29 @@
     const p1Tex = createBadgeTexture(p1Title, '#38bdf8', isMirror ? 'CHAMPION' : '');
     const p2Tex = createBadgeTexture(p2Title, '#ef4444', isMirror ? 'RIVAL' : '');
 
+    const isMobile = (window.innerWidth < 768);
+    const badgeScaleX = isMobile ? 2.0 : 3.2;
+    const badgeScaleY = isMobile ? 0.58 : 0.90;
+
     const p1Mat = new THREE.SpriteMaterial({ map: p1Tex, depthTest: false, transparent: true });
     p1BadgeSprite = new THREE.Sprite(p1Mat);
-    p1BadgeSprite.scale.set(3.4, 0.95, 1);
+    p1BadgeSprite.scale.set(badgeScaleX, badgeScaleY, 1);
     scene.add(p1BadgeSprite);
 
     const p2Mat = new THREE.SpriteMaterial({ map: p2Tex, depthTest: false, transparent: true });
     p2BadgeSprite = new THREE.Sprite(p2Mat);
-    p2BadgeSprite.scale.set(3.4, 0.95, 1);
+    p2BadgeSprite.scale.set(badgeScaleX, badgeScaleY, 1);
     scene.add(p2BadgeSprite);
   }
 
   function updateBotBadges() {
+    const isMobile = (window.innerWidth < 768);
+    const badgeYOffset = isMobile ? 1.30 : 1.85;
     if (p1BadgeSprite && playerBot && playerBot.root) {
-      p1BadgeSprite.position.set(playerBot.x, (playerBot.root.position.y || 0) + 1.85, playerBot.z);
+      p1BadgeSprite.position.set(playerBot.x, (playerBot.root.position.y || 0) + badgeYOffset, playerBot.z);
     }
     if (p2BadgeSprite && enemyBot && enemyBot.root) {
-      p2BadgeSprite.position.set(enemyBot.x, (enemyBot.root.position.y || 0) + 1.85, enemyBot.z);
+      p2BadgeSprite.position.set(enemyBot.x, (enemyBot.root.position.y || 0) + badgeYOffset, enemyBot.z);
     }
   }
 
@@ -4572,15 +4648,57 @@
   const rotateBanner = document.getElementById('mobile-rotate-banner');
   if (rotateBanner) rotateBanner.addEventListener('click', requestAppFullscreen);
 
-  // Check orientation on mobile and show landscape suggestion banner in portrait
+  const portraitModal = document.getElementById('portrait-rotate-modal');
+  const btnDismissPortrait = document.getElementById('btn-dismiss-portrait');
+  const btnForceRotateFs = document.getElementById('btn-force-fullscreen-rotate');
+  let portraitDismissed = false;
+
+  if (btnDismissPortrait) {
+    btnDismissPortrait.addEventListener('click', () => {
+      portraitDismissed = true;
+      if (portraitModal) portraitModal.classList.add('hidden');
+    });
+  }
+
+  if (btnForceRotateFs) {
+    btnForceRotateFs.addEventListener('click', () => {
+      requestAppFullscreen();
+      setTimeout(() => {
+        if (portraitModal) portraitModal.classList.add('hidden');
+      }, 500);
+    });
+  }
+
+  // Check orientation on mobile and show landscape suggestion banner/modal in portrait
   function checkMobileOrientation() {
-    if (!rotateBanner) return;
     const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
     const isPortrait = window.innerHeight > window.innerWidth;
-    if (isMobileDevice && isPortrait && !isFullscreenActive()) {
-      rotateBanner.classList.remove('hidden');
-    } else {
-      rotateBanner.classList.add('hidden');
+
+    if (rotateBanner) {
+      if (isMobileDevice && isPortrait && !isFullscreenActive()) {
+        rotateBanner.classList.remove('hidden');
+      } else {
+        rotateBanner.classList.add('hidden');
+      }
+    }
+
+    if (portraitModal) {
+      if (isMobileDevice && isPortrait && !portraitDismissed && !isFullscreenActive()) {
+        portraitModal.classList.remove('hidden');
+      } else {
+        portraitModal.classList.add('hidden');
+      }
+    }
+
+    // Dynamic FOV compensation for portrait mode so arena is never zoomed in or cropped!
+    if (typeof camera !== 'undefined' && camera) {
+      const aspect = window.innerWidth / window.innerHeight;
+      if (aspect < 1.0) {
+        camera.fov = Math.min(82, 50 / aspect);
+      } else {
+        camera.fov = 50;
+      }
+      camera.updateProjectionMatrix();
     }
   }
 
@@ -4947,6 +5065,7 @@
       if (el) el.classList.add('hidden');
     });
     document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
+    if (portraitModal && (window.innerWidth > window.innerHeight || portraitDismissed)) portraitModal.classList.add('hidden');
 
     let botTypeChoice = selectedBotType || 'robot1';
     const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5'];
