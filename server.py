@@ -1,6 +1,6 @@
 """
-Local HTTP Server for សង្វៀងរ៉ូបូត — BATTLEBOTx
-Run this script to serve the game locally with full 3D CAD/model support:
+Local HTTP Server for BATTLEBOTx — AI FARM
+Run this script to serve the game locally:
     python server.py
 """
 import http.server

@@ -97,4 +97,4 @@ python server.py
 This launches a local web server at `http://localhost:8080/index.html` and opens your browser.
 
 ### Method 2: Direct Offline Launch
-Double-click `index.html` or `battlebotx-desktop.html` in your file explorer. All 5 robot 3D models are embedded with offline base64 fallbacks for instant play without any setup.
+Double-click `index.html` in your file explorer. All 5 robot 3D models are embedded with offline base64 fallbacks for instant play without any setup.
