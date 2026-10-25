@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>BATTLEBOTx — AI FARM Combat Robotics</title>
   
   <!-- Khmer & Cyber Typography -->
@@ -679,10 +682,121 @@
       z-index: 20;
     }
 
-    @media (hover: hover) and (pointer: fine) {
-      /* On desktop with mouse/keyboard, hide mobile touch sliders */
-      .slider-wrap {
-        display: none !important;
+    /* ON-SCREEN TOUCH & MOBILE CONTROLS */
+    .slider-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body.hide-touch-controls .slider-wrap,
+    body.hide-touch-controls .touch-slider-steer,
+    body.hide-touch-controls .mobile-action-bar {
+      display: none !important;
+    }
+
+    .mobile-action-bar {
+      position: absolute;
+      right: 24px;
+      bottom: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+      z-index: 22;
+    }
+
+    .mobile-round-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(14, 20, 31, 0.78);
+      border: 2px solid rgba(255, 255, 255, 0.32);
+      color: #ffffff;
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.1s, background 0.15s;
+    }
+
+    .mobile-round-btn:active {
+      transform: scale(0.92);
+      background: rgba(37, 99, 235, 0.85);
+      border-color: #60a5fa;
+    }
+
+    /* Small screens / Phones responsive adjustments */
+    @media (max-width: 768px) {
+      .hud-top-bar {
+        top: 8px;
+        gap: 6px;
+        max-width: 96vw;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .hud-icon-btn {
+        padding: 5px 9px;
+        font-size: 0.72rem;
+      }
+      .timer-pill {
+        padding: 5px 12px;
+        font-size: 0.92rem;
+      }
+      .controls-bottom {
+        bottom: 12px;
+        left: 12px;
+      }
+      .touch-slider-steer {
+        bottom: 12px;
+        right: 12px;
+      }
+      .mobile-action-bar {
+        right: 12px;
+        bottom: 110px;
+      }
+      .throttle-track {
+        width: 66px !important;
+        height: 154px !important;
+      }
+      .steer-track {
+        width: 154px !important;
+        height: 66px !important;
+      }
+      .slider-knob {
+        width: 52px !important;
+        height: 52px !important;
+        font-size: 0.95rem !important;
+      }
+      .modal-box {
+        max-width: 96vw !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+        padding: 14px 10px !important;
+      }
+      .bot-grid {
+        grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)) !important;
+        gap: 6px !important;
+      }
+      .bot-card svg {
+        width: 48px !important;
+        height: 36px !important;
+      }
+      .bot-card-title {
+        font-size: 0.72rem !important;
+      }
+      .bot-card-sub {
+        font-size: 0.58rem !important;
       }
     }
 
@@ -1089,8 +1203,12 @@
   <div id="modal-select" class="overlay-screen hidden">
     <div class="modal-box">
       <div class="modal-header">
-        <h2>SELECT YOUR ROBOT</h2>
+        <h2 id="modal-select-title">SELECT ROBOT</h2>
         <button class="close-btn" id="btn-select-close" type="button">✕</button>
+      </div>
+
+      <div id="p1-select-label" style="font-size: 0.82rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.08em; margin-bottom: 6px; text-transform: uppercase;">
+        PLAYER 1 ROBOT
       </div>
 
       <!-- 5 Selectable Robot Cards -->
@@ -1191,6 +1309,47 @@
         </div>
       </div>
 
+            <!-- OPPONENT / PLAYER 2 SELECTION (Supports picking the same robot for mirror match) -->
+      <div id="opponent-select-section" style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 10px;">
+        <div id="opponent-select-label" style="font-size: 0.82rem; font-weight: 700; color: #f87171; letter-spacing: 0.08em; margin-bottom: 6px; text-transform: uppercase;">
+          OPPONENT ROBOT (SAME ROBOT ALLOWED)
+        </div>
+        <div class="bot-grid" id="p2-bot-selector">
+          <!-- Mini bot choices for P2 / Opponent -->
+          <div class="bot-card" data-p2bot="random">
+            <div class="bot-check">✓</div>
+            <div style="font-size: 1.6rem; padding: 4px 0;">🎲</div>
+            <div class="bot-card-title" style="color:#fbbf24;">Random</div>
+            <div class="bot-card-sub">Any Robot 1-5</div>
+          </div>
+          <div class="bot-card" data-p2bot="robot1">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#60a5fa;">Robot 1</div>
+            <div class="bot-card-sub">Overhead Blade</div>
+          </div>
+          <div class="bot-card selected" data-p2bot="robot2">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#ef4444;">Robot 2</div>
+            <div class="bot-card-sub">Vertical Drum</div>
+          </div>
+          <div class="bot-card" data-p2bot="robot3">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#fbbf24;">Robot 3</div>
+            <div class="bot-card-sub">Underhead Disc</div>
+          </div>
+          <div class="bot-card" data-p2bot="robot4">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#a855f7;">Robot 4</div>
+            <div class="bot-card-sub">Twin Blade</div>
+          </div>
+          <div class="bot-card" data-p2bot="robot5">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#06b6d4;">Robot 5</div>
+            <div class="bot-card-sub">Drum Spinner</div>
+          </div>
+        </div>
+      </div>
+
       <button class="action-btn" id="btn-start-match" type="button">START MATCH &nbsp;➔</button>
     </div>
   </div>
@@ -1205,9 +1364,16 @@
     <div class="hud-top-bar">
       <div class="timer-pill" id="hud-timer">03:00</div>
       <button class="hud-icon-btn" id="btn-pause" type="button" title="Pause Game">II</button>
-      <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam: Follow Direction [C]</button>
+      <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam [C]</button>
       <button class="hud-icon-btn" id="btn-cam-down" type="button" title="Lower Camera">Cam -</button>
       <button class="hud-icon-btn" id="btn-cam-up" type="button" title="Raise Camera">Cam +</button>
+      <button class="hud-icon-btn" id="btn-toggle-touch" type="button" title="Toggle Touch Controls">🎮 Touch</button>
+      <button class="hud-icon-btn" id="btn-fullscreen" type="button" title="Fullscreen Toggle">⛶</button>
+    </div>
+
+    <!-- Mobile Quick Action Buttons (Thumb friendly) -->
+    <div class="mobile-action-bar" id="mobile-action-bar">
+      <button class="mobile-round-btn" id="btn-mobile-cam" type="button" title="Cycle Camera">🎥</button>
     </div>
 
     <!-- Immobilization / Count-Out Referee Banner -->
@@ -3692,8 +3858,118 @@
     return bot;
   }
 
+    // ========================================================
+  // 6.5 FLOATING OVERHEAD 3D BADGES & MIRROR MATCH STYLING
+  // ========================================================
+  let p1BadgeSprite = null;
+  let p2BadgeSprite = null;
+
+  function createBadgeTexture(text, color, subText) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 72;
+    const ctx = canvas.getContext('2d');
+
+    // Rounded pill container
+    ctx.fillStyle = 'rgba(10, 15, 24, 0.88)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(4, 4, 248, 64, 32);
+    } else {
+      ctx.rect(4, 4, 248, 64);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // Main tag text
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 26px Orbitron, sans-serif';
+    ctx.fillStyle = color;
+    ctx.fillText(text, 128, subText ? 26 : 36);
+
+    if (subText) {
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(subText, 128, 52);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function clearBotBadges() {
+    if (p1BadgeSprite) { scene.remove(p1BadgeSprite); p1BadgeSprite = null; }
+    if (p2BadgeSprite) { scene.remove(p2BadgeSprite); p2BadgeSprite = null; }
+  }
+
+  function setupBotBadges() {
+    clearBotBadges();
+    if (!playerBot || !enemyBot) return;
+
+    const isMirror = (playerBot.type === enemyBot.type);
+    let p1Title = 'P1 · BLUE';
+    let p2Title = 'P2 · RED';
+    if (NetworkSys.isOnline) {
+      p1Title = NetworkSys.isHost ? 'P1 · HOST' : 'P2 · GUEST';
+      p2Title = NetworkSys.isHost ? 'P2 · GUEST' : 'P1 · HOST';
+    } else if (gameMode === 'vs_bot') {
+      p1Title = 'P1 · YOU';
+      p2Title = 'AI ENEMY';
+    } else if (gameMode === 'practice') {
+      p1Title = 'P1 · YOU';
+      p2Title = 'DUMMY';
+    }
+
+    const p1Tex = createBadgeTexture(p1Title, '#38bdf8', isMirror ? 'CHAMPION' : '');
+    const p2Tex = createBadgeTexture(p2Title, '#ef4444', isMirror ? 'RIVAL' : '');
+
+    const p1Mat = new THREE.SpriteMaterial({ map: p1Tex, depthTest: false, transparent: true });
+    p1BadgeSprite = new THREE.Sprite(p1Mat);
+    p1BadgeSprite.scale.set(3.4, 0.95, 1);
+    scene.add(p1BadgeSprite);
+
+    const p2Mat = new THREE.SpriteMaterial({ map: p2Tex, depthTest: false, transparent: true });
+    p2BadgeSprite = new THREE.Sprite(p2Mat);
+    p2BadgeSprite.scale.set(3.4, 0.95, 1);
+    scene.add(p2BadgeSprite);
+  }
+
+  function updateBotBadges() {
+    if (p1BadgeSprite && playerBot && playerBot.root) {
+      p1BadgeSprite.position.set(playerBot.x, (playerBot.root.position.y || 0) + 1.85, playerBot.z);
+    }
+    if (p2BadgeSprite && enemyBot && enemyBot.root) {
+      p2BadgeSprite.position.set(enemyBot.x, (enemyBot.root.position.y || 0) + 1.85, enemyBot.z);
+    }
+  }
+
+  function applyMirrorMatchRivalStyle(bot) {
+    if (!bot || !bot.root) return;
+    bot.root.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(mat => {
+          const n = (mat.name || '').toLowerCase();
+          // Tint body frame and armor accents to crimson rival red
+          if (!n.includes('tire') && !n.includes('rubber') && !n.includes('nut') && !n.includes('rim') && !n.includes('steel') && !n.includes('blade')) {
+            if (mat.color) {
+              mat.color.setHex(0xdc2626);
+              if (mat.emissive) mat.emissive.setHex(0x3f0a0a);
+              mat.needsUpdate = true;
+            }
+          }
+        });
+      }
+    });
+  }
+
   function cleanupBots() {
     AudioSys.stopCombatAudio();
+    clearBotBadges();
     if (playerBot) { scene.remove(playerBot.root); playerBot = null; }
     if (enemyBot) { scene.remove(enemyBot.root); enemyBot = null; }
     clearArenaDebris();
@@ -3749,47 +4025,110 @@
   const steerTrack = document.getElementById('steer-track');
   const steerKnob = document.getElementById('steer-knob');
 
-  function updateThrottleFromPointer(clientY) {
+  function updateThrottleFromCoord(clientY) {
     const rect = throttleTrack.getBoundingClientRect();
     const center = rect.top + rect.height / 2;
-    const maxOffset = (rect.height - 44) / 2;
+    const maxOffset = (rect.height - 50) / 2;
     const dy = Math.max(-maxOffset, Math.min(maxOffset, clientY - center));
     sliderThrottleVal = -dy / maxOffset;
+    if (throttleKnob) throttleKnob.style.transform = `translateY(${dy}px)`;
   }
 
-  function updateSteerFromPointer(clientX) {
+  function updateSteerFromCoord(clientX) {
     const rect = steerTrack.getBoundingClientRect();
     const center = rect.left + rect.width / 2;
-    const maxOffset = (rect.width - 44) / 2;
+    const maxOffset = (rect.width - 50) / 2;
     const dx = Math.max(-maxOffset, Math.min(maxOffset, clientX - center));
     sliderSteerVal = dx / maxOffset;
+    if (steerKnob) steerKnob.style.transform = `translateX(${dx}px)`;
   }
 
-  throttleTrack.addEventListener('pointerdown', (e) => {
-    dragThrottle = true;
-    throttleTrack.setPointerCapture(e.pointerId);
-    updateThrottleFromPointer(e.clientY);
-  });
-  throttleTrack.addEventListener('pointermove', (e) => {
-    if (dragThrottle) updateThrottleFromPointer(e.clientY);
-  });
-  throttleTrack.addEventListener('pointerup', () => {
+  function resetThrottle() {
     dragThrottle = false;
     sliderThrottleVal = 0;
+    if (throttleKnob) throttleKnob.style.transform = 'translateY(0px)';
+  }
+
+  function resetSteer() {
+    dragSteer = false;
+    sliderSteerVal = 0;
+    if (steerKnob) steerKnob.style.transform = 'translateX(0px)';
+  }
+
+  // Pointer event listeners (desktop mice & unified pointers)
+  throttleTrack.addEventListener('pointerdown', (e) => {
+    dragThrottle = true;
+    try { throttleTrack.setPointerCapture(e.pointerId); } catch (err) {}
+    updateThrottleFromCoord(e.clientY);
   });
+  throttleTrack.addEventListener('pointermove', (e) => {
+    if (dragThrottle) updateThrottleFromCoord(e.clientY);
+  });
+  throttleTrack.addEventListener('pointerup', resetThrottle);
+  throttleTrack.addEventListener('pointercancel', resetThrottle);
 
   steerTrack.addEventListener('pointerdown', (e) => {
     dragSteer = true;
-    steerTrack.setPointerCapture(e.pointerId);
-    updateSteerFromPointer(e.clientX);
+    try { steerTrack.setPointerCapture(e.pointerId); } catch (err) {}
+    updateSteerFromCoord(e.clientX);
   });
   steerTrack.addEventListener('pointermove', (e) => {
-    if (dragSteer) updateSteerFromPointer(e.clientX);
+    if (dragSteer) updateSteerFromCoord(e.clientX);
   });
-  steerTrack.addEventListener('pointerup', () => {
-    dragSteer = false;
-    sliderSteerVal = 0;
-  });
+  steerTrack.addEventListener('pointerup', resetSteer);
+  steerTrack.addEventListener('pointercancel', resetSteer);
+
+  // Dedicated multi-touch engine for mobile phones & tablets (allows simultaneous drive & steer)
+  let activeThrottleTouchId = null;
+  let activeSteerTouchId = null;
+
+  throttleTrack.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.targetTouches[0];
+    if (t) {
+      activeThrottleTouchId = t.identifier;
+      dragThrottle = true;
+      updateThrottleFromCoord(t.clientY);
+    }
+  }, { passive: false });
+
+  steerTrack.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.targetTouches[0];
+    if (t) {
+      activeSteerTouchId = t.identifier;
+      dragSteer = true;
+      updateSteerFromCoord(t.clientX);
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === activeThrottleTouchId) {
+        updateThrottleFromCoord(t.clientY);
+      }
+      if (t.identifier === activeSteerTouchId) {
+        updateSteerFromCoord(t.clientX);
+      }
+    }
+  }, { passive: false });
+
+  function handleTouchEnd(e) {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === activeThrottleTouchId) {
+        activeThrottleTouchId = null;
+        resetThrottle();
+      }
+      if (t.identifier === activeSteerTouchId) {
+        activeSteerTouchId = null;
+        resetSteer();
+      }
+    }
+  }
+  window.addEventListener('touchend', handleTouchEnd);
+  window.addEventListener('touchcancel', handleTouchEnd);
 
   // ========================================================
   // 8. UI NAVIGATION & MODALS
@@ -3813,6 +4152,7 @@
       } else {
         gameMode = m;
         updateControlsHint();
+        refreshSelectModalLabels();
         modalSelect.classList.remove('hidden');
       }
     });
@@ -3829,10 +4169,32 @@
   let onlineJoinBot = 'robot2';
 
   // 1v1 Mode selection button
+  function refreshSelectModalLabels() {
+    const titleEl = document.getElementById('modal-select-title');
+    const p1Label = document.getElementById('p1-select-label');
+    const oppLabel = document.getElementById('opponent-select-label');
+    if (!titleEl || !p1Label || !oppLabel) return;
+
+    if (gameMode === '1v1') {
+      titleEl.textContent = '1V1 BATTLE · SELECT BOTH ROBOTS';
+      p1Label.textContent = 'PLAYER 1 ROBOT (WASD TO DRIVE)';
+      oppLabel.textContent = 'PLAYER 2 ROBOT (ARROW KEYS TO DRIVE · SAME ROBOT ALLOWED)';
+    } else if (gameMode === 'vs_bot') {
+      titleEl.textContent = 'VS BOT · SELECT YOUR ROBOT';
+      p1Label.textContent = 'YOUR ROBOT';
+      oppLabel.textContent = 'AI OPPONENT ROBOT (SAME ROBOT ALLOWED)';
+    } else if (gameMode === 'practice') {
+      titleEl.textContent = 'PRACTICE ARENA · SELECT ROBOT';
+      p1Label.textContent = 'YOUR ROBOT';
+      oppLabel.textContent = 'TARGET DUMMY ROBOT (SAME ROBOT ALLOWED)';
+    }
+  }
+
   document.getElementById('btn-1v1-local').addEventListener('click', () => {
     gameMode = '1v1';
     modal1v1.classList.add('hidden');
     updateControlsHint();
+    refreshSelectModalLabels();
     modalSelect.classList.remove('hidden');
   });
 
@@ -4001,15 +4363,63 @@
     }
   }
 
-  document.querySelectorAll('.bot-card').forEach(card => {
+  let selectedP2BotType = 'robot2';
+
+  // P1 selection cards
+  document.querySelectorAll('#p1-bot-selector .bot-card').forEach(card => {
     card.addEventListener('click', () => {
       AudioSys.init();
       AudioSys.beep(540, 0.06);
-      document.querySelectorAll('.bot-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#p1-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       selectedBotType = card.dataset.bot;
     });
   });
+
+  // P2 / Opponent selection cards (Allows picking the exact same robot!)
+  document.querySelectorAll('#p2-bot-selector .bot-card').forEach(card => {
+    card.addEventListener('click', () => {
+      AudioSys.init();
+      AudioSys.beep(540, 0.06);
+      document.querySelectorAll('#p2-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedP2BotType = card.dataset.p2bot;
+    });
+  });
+
+  // HUD Touch Controls Toggle
+  const btnToggleTouch = document.getElementById('btn-toggle-touch');
+  let touchControlsActive = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
+  if (!touchControlsActive) {
+    document.body.classList.add('hide-touch-controls');
+    if (btnToggleTouch) btnToggleTouch.textContent = '🎮 Touch: OFF';
+  } else {
+    if (btnToggleTouch) btnToggleTouch.textContent = '🎮 Touch: ON';
+  }
+  if (btnToggleTouch) {
+    btnToggleTouch.addEventListener('click', () => {
+      const isHidden = document.body.classList.toggle('hide-touch-controls');
+      btnToggleTouch.textContent = isHidden ? '🎮 Touch: OFF' : '🎮 Touch: ON';
+    });
+  }
+
+  // Fullscreen button for mobile web
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+    });
+  }
+
+  // Mobile Quick Action camera button
+  const btnMobileCam = document.getElementById('btn-mobile-cam');
+  if (btnMobileCam) {
+    btnMobileCam.addEventListener('click', cycleCameraMode);
+  }
 
   const camBtn = document.getElementById('btn-cam-mode');
   function cycleCameraMode() {
@@ -4364,13 +4774,26 @@
     if (NetworkSys.isOnline) {
       botTypeChoice = NetworkSys.isHost ? NetworkSys.selectedBot : NetworkSys.opponentBot;
       enemyType = NetworkSys.isHost ? NetworkSys.opponentBot : NetworkSys.selectedBot;
+    } else if (gameMode === '1v1') {
+      // Local 1v1: Use selected Player 2 robot (same robot as P1 is fully supported!)
+      enemyType = (selectedP2BotType && selectedP2BotType !== 'random') ? selectedP2BotType : (selectedBotType || 'robot2');
     } else {
-      const availableOpponents = allBots.filter(b => b !== botTypeChoice);
-      enemyType = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
+      // VS Bot or Practice: Use picked opponent or pick randomly from ALL 5 robots (including mirror match!)
+      if (selectedP2BotType && selectedP2BotType !== 'random' && allBots.includes(selectedP2BotType)) {
+        enemyType = selectedP2BotType;
+      } else {
+        enemyType = allBots[Math.floor(Math.random() * allBots.length)];
+      }
     }
 
     playerBot = createBotInstance(botTypeChoice, 0, 7.5, Math.PI);
     enemyBot = createBotInstance(enemyType, 0, -7.5, 0);
+
+    // If mirror match (same robot), give the opponent a distinct rival red livery
+    if (playerBot.type === enemyBot.type) {
+      applyMirrorMatchRivalStyle(enemyBot);
+    }
+    setupBotBadges();
 
     // Immediately attach high-res CAD models
     if (playerBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(playerBot);
@@ -5762,6 +6185,7 @@
 
     updateArenaWallTransparency(dt);
     updateCamera(dt);
+    updateBotBadges();
     renderer.render(scene, camera);
   }
 
