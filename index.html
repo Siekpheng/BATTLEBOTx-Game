@@ -28,6 +28,7 @@
   <script src="Robot3_Model.js"></script>
   <script src="Robot4_Model.js"></script>
   <script src="Robot5_Model.js"></script>
+  <script src="Robot6_Model.js"></script>
 
   <style>
     :root {
@@ -1287,6 +1288,10 @@
           <div style="font-size: 1.4rem;">🛡️</div>
           <div class="mini-bot-name">ROBOT 5</div>
         </div>
+        <div class="mini-bot-card" data-bot="robot6">
+          <div style="font-size: 1.4rem;">🌪️</div>
+          <div class="mini-bot-name">ROBOT 6</div>
+        </div>
       </div>
 
       <button class="action-btn secondary" type="button" id="btn-host-cancel" style="width: 100%;">Cancel & Back</button>
@@ -1334,6 +1339,10 @@
           <div style="font-size: 1.4rem;">🛡️</div>
           <div class="mini-bot-name">ROBOT 5</div>
         </div>
+        <div class="mini-bot-card" data-bot="robot6">
+          <div style="font-size: 1.4rem;">🌪️</div>
+          <div class="mini-bot-name">ROBOT 6</div>
+        </div>
       </div>
 
       <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -1356,7 +1365,7 @@
       </div>
 
       <!-- 5 Selectable Robot Cards -->
-      <div class="bot-grid">
+      <div class="bot-grid" id="p1-bot-selector">
         <!-- 1. Robot 1 (Fusion 360 High-Res Combat Bot) -->
         <div class="bot-card selected" data-bot="robot1">
           <div class="bot-check">✓</div>
@@ -1451,6 +1460,29 @@
           <div class="bot-card-title" style="color:#06b6d4;">Robot 5</div>
           <div class="bot-card-sub">380mm · Drum Spinner BlueThunder</div>
         </div>
+
+        <!-- 6. Robot 6 (Vortex - 4WD Heavy Vertical Disc Spinner) -->
+        <div class="bot-card" data-bot="robot6">
+          <div class="bot-check">✓</div>
+          <svg width="68" height="50" viewBox="0 0 88 60">
+            <!-- 4 Wheels -->
+            <rect x="6" y="8" width="8" height="18" rx="2" fill="#111827" stroke="#00f2fe" stroke-width="1.2"/>
+            <rect x="74" y="8" width="8" height="18" rx="2" fill="#111827" stroke="#00f2fe" stroke-width="1.2"/>
+            <rect x="6" y="34" width="8" height="20" rx="2" fill="#111827" stroke="#00f2fe" stroke-width="1.2"/>
+            <rect x="74" y="34" width="8" height="20" rx="2" fill="#111827" stroke="#00f2fe" stroke-width="1.2"/>
+            <!-- Main Chassis Body -->
+            <rect x="18" y="14" width="52" height="38" rx="4" fill="#0f172a" stroke="#00f2fe" stroke-width="1.8"/>
+            <!-- Front Wedges -->
+            <polygon points="24,14 34,14 30,4" fill="#00f2fe"/>
+            <polygon points="54,14 64,14 58,4" fill="#00f2fe"/>
+            <!-- Heavy Vertical Disc & Orange Drum Hub -->
+            <rect x="36" y="10" width="16" height="22" rx="3" fill="#ea580c" stroke="#f97316" stroke-width="1.5"/>
+            <rect x="41" y="2" width="6" height="38" rx="2" fill="#00f2fe" stroke="#ffffff" stroke-width="1.2"/>
+            <circle cx="44" cy="21" r="3.5" fill="#f97316"/>
+          </svg>
+          <div class="bot-card-title" style="color:#00f2fe;">Robot 6</div>
+          <div class="bot-card-sub">420mm · Heavy Disc Vortex</div>
+        </div>
       </div>
 
             <!-- OPPONENT / PLAYER 2 SELECTION (Supports picking the same robot for mirror match) -->
@@ -1464,7 +1496,7 @@
             <div class="bot-check">✓</div>
             <div style="font-size: 1.6rem; padding: 4px 0;">🎲</div>
             <div class="bot-card-title" style="color:#fbbf24;">Random</div>
-            <div class="bot-card-sub">Any Robot 1-5</div>
+            <div class="bot-card-sub">Any Robot 1-6</div>
           </div>
           <div class="bot-card" data-p2bot="robot1">
             <div class="bot-check">✓</div>
@@ -1490,6 +1522,11 @@
             <div class="bot-check">✓</div>
             <div class="bot-card-title" style="color:#06b6d4;">Robot 5</div>
             <div class="bot-card-sub">Drum Spinner</div>
+          </div>
+          <div class="bot-card" data-p2bot="robot6">
+            <div class="bot-check">✓</div>
+            <div class="bot-card-title" style="color:#00f2fe;">Robot 6</div>
+            <div class="bot-card-sub">Heavy Disc</div>
           </div>
         </div>
       </div>
@@ -3214,6 +3251,7 @@
   let robot3ModelScene = null;
   let robot4ModelScene = null;
   let robot5ModelScene = null;
+  let robot6ModelScene = null;
 
   function loadRobot3HighRes() {
     if (typeof THREE.GLTFLoader === 'undefined') return;
@@ -3323,6 +3361,44 @@
   loadRobot3HighRes();
   loadRobot4HighRes();
   loadRobot5HighRes();
+  loadRobot6HighRes();
+
+  function loadRobot6HighRes() {
+    if (typeof THREE.GLTFLoader === 'undefined') return;
+    const loader = new THREE.GLTFLoader();
+
+    function onLoaded(gltf) {
+      robot6ModelScene = gltf.scene;
+      robot6ModelScene.traverse(obj => {
+        if (obj.isMesh) {
+          optimizeRobotMaterial(obj);
+          obj.castShadow = true;
+          obj.receiveShadow = false;
+        }
+      });
+      console.log('✅ High-Resolution Autodesk Fusion Robot 6 loaded successfully!');
+      if (playerBot && playerBot.type === 'robot6') attachCadToBot(playerBot, 'robot6');
+      if (enemyBot && enemyBot.type === 'robot6') attachCadToBot(enemyBot, 'robot6');
+    }
+
+    if (window.ROBOT6_GLB_BASE64) {
+      try {
+        const binStr = atob(window.ROBOT6_GLB_BASE64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+        loader.parse(bytes.buffer, '', onLoaded);
+        return;
+      } catch (e) {
+        console.warn('Robot 6 Base64 parse error, falling back to file load:', e);
+      }
+    }
+
+    loader.load('./models/Robot6.glb', onLoaded, undefined, () => {
+      loader.load('models/Robot6.glb', onLoaded, undefined, () => {});
+    });
+  }
+
+  
 
   function getBotScene(type) {
     if (type === 'robot1') return robot1ModelScene;
@@ -3330,6 +3406,7 @@
     if (type === 'robot3') return robot3ModelScene;
     if (type === 'robot4') return robot4ModelScene;
     if (type === 'robot5') return robot5ModelScene;
+    if (type === 'robot6') return robot6ModelScene;
     return null;
   }
 
@@ -3365,6 +3442,7 @@
   function attachCadToRobot3(bot) { attachCadToBot(bot, 'robot3'); }
   function attachCadToRobot4(bot) { attachCadToBot(bot, 'robot4'); }
   function attachCadToRobot5(bot) { attachCadToBot(bot, 'robot5'); }
+  function attachCadToRobot6(bot) { attachCadToBot(bot, 'robot6'); }
 
   // ========================================================
   // 4. ROBOT BUILDER & DETACHABLE ARMOR PLATES
@@ -3962,7 +4040,7 @@
   Object.defineProperty(window, 'detachedDebris', { get: () => detachedDebris, configurable: true });
   window.detachWheel = (bot, impactDir, hitPoint) => detachWheel(bot, impactDir, hitPoint);
   window.detachArmorPiece = (bot, impactDir, hitPoint) => detachArmorPiece(bot, impactDir, hitPoint);
-  window.startMatch = () => startMatch();
+  window.startMatch = () => startMatchSequence();
 
   function createBotInstance(type, x, z, yaw) {
     const built = createRobotMesh(type);
@@ -5068,7 +5146,7 @@
     if (portraitModal && (window.innerWidth > window.innerHeight || portraitDismissed)) portraitModal.classList.add('hidden');
 
     let botTypeChoice = selectedBotType || 'robot1';
-    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5'];
+    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
 
     let enemyType;
@@ -5102,12 +5180,14 @@
     if (playerBot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(playerBot);
     if (playerBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(playerBot);
     if (playerBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(playerBot);
+    if (playerBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(playerBot);
 
     if (enemyBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(enemyBot);
     if (enemyBot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(enemyBot);
     if (enemyBot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(enemyBot);
     if (enemyBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(enemyBot);
     if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
+    if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
 
     matchTimeRemaining = 180;
     updateTimerDisplay();
@@ -5463,7 +5543,7 @@
       } else if (bot.type === 'robot3') {
         // Robot 3: Horizontal blade spinner rotates around vertical Y axis
         bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
-      } else if (bot.type === 'robot4' || bot.type === 'robot5') {
+      } else if (bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6') {
         // Robot 4 & 5: Vertical drum / disc spinner rotates around horizontal X axis
         bot.weaponMesh.rotation.x += bot.weaponSpinSpeed * dt;
       } else {
@@ -6085,6 +6165,7 @@
       if (bot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(bot);
       if (bot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(bot);
       if (bot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(bot);
+      if (bot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(bot);
     }
   }
 
