@@ -6,6 +6,9 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#080c12" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <title>BATTLEBOTx — AI FARM Combat Robotics</title>
   
   <!-- Khmer & Cyber Typography -->
@@ -54,16 +57,23 @@
     html, body {
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
+      position: fixed;
+      inset: 0;
       background-color: var(--bg-dark);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: var(--text-main);
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
     }
 
     #app {
       position: relative;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
       overflow: hidden;
     }
 
@@ -730,6 +740,66 @@
       transition: transform 0.1s, background 0.15s;
     }
 
+        .menu-fullscreen-btn {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #38bdf8;
+      border-radius: 9999px;
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      z-index: 35;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .menu-fullscreen-btn:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: #38bdf8;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .mobile-rotate-banner {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.95), rgba(30, 58, 138, 0.95));
+      border: 1px solid rgba(125, 211, 252, 0.6);
+      color: #ffffff;
+      padding: 9px 18px;
+      border-radius: 9999px;
+      font-size: 0.80rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 99999;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+      cursor: pointer;
+      animation: pulseAlert 1.2s infinite alternate ease-in-out;
+      max-width: 92vw;
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    @media (orientation: landscape) {
+      .mobile-rotate-banner {
+        display: none !important;
+      }
+    }
+
     .mobile-round-btn:active {
       transform: scale(0.92);
       background: rgba(37, 99, 235, 0.85);
@@ -996,9 +1066,13 @@
 <div id="app">
   <div id="canvas-container"></div>
   <div id="damage-vignette"></div>
+  <div id="mobile-rotate-banner" class="mobile-rotate-banner hidden">
+    <span>📱 Turn phone to Landscape & Tap here for Fullscreen ⛶</span>
+  </div>
 
   <!-- MAIN MENU OVERLAY -->
   <div id="menu-screen" class="overlay-screen">
+    <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
     <div class="menu-card">
       <h1 class="menu-title">BATTLEBOTx</h1>
 
@@ -1373,6 +1447,7 @@
 
     <!-- Mobile Quick Action Buttons (Thumb friendly) -->
     <div class="mobile-action-bar" id="mobile-action-bar">
+      <button class="mobile-round-btn" id="btn-mobile-fs" type="button" title="Toggle Fullscreen">⛶</button>
       <button class="mobile-round-btn" id="btn-mobile-cam" type="button" title="Cycle Camera">🎥</button>
     </div>
 
@@ -4144,6 +4219,7 @@
 
   document.querySelectorAll('.menu-actions .mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      autoFullscreenOnMobile();
       AudioSys.init();
       AudioSys.beep(620, 0.08);
       const m = btn.dataset.mode;
@@ -4403,16 +4479,121 @@
     });
   }
 
-  // Fullscreen button for mobile web
-  const btnFullscreen = document.getElementById('btn-fullscreen');
-  if (btnFullscreen) {
-    btnFullscreen.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  // ========================================================
+  // UNIVERSAL MOBILE FULLSCREEN & LANDSCAPE ENGINE
+  // ========================================================
+  function isFullscreenActive() {
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  }
+
+  function requestAppFullscreen() {
+    const docEl = document.documentElement;
+    const req = docEl.requestFullscreen ||
+                docEl.webkitRequestFullscreen ||
+                docEl.webkitRequestFullScreen ||
+                docEl.mozRequestFullScreen ||
+                docEl.msRequestFullscreen;
+
+    if (req) {
+      try {
+        const p = req.call(docEl);
+        if (p && p.catch) p.catch(() => {});
+      } catch (err) {}
+    }
+
+    // Attempt to lock into landscape orientation on mobile
+    if (screen.orientation && screen.orientation.lock) {
+      try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}
+    } else if (screen.lockOrientation) {
+      try { screen.lockOrientation('landscape'); } catch (e) {}
+    }
+
+    // iOS Safari / Mobile address bar scroll trick
+    setTimeout(() => {
+      window.scrollTo(0, 1);
+      if (typeof renderer !== 'undefined' && renderer && typeof camera !== 'undefined' && camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
       }
-    });
+    }, 250);
+
+    updateFullscreenButtonText();
+  }
+
+  function exitAppFullscreen() {
+    const exit = document.exitFullscreen ||
+                 document.webkitExitFullscreen ||
+                 document.mozCancelFullScreen ||
+                 document.msExitFullscreen;
+    if (exit) {
+      try {
+        const p = exit.call(document);
+        if (p && p.catch) p.catch(() => {});
+      } catch (err) {}
+    }
+    updateFullscreenButtonText();
+  }
+
+  function toggleAppFullscreen() {
+    if (isFullscreenActive()) {
+      exitAppFullscreen();
+    } else {
+      requestAppFullscreen();
+    }
+  }
+
+  function updateFullscreenButtonText() {
+    const active = isFullscreenActive();
+    const btnMenu = document.getElementById('btn-menu-fullscreen');
+    if (btnMenu) btnMenu.textContent = active ? '✕ Exit Fullscreen' : '⛶ Fullscreen (Landscape)';
+    const btnHud = document.getElementById('btn-fullscreen');
+    if (btnHud) btnHud.textContent = active ? '✕ Exit' : '⛶';
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenButtonText);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButtonText);
+
+  // Hook up all fullscreen buttons
+  const btnMenuFs = document.getElementById('btn-menu-fullscreen');
+  if (btnMenuFs) btnMenuFs.addEventListener('click', toggleAppFullscreen);
+
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  if (btnFullscreen) btnFullscreen.addEventListener('click', toggleAppFullscreen);
+
+  const btnMobileFs = document.getElementById('btn-mobile-fs');
+  if (btnMobileFs) btnMobileFs.addEventListener('click', toggleAppFullscreen);
+
+  const rotateBanner = document.getElementById('mobile-rotate-banner');
+  if (rotateBanner) rotateBanner.addEventListener('click', requestAppFullscreen);
+
+  // Check orientation on mobile and show landscape suggestion banner in portrait
+  function checkMobileOrientation() {
+    if (!rotateBanner) return;
+    const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
+    const isPortrait = window.innerHeight > window.innerWidth;
+    if (isMobileDevice && isPortrait && !isFullscreenActive()) {
+      rotateBanner.classList.remove('hidden');
+    } else {
+      rotateBanner.classList.add('hidden');
+    }
+  }
+
+  window.addEventListener('resize', checkMobileOrientation);
+  window.addEventListener('orientationchange', checkMobileOrientation);
+  checkMobileOrientation();
+
+  // Auto-trigger fullscreen on first mobile tap when launching any game mode
+  function autoFullscreenOnMobile() {
+    const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
+    if (isMobileDevice && !isFullscreenActive()) {
+      requestAppFullscreen();
+    }
   }
 
   // Mobile Quick Action camera button
@@ -4467,6 +4648,7 @@
   });
 
   document.getElementById('btn-start-match').addEventListener('click', () => {
+    autoFullscreenOnMobile();
     modalSelect.classList.add('hidden');
     menuScreen.classList.add('hidden');
     startMatchSequence();
