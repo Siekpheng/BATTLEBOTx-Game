@@ -1,0 +1,17 @@
+# Raw 3D mesh CAD source files (already converted to GLB & Model.js)
+*.obj
+*.mtl
+*.stl
+models/*.obj
+models/*.mtl
+
+# Python build and scratch scripts
+__pycache__/
+*.pyc
+build_optimized_robot2.py
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
