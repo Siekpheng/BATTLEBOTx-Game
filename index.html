@@ -22,13 +22,7 @@
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
-  <!-- High-Resolution Autodesk Fusion Robot Models (100% Offline Compatible) -->
-  <script src="Robot1_Model.js"></script>
-  <script src="Robot2_Model.js"></script>
-  <script src="Robot3_Model.js"></script>
-  <script src="Robot4_Model.js"></script>
-  <script src="Robot5_Model.js"></script>
-  <script src="Robot6_Model.js"></script>
+  <!-- Fast High-Resolution Autodesk Fusion Robot Models (Streamed on demand) -->
 
   <style>
     :root {
@@ -1115,6 +1109,76 @@
     #modal-pause {
       z-index: 25;
     }
+
+    /* Match Loading Overlay for CAD Telemetry Streaming */
+    #match-loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 28;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 12, 18, 0.90);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #match-loading-overlay.hidden {
+      display: none !important;
+    }
+    .match-loading-card {
+      width: 90%;
+      max-width: 440px;
+      padding: 32px 26px;
+      background: rgba(15, 22, 34, 0.96);
+      border: 1px solid rgba(59, 130, 246, 0.45);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85), 0 0 30px rgba(59, 130, 246, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .match-loading-spinner {
+      width: 46px;
+      height: 46px;
+      border: 4px solid rgba(59, 130, 246, 0.2);
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: mlSpin 0.85s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes mlSpin {
+      to { transform: rotate(360deg); }
+    }
+    .match-loading-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: #f8fafc;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .match-loading-status {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      font-family: monospace;
+      margin-bottom: 16px;
+    }
+    .match-loading-bar-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .match-loading-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #06b6d4, #10b981);
+      box-shadow: 0 0 12px rgba(6, 182, 212, 0.65);
+      transition: width 0.15s ease-out;
+    }
   </style>
 </head>
 <body>
@@ -1532,6 +1596,18 @@
       </div>
 
       <button class="action-btn" id="btn-start-match" type="button">START MATCH &nbsp;➔</button>
+    </div>
+  </div>
+
+  <!-- COMBAT BOTS STREAMING / MATCH LOADING OVERLAY -->
+  <div id="match-loading-overlay" class="hidden">
+    <div class="match-loading-card">
+      <div class="match-loading-spinner"></div>
+      <div class="match-loading-title">DEPLOYING COMBAT BOTS</div>
+      <div class="match-loading-status" id="match-loading-status">Streaming high-precision CAD telemetry... 0%</div>
+      <div class="match-loading-bar-track">
+        <div class="match-loading-bar-fill" id="match-loading-bar-fill"></div>
+      </div>
     </div>
   </div>
 
@@ -3055,49 +3131,11 @@
     console.log('✅ Extracted Robot 1 Big Rear Wheels (Wheel_Rear_L & Wheel_Rear_R) successfully with stationary chassis frame!');
   }
 
-  function loadRobot1HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
-
-    function onLoaded(gltf) {
-      robot1ModelScene = gltf.scene;
-      extractRobot1RearWheels(robot1ModelScene);
-      robot1ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          optimizeRobotMaterial(obj);
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 1 loaded successfully!');
-
-      if (playerBot && playerBot.type === 'robot1') attachCadToRobot1(playerBot);
-      if (enemyBot && enemyBot.type === 'robot1') attachCadToRobot1(enemyBot);
-    }
-
-    // 1. Direct In-Memory Base64 from Robot1_Model.js (100% offline & file:/// safe)
-    if (window.ROBOT1_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT1_GLB_BASE64);
-        const len = binStr.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binStr.charCodeAt(i);
-        }
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Base64 parse error, falling back to file load:', e);
-      }
-    }
-
-    // 2. Local GLB file fallback
-    loader.load('./models/Robot1.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot1.glb', onLoaded, undefined, () => {});
-    });
-  }
-
-  loadRobot1HighRes();
-
   let robot2ModelScene = null;
+  let robot3ModelScene = null;
+  let robot4ModelScene = null;
+  let robot5ModelScene = null;
+  let robot6ModelScene = null;
 
   function attachCadToRobot2(bot) {
     if (!robot2ModelScene || !bot || !bot.tiltGroup || bot.cadAttached) return;
@@ -3204,200 +3242,152 @@
     console.log('✅ Extracted Robot 2 Static Drive Belts successfully!');
   }
 
-  function loadRobot2HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
+  const botModelScenes = {
+    robot1: null,
+    robot2: null,
+    robot3: null,
+    robot4: null,
+    robot5: null,
+    robot6: null
+  };
+  const botLoadingPromises = {};
 
-    function onLoaded(gltf) {
-      robot2ModelScene = gltf.scene;
-      extractRobot2RearBelts(robot2ModelScene);
-      robot2ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          obj.castShadow = true;
-          obj.receiveShadow = false;
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 2 loaded successfully!');
-
-      if (playerBot && playerBot.type === 'robot2') attachCadToRobot2(playerBot);
-      if (enemyBot && enemyBot.type === 'robot2') attachCadToRobot2(enemyBot);
+  function ensureBotModelLoaded(type, onProgress) {
+    if (!type) return Promise.resolve(null);
+    if (getBotScene(type)) {
+      if (onProgress) onProgress(1.0);
+      return Promise.resolve(getBotScene(type));
+    }
+    if (botLoadingPromises[type]) {
+      return botLoadingPromises[type];
     }
 
-    // 1. Direct In-Memory Base64 from Robot2_Model.js (100% offline & file:/// safe)
-    if (window.ROBOT2_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT2_GLB_BASE64);
-        const len = binStr.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binStr.charCodeAt(i);
-        }
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Robot 2 Base64 parse error, falling back to file load:', e);
+    const botNum = type.replace('robot', '');
+    const promise = new Promise((resolve) => {
+      if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') {
+        console.warn('THREE.GLTFLoader not ready');
+        return resolve(null);
       }
-    }
+      const loader = new THREE.GLTFLoader();
 
-    // 2. Local GLB file fallback
-    loader.load('./models/Robot2.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot2.glb', onLoaded, undefined, () => {});
+      function onLoaded(gltf) {
+        const scene = gltf.scene;
+        if (type === 'robot1') {
+          extractRobot1RearWheels(scene);
+        } else if (type === 'robot2') {
+          extractRobot2RearBelts(scene);
+        }
+        scene.traverse(obj => {
+          if (obj.isMesh) {
+            optimizeRobotMaterial(obj);
+            obj.castShadow = true;
+            obj.receiveShadow = false;
+          }
+        });
+
+        if (type === 'robot1') robot1ModelScene = scene;
+        else if (type === 'robot2') robot2ModelScene = scene;
+        else if (type === 'robot3') robot3ModelScene = scene;
+        else if (type === 'robot4') robot4ModelScene = scene;
+        else if (type === 'robot5') robot5ModelScene = scene;
+        else if (type === 'robot6') robot6ModelScene = scene;
+        botModelScenes[type] = scene;
+
+        console.log(`✅ High-Resolution Autodesk Fusion Robot ${botNum} loaded successfully!`);
+
+        if (playerBot && playerBot.type === type && typeof attachCadToBot === 'function') {
+          attachCadToBot(playerBot, type);
+        }
+        if (enemyBot && enemyBot.type === type && typeof attachCadToBot === 'function') {
+          attachCadToBot(enemyBot, type);
+        }
+
+        if (onProgress) onProgress(1.0);
+        resolve(scene);
+      }
+
+      function tryParseBase64() {
+        const b64 = window[`ROBOT${botNum}_GLB_BASE64`];
+        if (b64) {
+          try {
+            const binStr = atob(b64);
+            const len = binStr.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+            loader.parse(bytes.buffer, '', onLoaded, (err) => {
+              console.warn(`Base64 parse error for Robot ${botNum}:`, err);
+              resolve(null);
+            });
+            return true;
+          } catch (e) {
+            console.warn(`Base64 decode error for Robot ${botNum}:`, e);
+          }
+        }
+        return false;
+      }
+
+      if (tryParseBase64()) return;
+
+      const isFileProtocol = window.location.protocol === 'file:';
+
+      if (isFileProtocol) {
+        const script = document.createElement('script');
+        script.src = `Robot${botNum}_Model.js`;
+        script.onload = () => {
+          if (!tryParseBase64()) resolve(null);
+        };
+        script.onerror = (e) => {
+          console.warn(`Failed to inject Robot${botNum}_Model.js offline:`, e);
+          resolve(null);
+        };
+        document.head.appendChild(script);
+        return;
+      }
+
+      const modelPath = `./models/Robot${botNum}.glb`;
+      loader.load(
+        modelPath,
+        onLoaded,
+        (xhr) => {
+          if (xhr && xhr.lengthComputable && xhr.total > 0 && onProgress) {
+            onProgress(Math.min(0.99, xhr.loaded / xhr.total));
+          }
+        },
+        (err) => {
+          console.warn(`Primary load failed for ${modelPath}, trying fallback path...`, err);
+          loader.load(
+            `models/Robot${botNum}.glb`,
+            onLoaded,
+            (xhr) => {
+              if (xhr && xhr.lengthComputable && xhr.total > 0 && onProgress) {
+                onProgress(Math.min(0.99, xhr.loaded / xhr.total));
+              }
+            },
+            (err2) => {
+              console.warn(`Fallback binary load failed for Robot ${botNum}:`, err2);
+              const script = document.createElement('script');
+              script.src = `Robot${botNum}_Model.js`;
+              script.onload = () => {
+                if (!tryParseBase64()) resolve(null);
+              };
+              script.onerror = () => resolve(null);
+              document.head.appendChild(script);
+            }
+          );
+        }
+      );
     });
+
+    botLoadingPromises[type] = promise;
+    return promise;
   }
 
-  loadRobot2HighRes();
-
-  let robot3ModelScene = null;
-  let robot4ModelScene = null;
-  let robot5ModelScene = null;
-  let robot6ModelScene = null;
-
-  function loadRobot3HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
-
-    function onLoaded(gltf) {
-      robot3ModelScene = gltf.scene;
-      robot3ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          optimizeRobotMaterial(obj);
-          obj.castShadow = true;
-          obj.receiveShadow = false;
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 3 loaded successfully!');
-      if (playerBot && playerBot.type === 'robot3') attachCadToBot(playerBot, 'robot3');
-      if (enemyBot && enemyBot.type === 'robot3') attachCadToBot(enemyBot, 'robot3');
-    }
-
-    if (window.ROBOT3_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT3_GLB_BASE64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Robot 3 Base64 parse error, falling back to file load:', e);
-      }
-    }
-
-    loader.load('./models/Robot3.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot3.glb', onLoaded, undefined, () => {});
-    });
-  }
-
-  function loadRobot4HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
-
-    function onLoaded(gltf) {
-      robot4ModelScene = gltf.scene;
-      robot4ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          optimizeRobotMaterial(obj);
-          obj.castShadow = true;
-          obj.receiveShadow = false;
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 4 loaded successfully!');
-      if (playerBot && playerBot.type === 'robot4') attachCadToBot(playerBot, 'robot4');
-      if (enemyBot && enemyBot.type === 'robot4') attachCadToBot(enemyBot, 'robot4');
-    }
-
-    if (window.ROBOT4_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT4_GLB_BASE64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Robot 4 Base64 parse error, falling back to file load:', e);
-      }
-    }
-
-    loader.load('./models/Robot4.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot4.glb', onLoaded, undefined, () => {});
-    });
-  }
-
-  function loadRobot5HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
-
-    function onLoaded(gltf) {
-      robot5ModelScene = gltf.scene;
-      robot5ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          optimizeRobotMaterial(obj);
-          obj.castShadow = true;
-          obj.receiveShadow = false;
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 5 loaded successfully!');
-      if (playerBot && playerBot.type === 'robot5') attachCadToBot(playerBot, 'robot5');
-      if (enemyBot && enemyBot.type === 'robot5') attachCadToBot(enemyBot, 'robot5');
-    }
-
-    if (window.ROBOT5_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT5_GLB_BASE64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Robot 5 Base64 parse error, falling back to file load:', e);
-      }
-    }
-
-    loader.load('./models/Robot5.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot5.glb', onLoaded, undefined, () => {});
-    });
-  }
-
-  loadRobot3HighRes();
-  loadRobot4HighRes();
-  loadRobot5HighRes();
-  loadRobot6HighRes();
-
-  function loadRobot6HighRes() {
-    if (typeof THREE.GLTFLoader === 'undefined') return;
-    const loader = new THREE.GLTFLoader();
-
-    function onLoaded(gltf) {
-      robot6ModelScene = gltf.scene;
-      robot6ModelScene.traverse(obj => {
-        if (obj.isMesh) {
-          optimizeRobotMaterial(obj);
-          obj.castShadow = true;
-          obj.receiveShadow = false;
-        }
-      });
-      console.log('✅ High-Resolution Autodesk Fusion Robot 6 loaded successfully!');
-      if (playerBot && playerBot.type === 'robot6') attachCadToBot(playerBot, 'robot6');
-      if (enemyBot && enemyBot.type === 'robot6') attachCadToBot(enemyBot, 'robot6');
-    }
-
-    if (window.ROBOT6_GLB_BASE64) {
-      try {
-        const binStr = atob(window.ROBOT6_GLB_BASE64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        loader.parse(bytes.buffer, '', onLoaded);
-        return;
-      } catch (e) {
-        console.warn('Robot 6 Base64 parse error, falling back to file load:', e);
-      }
-    }
-
-    loader.load('./models/Robot6.glb', onLoaded, undefined, () => {
-      loader.load('models/Robot6.glb', onLoaded, undefined, () => {});
-    });
-  }
-
-  
+  function loadRobot1HighRes() { return ensureBotModelLoaded('robot1'); }
+  function loadRobot2HighRes() { return ensureBotModelLoaded('robot2'); }
+  function loadRobot3HighRes() { return ensureBotModelLoaded('robot3'); }
+  function loadRobot4HighRes() { return ensureBotModelLoaded('robot4'); }
+  function loadRobot5HighRes() { return ensureBotModelLoaded('robot5'); }
+  function loadRobot6HighRes() { return ensureBotModelLoaded('robot6'); }
 
   function getBotScene(type) {
     if (type === 'robot1') return robot1ModelScene;
@@ -4602,6 +4592,9 @@
       document.querySelectorAll('#p1-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       selectedBotType = card.dataset.bot;
+      if (selectedBotType && typeof ensureBotModelLoaded === 'function') {
+        ensureBotModelLoaded(selectedBotType);
+      }
     });
   });
 
@@ -4613,7 +4606,18 @@
       document.querySelectorAll('#p2-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       selectedP2BotType = card.dataset.p2bot;
+      if (selectedP2BotType && selectedP2BotType !== 'random' && typeof ensureBotModelLoaded === 'function') {
+        ensureBotModelLoaded(selectedP2BotType);
+      }
     });
+  // Idle preloader: seamlessly stream default combatants (Robot 1 & 2) in background after menu renders
+  setTimeout(() => {
+    if (typeof ensureBotModelLoaded === 'function') {
+      ensureBotModelLoaded('robot1');
+      setTimeout(() => ensureBotModelLoaded('robot2'), 800);
+    }
+  }, 1500);
+
   });
 
   // HUD Touch Controls Toggle
@@ -5129,7 +5133,7 @@
     }
   };
 
-  function startMatchSequence() {
+  async function startMatchSequence() {
     AudioSys.init();
     cleanupBots();
 
@@ -5162,6 +5166,33 @@
       } else {
         enemyType = allBots[Math.floor(Math.random() * allBots.length)];
       }
+    }
+
+    // High-precision on-demand model streaming with live progress overlay
+    const p1Ready = !!getBotScene(botTypeChoice);
+    const p2Ready = !!getBotScene(enemyType);
+
+    if (!p1Ready || !p2Ready) {
+      const loadingOverlay = document.getElementById('match-loading-overlay');
+      const loadingBar = document.getElementById('match-loading-bar-fill');
+      const loadingStatus = document.getElementById('match-loading-status');
+      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+
+      let prog1 = p1Ready ? 1.0 : 0;
+      let prog2 = p2Ready ? 1.0 : 0;
+      const updateProgressDisplay = () => {
+        const pct = Math.round(((prog1 + prog2) / 2) * 100);
+        if (loadingBar) loadingBar.style.width = pct + '%';
+        if (loadingStatus) loadingStatus.textContent = `Streaming high-precision CAD telemetry... ${pct}%`;
+      };
+      updateProgressDisplay();
+
+      await Promise.all([
+        ensureBotModelLoaded(botTypeChoice, (p) => { prog1 = p; updateProgressDisplay(); }),
+        ensureBotModelLoaded(enemyType, (p) => { prog2 = p; updateProgressDisplay(); })
+      ]);
+
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
     }
 
     playerBot = createBotInstance(botTypeChoice, 0, 7.5, Math.PI);
