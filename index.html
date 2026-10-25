@@ -12,6 +12,8 @@
   
   <!-- Three.js r128 Core + GLTF Loader -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- PeerJS WebRTC P2P Library for Online 1v1 Room Codes -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
   <!-- High-Resolution Autodesk Fusion Robot Models (100% Offline Compatible) -->
@@ -268,6 +270,72 @@
       border: 1px solid rgba(255,255,255,0.16);
       color: #f8fafc;
       letter-spacing: 0.6px;
+    }
+
+    .room-input {
+      width: 100%;
+      padding: 14px 18px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Orbitron', monospace;
+      font-size: 1.5rem;
+      letter-spacing: 0.25em;
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .room-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+    .room-code-display {
+      font-family: 'Orbitron', monospace;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: 0.25em;
+      color: #38bdf8;
+      text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+      padding: 14px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px dashed rgba(56, 189, 248, 0.45);
+      border-radius: 14px;
+      text-align: center;
+      margin: 12px 0;
+      user-select: all;
+    }
+    .mini-bot-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .mini-bot-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 8px 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .mini-bot-card:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    .mini-bot-card.selected {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+    .mini-bot-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-top: 4px;
     }
 
     .modal-box {
@@ -885,25 +953,135 @@
 
   <!-- 1V1 SUBMENU MODAL -->
   <div id="modal-1v1" class="overlay-screen hidden">
-    <div class="modal-box" style="max-width: 440px;">
+    <div class="modal-box" style="max-width: 480px;">
       <div class="modal-header">
-        <h2>1V1 BATTLE</h2>
+        <h2>1V1 BATTLE MODE</h2>
+        <button class="close-btn" id="btn-1v1-close" type="button">✕</button>
       </div>
-      <button class="mode-btn primary" type="button" id="btn-1v1-create">
+      <button class="mode-btn primary" type="button" id="btn-1v1-local">
         <div class="mode-btn-text">
-          <strong>Local 2-Player (Same Keyboard)</strong>
-          <small>WASD vs ARROW KEYS</small>
+          <strong>Local 2-Player</strong>
+          <small>SAME KEYBOARD · WASD VS ARROWS</small>
         </div>
         <span>➔</span>
       </button>
-      <button class="mode-btn" type="button" id="btn-1v1-join">
+      <button class="mode-btn" type="button" id="btn-1v1-create-room" style="border-color: rgba(56, 189, 248, 0.45);">
         <div class="mode-btn-text">
-          <strong>Quick Match</strong>
-          <small>INSTANT BATTLE</small>
+          <strong style="color:#38bdf8;">Create Online Room</strong>
+          <small>GENERATE CODE & INVITE A FRIEND</small>
+        </div>
+        <span>➔</span>
+      </button>
+      <button class="mode-btn" type="button" id="btn-1v1-join-room" style="border-color: rgba(34, 197, 94, 0.45);">
+        <div class="mode-btn-text">
+          <strong style="color:#4ade80;">Join Online Room</strong>
+          <small>ENTER A CODE TO BATTLE</small>
         </div>
         <span>➔</span>
       </button>
       <button class="action-btn secondary" type="button" id="btn-1v1-back">Back</button>
+    </div>
+  </div>
+
+  <!-- ONLINE HOST MODAL -->
+  <div id="modal-online-host" class="overlay-screen hidden">
+    <div class="modal-box" style="max-width: 520px; text-align: center;">
+      <div class="modal-header">
+        <h2>HOST ONLINE 1V1 ROOM</h2>
+        <button class="close-btn" id="btn-host-close" type="button">✕</button>
+      </div>
+
+      <div style="margin: 8px 0;">
+        <span style="font-size: 0.82rem; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase;">Share this Room Code with your opponent:</span>
+        <div id="host-room-code-display" class="room-code-display">CONNECTING...</div>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 14px;">
+        <button class="action-btn secondary" type="button" id="btn-copy-code" style="flex:1; padding: 10px;">📋 Copy Code</button>
+        <button class="action-btn secondary" type="button" id="btn-copy-link" style="flex:1; padding: 10px;">🔗 Copy Invite Link</button>
+      </div>
+
+      <div id="host-status" style="font-size: 0.92rem; color: #fbbf24; margin-bottom: 14px; font-weight: 600; min-height: 22px;">
+        ⏳ Connecting to peer network...
+      </div>
+
+      <div style="text-align: left; margin-bottom: 8px;">
+        <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; letter-spacing:0.05em;">YOUR ROBOT:</span>
+      </div>
+      <div class="mini-bot-grid" id="host-bot-selector">
+        <div class="mini-bot-card selected" data-bot="robot1">
+          <div style="font-size: 1.4rem;">⚔️</div>
+          <div class="mini-bot-name">ROBOT 1</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot2">
+          <div style="font-size: 1.4rem;">🔨</div>
+          <div class="mini-bot-name">ROBOT 2</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot3">
+          <div style="font-size: 1.4rem;">📐</div>
+          <div class="mini-bot-name">ROBOT 3</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot4">
+          <div style="font-size: 1.4rem;">⚙️</div>
+          <div class="mini-bot-name">ROBOT 4</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot5">
+          <div style="font-size: 1.4rem;">🛡️</div>
+          <div class="mini-bot-name">ROBOT 5</div>
+        </div>
+      </div>
+
+      <button class="action-btn secondary" type="button" id="btn-host-cancel" style="width: 100%;">Cancel & Back</button>
+    </div>
+  </div>
+
+  <!-- ONLINE JOIN MODAL -->
+  <div id="modal-online-join" class="overlay-screen hidden">
+    <div class="modal-box" style="max-width: 520px; text-align: center;">
+      <div class="modal-header">
+        <h2>JOIN ONLINE 1V1 ROOM</h2>
+        <button class="close-btn" id="btn-join-close" type="button">✕</button>
+      </div>
+
+      <div style="margin: 8px 0; text-align: left;">
+        <label for="join-room-code-input" style="font-size: 0.82rem; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 6px;">Enter 4-Digit Room Code:</label>
+        <input type="text" id="join-room-code-input" class="room-input" placeholder="e.g. 7482" maxlength="8" autocomplete="off" />
+      </div>
+
+      <div id="join-status" style="font-size: 0.92rem; color: #fbbf24; min-height: 22px; margin-bottom: 12px; font-weight: 600;">
+        Choose your robot, enter the code, and click Connect.
+      </div>
+
+      <div style="text-align: left; margin-bottom: 8px;">
+        <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; letter-spacing:0.05em;">YOUR ROBOT:</span>
+      </div>
+      <div class="mini-bot-grid" id="join-bot-selector">
+        <div class="mini-bot-card" data-bot="robot1">
+          <div style="font-size: 1.4rem;">⚔️</div>
+          <div class="mini-bot-name">ROBOT 1</div>
+        </div>
+        <div class="mini-bot-card selected" data-bot="robot2">
+          <div style="font-size: 1.4rem;">🔨</div>
+          <div class="mini-bot-name">ROBOT 2</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot3">
+          <div style="font-size: 1.4rem;">📐</div>
+          <div class="mini-bot-name">ROBOT 3</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot4">
+          <div style="font-size: 1.4rem;">⚙️</div>
+          <div class="mini-bot-name">ROBOT 4</div>
+        </div>
+        <div class="mini-bot-card" data-bot="robot5">
+          <div style="font-size: 1.4rem;">🛡️</div>
+          <div class="mini-bot-name">ROBOT 5</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button class="action-btn secondary" type="button" id="btn-join-back" style="flex:1;">Back</button>
+        <button class="action-btn primary" type="button" id="btn-join-connect" style="flex:2;">➔ CONNECT & FIGHT</button>
+      </div>
     </div>
   </div>
 
@@ -3640,23 +3818,173 @@
     });
   });
 
+
+  // ========================================================
+  // 1V1 MODAL & ONLINE ROOM LISTENERS
+  // ========================================================
+  const modal1v1 = document.getElementById('modal-1v1');
+  const modalOnlineHost = document.getElementById('modal-online-host');
+  const modalOnlineJoin = document.getElementById('modal-online-join');
+
+  let onlineHostBot = 'robot1';
+  let onlineJoinBot = 'robot2';
+
+  // 1v1 Mode selection button
+  document.getElementById('btn-1v1-local').addEventListener('click', () => {
+    gameMode = '1v1';
+    modal1v1.classList.add('hidden');
+    updateControlsHint();
+    modalSelect.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-1v1-close').addEventListener('click', () => {
+    modal1v1.classList.add('hidden');
+  });
   document.getElementById('btn-1v1-back').addEventListener('click', () => {
     modal1v1.classList.add('hidden');
   });
 
-  document.getElementById('btn-1v1-create').addEventListener('click', () => {
-    gameMode = '1v1';
+  // CREATE ONLINE ROOM
+  document.getElementById('btn-1v1-create-room').addEventListener('click', () => {
     modal1v1.classList.add('hidden');
-    updateControlsHint();
-    modalSelect.classList.remove('hidden');
+    modalOnlineHost.classList.remove('hidden');
+    const codeDisplay = document.getElementById('host-room-code-display');
+    const statusEl = document.getElementById('host-status');
+    codeDisplay.textContent = 'GENERATING...';
+    statusEl.textContent = '⏳ Connecting to peer network...';
+    statusEl.style.color = '#fbbf24';
+
+    NetworkSys.createRoom(
+      onlineHostBot,
+      (code) => {
+        codeDisplay.textContent = code;
+        statusEl.textContent = '⏳ Room active! Share code with Player 2...';
+        statusEl.style.color = '#38bdf8';
+      },
+      (err) => {
+        statusEl.textContent = '❌ Error: ' + err;
+        statusEl.style.color = '#ef4444';
+      }
+    );
   });
 
-  document.getElementById('btn-1v1-join').addEventListener('click', () => {
-    gameMode = '1v1';
-    modal1v1.classList.add('hidden');
-    updateControlsHint();
-    modalSelect.classList.remove('hidden');
+  // Host mini-bot cards
+  document.querySelectorAll('#host-bot-selector .mini-bot-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('#host-bot-selector .mini-bot-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      onlineHostBot = card.dataset.bot;
+      NetworkSys.selectedBot = onlineHostBot;
+    });
   });
+
+  // Copy Code button
+  document.getElementById('btn-copy-code').addEventListener('click', () => {
+    if (NetworkSys.roomCode) {
+      navigator.clipboard.writeText(NetworkSys.roomCode);
+      const btn = document.getElementById('btn-copy-code');
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = '📋 Copy Code'; }, 2000);
+    }
+  });
+
+  // Copy Invite Link button
+  document.getElementById('btn-copy-link').addEventListener('click', () => {
+    if (NetworkSys.roomCode) {
+      const inviteUrl = window.location.origin + window.location.pathname + '?room=' + NetworkSys.roomCode;
+      navigator.clipboard.writeText(inviteUrl);
+      const btn = document.getElementById('btn-copy-link');
+      btn.textContent = '✓ Link Copied!';
+      setTimeout(() => { btn.textContent = '🔗 Copy Invite Link'; }, 2000);
+    }
+  });
+
+  // Host Cancel / Close
+  function closeHostModal() {
+    modalOnlineHost.classList.add('hidden');
+    if (NetworkSys.peer) {
+      try { NetworkSys.peer.destroy(); } catch (e) {}
+      NetworkSys.peer = null;
+    }
+    NetworkSys.isOnline = false;
+    NetworkSys.isHost = false;
+  }
+  document.getElementById('btn-host-close').addEventListener('click', closeHostModal);
+  document.getElementById('btn-host-cancel').addEventListener('click', closeHostModal);
+
+  // JOIN ONLINE ROOM
+  document.getElementById('btn-1v1-join-room').addEventListener('click', () => {
+    modal1v1.classList.add('hidden');
+    modalOnlineJoin.classList.remove('hidden');
+    document.getElementById('join-status').textContent = 'Enter code and choose your robot:';
+    document.getElementById('join-status').style.color = '#fbbf24';
+  });
+
+  // Join mini-bot cards
+  document.querySelectorAll('#join-bot-selector .mini-bot-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('#join-bot-selector .mini-bot-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      onlineJoinBot = card.dataset.bot;
+      NetworkSys.selectedBot = onlineJoinBot;
+    });
+  });
+
+  // Join Connect button
+  document.getElementById('btn-join-connect').addEventListener('click', () => {
+    const code = document.getElementById('join-room-code-input').value.trim();
+    const statusEl = document.getElementById('join-status');
+    if (!code || code.length < 3) {
+      statusEl.textContent = '⚠️ Please enter a valid Room Code!';
+      statusEl.style.color = '#ef4444';
+      return;
+    }
+    statusEl.textContent = '⏳ Connecting to Host (Room ' + code + ')...';
+    statusEl.style.color = '#38bdf8';
+
+    NetworkSys.joinRoom(
+      code,
+      onlineJoinBot,
+      () => {
+        statusEl.textContent = '✓ Connected! Entering arena...';
+        statusEl.style.color = '#34d399';
+      },
+      (err) => {
+        statusEl.textContent = '❌ ' + err;
+        statusEl.style.color = '#ef4444';
+      }
+    );
+  });
+
+  // Join Cancel / Close
+  function closeJoinModal() {
+    modalOnlineJoin.classList.add('hidden');
+    if (NetworkSys.peer) {
+      try { NetworkSys.peer.destroy(); } catch (e) {}
+      NetworkSys.peer = null;
+    }
+    NetworkSys.isOnline = false;
+  }
+  document.getElementById('btn-join-close').addEventListener('click', closeJoinModal);
+  document.getElementById('btn-join-back').addEventListener('click', closeJoinModal);
+
+  // Check URL query parameters for auto-join link: ?room=XXXX
+  window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+      const cleanCode = roomParam.trim().replace(/^bbx-/i, '');
+      const inputEl = document.getElementById('join-room-code-input');
+      if (inputEl) inputEl.value = cleanCode;
+      modalOnlineJoin.classList.remove('hidden');
+      const statusEl = document.getElementById('join-status');
+      if (statusEl) {
+        statusEl.textContent = 'Room ' + cleanCode + ' detected from link! Pick your bot and click Connect.';
+        statusEl.style.color = '#38bdf8';
+      }
+    }
+  });
+
 
   document.getElementById('btn-select-close').addEventListener('click', () => {
     modalSelect.classList.add('hidden');
@@ -3737,7 +4065,16 @@
 
   document.getElementById('btn-play-again').addEventListener('click', () => {
     modalGameover.classList.add('hidden');
-    startMatchSequence();
+    if (NetworkSys.isOnline) {
+      if (NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+        NetworkSys.conn.send({ type: 'start_match', hostBot: NetworkSys.selectedBot, guestBot: NetworkSys.opponentBot });
+        startMatchSequence();
+      } else if (!NetworkSys.isHost) {
+        alert('Waiting for host to restart the match...');
+      }
+    } else {
+      startMatchSequence();
+    }
   });
 
   document.getElementById('btn-back-menu').addEventListener('click', () => {
@@ -3746,11 +4083,266 @@
     menuScreen.classList.remove('hidden');
     matchState = 'menu';
     cleanupBots();
+    if (NetworkSys.isOnline) {
+      NetworkSys.handleDisconnect('Exited online match.');
+    }
   });
 
   // ========================================================
   // 9. MATCH SEQUENCE & COUNTDOWN
   // ========================================================
+
+  // ========================================================
+  // WEBRTC ONLINE 1V1 ROOM SYSTEM (PEERJS P2P BROKER)
+  // ========================================================
+  const NetworkSys = {
+    peer: null,
+    conn: null,
+    isOnline: false,
+    isHost: false,
+    roomCode: '',
+    selectedBot: 'robot1',
+    opponentBot: 'robot2',
+    queuedEvents: [],
+    lastSendTime: 0,
+
+    queueEvent(ev) {
+      if (this.isOnline && this.isHost) {
+        this.queuedEvents.push(ev);
+      }
+    },
+
+    createRoom(botType, onReady, onError) {
+      this.isOnline = true;
+      this.isHost = true;
+      this.selectedBot = botType;
+      this.roomCode = String(Math.floor(1000 + Math.random() * 9000));
+      const peerId = 'bbx-' + this.roomCode;
+
+      try {
+        if (this.peer) {
+          try { this.peer.destroy(); } catch (e) {}
+        }
+        this.peer = new Peer(peerId, {
+          debug: 1,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+          }
+        });
+
+        this.peer.on('open', (id) => {
+          console.log('[Network] Host Peer ready with ID:', id);
+          onReady(this.roomCode);
+        });
+
+        this.peer.on('connection', (conn) => {
+          this.conn = conn;
+          this.setupHostConnection();
+        });
+
+        this.peer.on('error', (err) => {
+          console.warn('[Network] Peer error:', err);
+          if (err.type === 'unavailable-id') {
+            this.createRoom(botType, onReady, onError);
+          } else {
+            onError(err.message || 'Network broker error');
+          }
+        });
+      } catch (e) {
+        onError(e.message);
+      }
+    },
+
+    setupHostConnection() {
+      const statusEl = document.getElementById('host-status');
+      if (statusEl) {
+        statusEl.textContent = '✓ Opponent connected! Starting match...';
+        statusEl.style.color = '#34d399';
+      }
+
+      this.conn.on('data', (data) => {
+        if (data.type === 'guest_join') {
+          this.opponentBot = data.botType || 'robot2';
+          this.conn.send({
+            type: 'start_match',
+            hostBot: this.selectedBot,
+            guestBot: this.opponentBot
+          });
+          document.getElementById('modal-online-host').classList.add('hidden');
+          gameMode = '1v1_online';
+          startMatchSequence();
+        } else if (data.type === 'guest_input') {
+          if (enemyBot) {
+            enemyBot.throttleInput = data.t || 0;
+            enemyBot.steerInput = data.s || 0;
+          }
+        }
+      });
+
+      this.conn.on('close', () => {
+        this.handleDisconnect('Opponent disconnected from battle.');
+      });
+    },
+
+    joinRoom(code, botType, onConnected, onError) {
+      this.isOnline = true;
+      this.isHost = false;
+      this.selectedBot = botType;
+      this.roomCode = code.trim().replace(/^bbx-/i, '');
+      const targetPeerId = 'bbx-' + this.roomCode;
+
+      try {
+        if (this.peer) {
+          try { this.peer.destroy(); } catch (e) {}
+        }
+        this.peer = new Peer(null, {
+          debug: 1,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+          }
+        });
+
+        this.peer.on('open', (id) => {
+          console.log('[Network] Guest Peer ready with ID:', id);
+          const conn = this.peer.connect(targetPeerId, { reliable: true });
+          this.conn = conn;
+
+          conn.on('open', () => {
+            conn.send({ type: 'guest_join', botType: this.selectedBot });
+            onConnected();
+          });
+
+          conn.on('data', (data) => {
+            if (data.type === 'start_match') {
+              this.opponentBot = data.hostBot;
+              document.getElementById('modal-online-join').classList.add('hidden');
+              gameMode = '1v1_online';
+              startMatchSequence();
+            } else if (data.type === 'state') {
+              this.applyRemoteState(data);
+            } else if (data.type === 'end_match') {
+              endMatch(data.playerWon, data.isDraw, data.isKO);
+            }
+          });
+
+          conn.on('close', () => {
+            this.handleDisconnect('Host closed the battle room.');
+          });
+
+          setTimeout(() => {
+            if (!conn.open && !this.opponentBot) {
+              onError('Connection timeout. Please verify the 4-digit Room Code.');
+            }
+          }, 9000);
+        });
+
+        this.peer.on('error', (err) => {
+          console.warn('[Network] Guest error:', err);
+          onError('Room not found or host not ready. Check the code.');
+        });
+      } catch (e) {
+        onError(e.message);
+      }
+    },
+
+    sendInput(t, s) {
+      if (this.conn && this.conn.open && !this.isHost) {
+        this.conn.send({ type: 'guest_input', t, s });
+      }
+    },
+
+    broadcastState() {
+      if (!this.conn || !this.conn.open || !this.isHost) return;
+      if (!playerBot || !enemyBot) return;
+
+      const now = performance.now();
+      if (now - this.lastSendTime < 24) return; // ~40 FPS broadcast
+      this.lastSendTime = now;
+
+      const evs = this.queuedEvents.slice();
+      this.queuedEvents.length = 0;
+
+      this.conn.send({
+        type: 'state',
+        p1: {
+          x: playerBot.x, z: playerBot.z, y: playerBot.root.position.y,
+          yaw: playerBot.yaw, pitch: playerBot.pitch, roll: playerBot.roll,
+          spin: playerBot.weaponSpinSpeed, hp: playerBot.driveHealth, fp: playerBot.flipped
+        },
+        p2: {
+          x: enemyBot.x, z: enemyBot.z, y: enemyBot.root.position.y,
+          yaw: enemyBot.yaw, pitch: enemyBot.pitch, roll: enemyBot.roll,
+          spin: enemyBot.weaponSpinSpeed, hp: enemyBot.driveHealth, fp: enemyBot.flipped
+        },
+        events: evs
+      });
+    },
+
+    applyRemoteState(data) {
+      if (!playerBot || !enemyBot) return;
+
+      // Host robot (p1)
+      playerBot.x = data.p1.x;
+      playerBot.z = data.p1.z;
+      playerBot.root.position.x = data.p1.x;
+      playerBot.root.position.z = data.p1.z;
+      playerBot.root.position.y = (data.p1.y || 0);
+      playerBot.yaw = data.p1.yaw;
+      playerBot.pitch = data.p1.pitch;
+      playerBot.roll = data.p1.roll;
+      playerBot.root.rotation.y = data.p1.yaw;
+      playerBot.tiltGroup.rotation.x = data.p1.pitch;
+      playerBot.tiltGroup.rotation.z = data.p1.roll;
+      playerBot.weaponSpinSpeed = data.p1.spin;
+      playerBot.driveHealth = data.p1.hp;
+      playerBot.flipped = data.p1.fp;
+
+      // Guest robot (p2)
+      enemyBot.x = data.p2.x;
+      enemyBot.z = data.p2.z;
+      enemyBot.root.position.x = data.p2.x;
+      enemyBot.root.position.z = data.p2.z;
+      enemyBot.root.position.y = (data.p2.y || 0);
+      enemyBot.yaw = data.p2.yaw;
+      enemyBot.pitch = data.p2.pitch;
+      enemyBot.roll = data.p2.roll;
+      enemyBot.root.rotation.y = data.p2.yaw;
+      enemyBot.tiltGroup.rotation.x = data.p2.pitch;
+      enemyBot.tiltGroup.rotation.z = data.p2.roll;
+      enemyBot.weaponSpinSpeed = data.p2.spin;
+      enemyBot.driveHealth = data.p2.hp;
+      enemyBot.flipped = data.p2.fp;
+
+      if (data.events && Array.isArray(data.events)) {
+        data.events.forEach(ev => {
+          if (ev.t === 'clash') AudioSys.metalClashSound(ev.i, ev.h);
+          if (ev.t === 'slice') AudioSys.weaponSliceSound();
+          if (ev.t === 'stall') AudioSys.weaponStallSound();
+          if (ev.t === 'sparks') spawnCollisionSparks(new THREE.Vector3(ev.x, ev.y, ev.z), ev.c);
+        });
+      }
+    },
+
+    handleDisconnect(msg) {
+      if (!this.isOnline) return;
+      alert(msg || 'Connection lost.');
+      this.isOnline = false;
+      this.isHost = false;
+      if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
+      if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }
+      matchState = 'menu';
+      cleanupBots();
+      hud.classList.add('hidden');
+      menuScreen.classList.remove('hidden');
+    }
+  };
+
   function startMatchSequence() {
     AudioSys.init();
     cleanupBots();
@@ -3759,8 +4351,14 @@
     const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
 
-    const availableOpponents = allBots.filter(b => b !== botTypeChoice);
-    const enemyType = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
+    let enemyType;
+    if (NetworkSys.isOnline) {
+      botTypeChoice = NetworkSys.isHost ? NetworkSys.selectedBot : NetworkSys.opponentBot;
+      enemyType = NetworkSys.isHost ? NetworkSys.opponentBot : NetworkSys.selectedBot;
+    } else {
+      const availableOpponents = allBots.filter(b => b !== botTypeChoice);
+      enemyType = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
+    }
 
     playerBot = createBotInstance(botTypeChoice, 0, 7.5, Math.PI);
     enemyBot = createBotInstance(enemyType, 0, -7.5, 0);
@@ -3805,8 +4403,20 @@
     AudioSys.arenaBuzzer();
     AudioSys.stopCombatAudio();
 
+    if (NetworkSys.isOnline && NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+      NetworkSys.conn.send({
+        type: 'end_match',
+        playerWon,
+        isDraw,
+        isKO
+      });
+    }
+
+    const isGuest = (NetworkSys.isOnline && !NetworkSys.isHost);
+    const didIWin = isGuest ? !playerWon : playerWon;
+
     if (!isDraw) {
-      if (playerWon) playerScore++;
+      if (didIWin) playerScore++;
       else enemyScore++;
     }
 
@@ -3818,7 +4428,7 @@
       heading.className = 'result-title';
       if (detail) detail.textContent = 'Time Expired — Both robots active!';
       AudioSys.beep(300, 0.3);
-    } else if (playerWon) {
+    } else if (didIWin) {
       heading.textContent = isKO ? 'VICTORY BY K.O.!' : 'VICTORY';
       heading.className = 'result-title win';
       if (detail) detail.textContent = isKO ? 'Opponent robot immobilized! (K.O.)' : 'Won by Judges\' Decision!';
@@ -4078,7 +4688,10 @@
 
     // Active Weapon Rotation & Continuous Electric Motor Wind-Up
     if (bot.weaponMesh) {
-      if (bot.drivePower <= 0) {
+      if (gameMode === 'practice' && bot === enemyBot) {
+        // Practice dummy weapon stays completely disarmed & inactive (0 RPM)
+        bot.weaponSpinSpeed = 0;
+      } else if (bot.drivePower <= 0) {
         // Internal motor burnout spins down kinetic weapon
         bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - 20.0 * dt);
         if (Math.random() < 0.05) {
@@ -4263,7 +4876,7 @@
       const pApproach = Math.max(0, playerBot.vx * nx + playerBot.vz * nz);
       const eApproach = Math.max(0, enemyBot.vx * (-nx) + enemyBot.vz * (-nz));
 
-      // Proportional impulse scaling naturally with impact speed (no artificial 5.0 minimum)
+      // Proportional impulse scaling naturally with impact speed
       const impulse = Math.min(5.2, impactSpeed * 0.52);
       if (impulse > 0.08) {
         playerBot.vx -= nx * impulse;
@@ -4286,30 +4899,17 @@
       const eForwardDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
 
       // Local impact direction relative to each bot's heading:
-      // Vector from playerBot to enemyBot is (nx, nz).
-      // For enemyBot: contact point is on the side facing playerBot, i.e. (-nx, -nz).
       const eHitForward = (-nx) * Math.sin(enemyBot.yaw) + (-nz) * Math.cos(enemyBot.yaw);
       const eHitRight   = (-nx) * Math.cos(enemyBot.yaw) - (-nz) * Math.sin(enemyBot.yaw);
-
-      // For playerBot: contact point is on the side facing enemyBot, i.e. (nx, nz).
       const pHitForward = nx * Math.sin(playerBot.yaw) + nz * Math.cos(playerBot.yaw);
       const pHitRight   = nx * Math.cos(playerBot.yaw) - nz * Math.sin(playerBot.yaw);
 
-      const isPR1 = (playerBot.type === 'robot1');
-      const isPR2 = (playerBot.type === 'robot2');
-      const isER1 = (enemyBot.type === 'robot1');
-      const isER2 = (enemyBot.type === 'robot2');
-
-      // Equal minimum weapon strike speed threshold for both bots (40.0 rad/s)
       const minWeaponSpin = 40.0;
-
-      // Symmetric attack priority considering forward alignment, approach speed, and active weapon RPM
-      const pAttackScore = pForwardDot * (2.0 + pApproach * 1.5 + (playerBot.weaponSpinSpeed >= minWeaponSpin ? playerBot.weaponSpinSpeed * 0.10 : 0));
-      const eAttackScore = eForwardDot * (2.0 + eApproach * 1.5 + (enemyBot.weaponSpinSpeed >= minWeaponSpin ? enemyBot.weaponSpinSpeed * 0.10 : 0));
+      const isPractice = (gameMode === 'practice');
 
       if (impactSpeed > 1.8) {
-        const isPWeaponHit = (pForwardDot > 0.40 && playerBot.weaponSpinSpeed >= minWeaponSpin);
-        const isEWeaponHit = (eForwardDot > 0.40 && enemyBot.weaponSpinSpeed >= minWeaponSpin);
+        const isPWeaponHit = (pForwardDot > 0.35 && playerBot.weaponSpinSpeed >= minWeaponSpin);
+        const isEWeaponHit = (!isPractice && eForwardDot > 0.35 && enemyBot.weaponSpinSpeed >= minWeaponSpin);
         const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
 
         if (isBothWeaponClash) {
@@ -4319,12 +4919,15 @@
           AudioSys.metalClashSound(2.5, true);
           AudioSys.weaponSliceSound();
           AudioSys.weaponStallSound();
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'clash', i: 2.5, h: true });
+            NetworkSys.queueEvent({ t: 'slice' });
+            NetworkSys.queueEvent({ t: 'stall' });
+          }
 
-          // BOTH weapons stall simultaneously and must wind up again
           playerBot.weaponSpinSpeed = 0;
           enemyBot.weaponSpinSpeed = 0;
 
-          // Reciprocal violent kinetic pushback throwing BOTH robots apart
           const clashImpulse = Math.min(8.0, 3.2 + impactSpeed * 0.45);
           playerBot.vx -= nx * clashImpulse;
           playerBot.vz -= nz * clashImpulse;
@@ -4335,6 +4938,9 @@
           enemyBot.vy = 0.6;
 
           spawnCollisionSparks(midPos, 60);
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 60 });
+          }
           triggerDamageVignette();
 
           const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
@@ -4346,221 +4952,247 @@
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
 
           const clashDmg = impactSpeed * 1.6 + 6.0;
-          playerBot.driveHealth = Math.max(0, playerBot.driveHealth - clashDmg * pVuln);
+          if (!isPractice) {
+            playerBot.driveHealth = Math.max(0, playerBot.driveHealth - clashDmg * pVuln);
+          }
           enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - clashDmg * eVuln);
 
-          if (Math.random() < 0.45) detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
+          if (!isPractice && Math.random() < 0.45) detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
           if (Math.random() < 0.45) detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
 
           if (impactSpeed > 4.5) {
             const clashWheelProb = (impactSpeed > 6.5) ? 0.45 : 0.25;
-            if (playerBot.wheels && Math.random() < clashWheelProb) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
+            if (!isPractice && playerBot.wheels && Math.random() < clashWheelProb) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
             if (enemyBot.wheels && Math.random() < clashWheelProb) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
           }
-        } else if (pAttackScore >= eAttackScore) {
-          // Player lands attack on EnemyBot
+        } else if (isPWeaponHit) {
+          // ========================================================
+          // PLAYER WEAPON STRIKE ON ENEMY
+          // (Enemy takes kinetic damage, sparks, flings. Player takes 0 damage!)
+          // ========================================================
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
-          const isPR1SpikeRamp = (playerBot.type !== "robot3" && pForwardDot > 0.35 && playerBot.weaponSpinSpeed < minWeaponSpin);
+          const isWeaponFullSpeed = (playerBot.weaponSpinSpeed >= 78.0);
+          const isMovingFullSpeedToward = (pForwardDot > 0.45 && (pApproach >= 5.0 || pSpeedBefore >= 6.5));
+          const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
 
-          if (isPWeaponHit) {
-            AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
-            AudioSys.weaponSliceSound();
+          AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
+          AudioSys.weaponSliceSound();
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'slice' });
+          }
 
-            const isWeaponFullSpeed = (playerBot.weaponSpinSpeed >= 78.0);
-            const isMovingFullSpeedToward = (pForwardDot > 0.55 && (pApproach >= 6.5 || pSpeedBefore >= 7.5));
-            const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
-
-            if (canSendFlying) {
-              if (playerBot.type === 'robot3') {
-                // Horizontal kinetic blade: violent lateral fling + spin
-                enemyBot.vx += nx * 14.0;
-                enemyBot.vz += nz * 14.0;
-                enemyBot.yaw += (eHitRight > 0 ? 5.0 : -5.0);
-                enemyBot.rollVel = (eHitRight > 0 ? -12.0 : 12.0);
-                enemyBot.vy = 2.2;
-                enemyBot.airY = 0.35;
-                enemyBot.flipped = (Math.random() < 0.45);
-              } else {
-                // Vertical spinner / drum: launches opponent upward into a backflip
-                enemyBot.vy = 4.8 + Math.random() * 0.7;
-                if (isFrontalOrRear) {
-                  enemyBot.pitchVel = (eHitForward > 0 ? -25.0 : 25.0);
-                  enemyBot.rollVel = 0;
-                } else {
-                  enemyBot.rollVel = (eHitRight > 0 ? -20.0 : 20.0);
-                  enemyBot.pitchVel = 0;
-                }
-                enemyBot.flipped = true;
-              }
-              spawnCollisionSparks(midPos, 50);
+          if (canSendFlying) {
+            if (playerBot.type === 'robot3') {
+              enemyBot.vx += nx * 14.0;
+              enemyBot.vz += nz * 14.0;
+              enemyBot.yaw += (eHitRight > 0 ? 5.0 : -5.0);
+              enemyBot.rollVel = (eHitRight > 0 ? -12.0 : 12.0);
+              enemyBot.vy = 2.2;
+              enemyBot.airY = 0.35;
+              enemyBot.flipped = (Math.random() < 0.45);
             } else {
-              if (playerBot.type === 'robot3') {
-                enemyBot.vx += nx * (4.5 + impactSpeed * 0.8);
-                enemyBot.vz += nz * (4.5 + impactSpeed * 0.8);
-                enemyBot.yaw += (eHitRight > 0 ? 2.5 : -2.5);
+              enemyBot.vy = 4.8 + Math.random() * 0.7;
+              if (isFrontalOrRear) {
+                enemyBot.pitchVel = (eHitForward > 0 ? -25.0 : 25.0);
+                enemyBot.rollVel = 0;
               } else {
-                enemyBot.vy = 0.5;
-                if (isFrontalOrRear) {
-                  enemyBot.pitchVel = (eHitForward > 0 ? -5.0 : 5.0);
-                  enemyBot.rollVel = 0;
-                } else {
-                  enemyBot.rollVel = (eHitRight > 0 ? -5.0 : 5.0);
-                  enemyBot.pitchVel = 0;
-                }
+                enemyBot.rollVel = (eHitRight > 0 ? -20.0 : 20.0);
+                enemyBot.pitchVel = 0;
               }
-              spawnCollisionSparks(midPos, 22);
+              enemyBot.flipped = true;
             }
-
-            // WEAPON STOPS ON IMPACT AND MUST WIND UP AGAIN!
-            playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponSpinSpeed = 0; // Kinetic shock stalls both spinning weapons
-            AudioSys.weaponStallSound();
-
-            // Balanced damage & panel detachment
-            const eRemainingArmor = enemyBot.armorPanels.filter(p => p.attached).length;
-            const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
-            const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
-            const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
-            const driveDmg = baseDmg * eVuln;
-            enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
-
-            if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
-              detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
+            spawnCollisionSparks(midPos, 50);
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
             }
-            if (enemyBot.wheels) {
-              const eAttachedWheels = enemyBot.wheels.filter(w => w.attached).length;
-              const isDirectSideHit = Math.abs(eHitRight) > 0.28;
-              const eWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
-              if (eAttachedWheels > 0 && Math.random() < eWheelProb) {
-                detachWheel(enemyBot, { x: nx, z: nz }, midPos);
-              }
-            }
-          } else if (isPR1SpikeRamp) {
-            // Robot 1 front spike acts strictly as a passive wedge/ramp
-            enemyBot.airY = Math.min(0.38, (enemyBot.airY || 0) + 0.14);
-            enemyBot.pitchVel = (eHitForward > 0 ? -3.2 : 3.2);
-            AudioSys.hitSound(0.38);
-            spawnCollisionSparks(midPos, 8);
-            const bluntDmg = Math.max(0, impactSpeed * 0.35);
-            enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - bluntDmg);
           } else {
-            // Body / bumper collision (no weapon contact)
-            AudioSys.metalClashSound(Math.min(1.8, 0.55 + impactSpeed * 0.22), false);
-            enemyBot.vy = 0;
-            enemyBot.pitchVel = 0;
-            enemyBot.rollVel = 0;
-            const driveDmg = Math.max(0, impactSpeed * 0.85);
-            enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
-
-            if (impactSpeed > 7.0 && Math.random() < 0.35) {
-              detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
+            if (playerBot.type === 'robot3') {
+              enemyBot.vx += nx * (4.5 + impactSpeed * 0.8);
+              enemyBot.vz += nz * (4.5 + impactSpeed * 0.8);
+              enemyBot.yaw += (eHitRight > 0 ? 2.5 : -2.5);
+            } else {
+              enemyBot.vy = 0.5;
+              if (isFrontalOrRear) {
+                enemyBot.pitchVel = (eHitForward > 0 ? -5.0 : 5.0);
+                enemyBot.rollVel = 0;
+              } else {
+                enemyBot.rollVel = (eHitRight > 0 ? -5.0 : 5.0);
+                enemyBot.pitchVel = 0;
+              }
             }
-            if (impactSpeed > 5.2 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
-              if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+            spawnCollisionSparks(midPos, 22);
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
+            }
+          }
+
+          playerBot.weaponSpinSpeed = 0;
+          enemyBot.weaponSpinSpeed = 0;
+          AudioSys.weaponStallSound();
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'stall' });
+          }
+
+          const eRemainingArmor = enemyBot.armorPanels.filter(p => p.attached).length;
+          const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
+          const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
+          const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
+          const driveDmg = baseDmg * eVuln;
+          enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+
+          if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
+            detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
+          }
+          if (enemyBot.wheels) {
+            const eAttachedWheels = enemyBot.wheels.filter(w => w.attached).length;
+            const isDirectSideHit = Math.abs(eHitRight) > 0.28;
+            const eWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
+            if (eAttachedWheels > 0 && Math.random() < eWheelProb) {
+              detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+            }
+          }
+          // Player takes strictly ZERO damage!
+        } else if (isEWeaponHit) {
+          // ========================================================
+          // ENEMY WEAPON STRIKE ON PLAYER (Non-practice mode only)
+          // ========================================================
+          const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
+          const isWeaponFullSpeed = (enemyBot.weaponSpinSpeed >= 78.0);
+          const isMovingFullSpeedToward = (eForwardDot > 0.45 && (eApproach >= 5.0 || eSpeedBefore >= 6.5));
+          const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
+
+          AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
+          AudioSys.weaponSliceSound();
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'slice' });
+          }
+
+          if (canSendFlying) {
+            if (enemyBot.type === 'robot3') {
+              playerBot.vx -= nx * 14.0;
+              playerBot.vz -= nz * 14.0;
+              playerBot.yaw += (pHitRight > 0 ? 5.0 : -5.0);
+              playerBot.rollVel = (pHitRight > 0 ? -12.0 : 12.0);
+              playerBot.vy = 2.2;
+              playerBot.airY = 0.35;
+              playerBot.flipped = (Math.random() < 0.45);
+            } else {
+              playerBot.vy = 4.8 + Math.random() * 0.7;
+              if (isFrontalOrRear) {
+                playerBot.pitchVel = (pHitForward > 0 ? -25.0 : 25.0);
+                playerBot.rollVel = 0;
+              } else {
+                playerBot.rollVel = (pHitRight > 0 ? -20.0 : 20.0);
+                playerBot.pitchVel = 0;
+              }
+              playerBot.flipped = true;
+            }
+            spawnCollisionSparks(midPos, 50);
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
+            }
+          } else {
+            if (enemyBot.type === 'robot3') {
+              playerBot.vx -= nx * (4.5 + impactSpeed * 0.8);
+              playerBot.vz -= nz * (4.5 + impactSpeed * 0.8);
+              playerBot.yaw += (pHitRight > 0 ? 2.5 : -2.5);
+            } else {
+              playerBot.vy = 0.5;
+              if (isFrontalOrRear) {
+                playerBot.pitchVel = (pHitForward > 0 ? -5.0 : 5.0);
+                playerBot.rollVel = 0;
+              } else {
+                playerBot.rollVel = (pHitRight > 0 ? -5.0 : 5.0);
+                playerBot.pitchVel = 0;
+              }
+            }
+            spawnCollisionSparks(midPos, 22);
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
+            }
+          }
+
+          enemyBot.weaponSpinSpeed = 0;
+          playerBot.weaponSpinSpeed = 0;
+          AudioSys.weaponStallSound();
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'stall' });
+          }
+
+          triggerDamageVignette();
+
+          const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
+          const pMaxArmor = Math.max(1, playerBot.armorPanels.length);
+          const pVuln = 1.0 + (1.0 - (pRemainingArmor / pMaxArmor)) * 1.25;
+          const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
+          const driveDmg = baseDmg * pVuln;
+          playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
+
+          if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
+            detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
+          }
+          if (playerBot.wheels) {
+            const pAttachedWheels = playerBot.wheels.filter(w => w.attached).length;
+            const isDirectSideHit = Math.abs(pHitRight) > 0.28;
+            const pWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
+            if (pAttachedWheels > 0 && Math.random() < pWheelProb) {
+              detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
             }
           }
         } else {
-          // Enemy lands attack on PlayerBot
-          const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
-          const isER1SpikeRamp = (enemyBot.type !== "robot3" && eForwardDot > 0.35 && enemyBot.weaponSpinSpeed < minWeaponSpin);
+          // ========================================================
+          // CHASSIS / BUMPER / WEDGE COLLISION (RAMMING)
+          // ========================================================
+          AudioSys.metalClashSound(Math.min(1.8, 0.55 + impactSpeed * 0.22), false);
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'clash', i: Math.min(1.8, 0.55 + impactSpeed * 0.22), h: false });
+          }
 
-          if (isEWeaponHit) {
-            AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
-            AudioSys.weaponSliceSound();
-
-            const isWeaponFullSpeed = (enemyBot.weaponSpinSpeed >= 78.0);
-            const isMovingFullSpeedToward = (eForwardDot > 0.55 && (eApproach >= 6.5 || eSpeedBefore >= 7.5));
-            const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
-
-            if (canSendFlying) {
-              if (enemyBot.type === 'robot3') {
-                // Horizontal kinetic blade: violent lateral fling + spin
-                playerBot.vx -= nx * 14.0;
-                playerBot.vz -= nz * 14.0;
-                playerBot.yaw += (pHitRight > 0 ? 5.0 : -5.0);
-                playerBot.rollVel = (pHitRight > 0 ? -12.0 : 12.0);
-                playerBot.vy = 2.2;
-                playerBot.airY = 0.35;
-                playerBot.flipped = (Math.random() < 0.45);
-              } else {
-                // Vertical spinner / drum: launches opponent upward into a backflip
-                playerBot.vy = 4.8 + Math.random() * 0.7;
-                if (isFrontalOrRear) {
-                  playerBot.pitchVel = (pHitForward > 0 ? -25.0 : 25.0);
-                  playerBot.rollVel = 0;
-                } else {
-                  playerBot.rollVel = (pHitRight > 0 ? -20.0 : 20.0);
-                  playerBot.pitchVel = 0;
-                }
-                playerBot.flipped = true;
-              }
-              spawnCollisionSparks(midPos, 50);
-            } else {
-              if (enemyBot.type === 'robot3') {
-                playerBot.vx -= nx * (4.5 + impactSpeed * 0.8);
-                playerBot.vz -= nz * (4.5 + impactSpeed * 0.8);
-                playerBot.yaw += (pHitRight > 0 ? 2.5 : -2.5);
-              } else {
-                playerBot.vy = 0.5;
-                if (isFrontalOrRear) {
-                  playerBot.pitchVel = (pHitForward > 0 ? -5.0 : 5.0);
-                  playerBot.rollVel = 0;
-                } else {
-                  playerBot.rollVel = (pHitRight > 0 ? -5.0 : 5.0);
-                  playerBot.pitchVel = 0;
-                }
-              }
-              spawnCollisionSparks(midPos, 22);
-            }
-
-            // WEAPON STOPS ON IMPACT AND MUST WIND UP AGAIN!
-            enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponSpinSpeed = 0; // Kinetic shock stalls both spinning weapons
-            AudioSys.weaponStallSound();
-
-            triggerDamageVignette();
-
-            const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
-            const pMaxArmor = Math.max(1, playerBot.armorPanels.length);
-            const pVuln = 1.0 + (1.0 - (pRemainingArmor / pMaxArmor)) * 1.25;
-            const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
-            const driveDmg = baseDmg * pVuln;
-            playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
-
-            if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
-              detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
-            }
-            if (playerBot.wheels) {
-              const pAttachedWheels = playerBot.wheels.filter(w => w.attached).length;
-              const isDirectSideHit = Math.abs(pHitRight) > 0.28;
-              const pWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
-              if (pAttachedWheels > 0 && Math.random() < pWheelProb) {
-                detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
-              }
-            }
-          } else if (isER1SpikeRamp) {
-            // Enemy Robot 1 front spike acts strictly as a passive wedge/ramp
-            playerBot.airY = Math.min(0.38, (playerBot.airY || 0) + 0.14);
-            playerBot.pitchVel = (pHitForward > 0 ? -3.2 : 3.2);
-            AudioSys.hitSound(0.38);
-            spawnCollisionSparks(midPos, 8);
-            const bluntDmg = Math.max(0, impactSpeed * 0.35);
-            playerBot.driveHealth = Math.max(0, playerBot.driveHealth - bluntDmg);
-          } else {
-            // Body / bumper bump
-            AudioSys.metalClashSound(Math.min(1.8, 0.55 + impactSpeed * 0.22), false);
-            playerBot.vy = 0;
-            playerBot.pitchVel = 0;
-            playerBot.rollVel = 0;
+          if (isPractice) {
+            // Practice dummy is a stationary punching bag - NEVER damages player!
             const driveDmg = Math.max(0, impactSpeed * 0.85);
-            playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
-
-            triggerDamageVignette();
-            if (impactSpeed > 7.0 && Math.random() < 0.35) {
-              detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
+            enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+            if (impactSpeed > 6.5 && Math.random() < 0.35) {
+              detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
             }
-            if (impactSpeed > 5.2 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
-              if (Math.random() < 0.35) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
+            if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
+              if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+            }
+          } else {
+            // Real combat: attribute ramming damage based on closing velocity momentum
+            const pIsAttacker = (pApproach > 1.2 && pApproach > eApproach * 1.15);
+            const eIsAttacker = (eApproach > 1.2 && eApproach > pApproach * 1.15);
+
+            if (pIsAttacker) {
+              // Player rammed Enemy!
+              const driveDmg = Math.max(0, impactSpeed * 0.85);
+              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+              if (impactSpeed > 6.8 && Math.random() < 0.35) {
+                detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
+              }
+              if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
+                if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+              }
+            } else if (eIsAttacker) {
+              // Enemy rammed Player!
+              const driveDmg = Math.max(0, impactSpeed * 0.85);
+              playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
+              triggerDamageVignette();
+              if (impactSpeed > 6.8 && Math.random() < 0.35) {
+                detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
+              }
+              if (impactSpeed > 5.0 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
+                if (Math.random() < 0.35) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
+              }
+            } else {
+              // Mutual bumper crunch: both were driving into each other
+              const pRam = Math.max(0, eApproach * 0.55);
+              const eRam = Math.max(0, pApproach * 0.55);
+              playerBot.driveHealth = Math.max(0, playerBot.driveHealth - pRam);
+              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - eRam);
+              if (pRam > 2.5) triggerDamageVignette();
             }
           }
         }
@@ -4568,7 +5200,7 @@
     }
   }
 
-  let lastCountoutSec = 10;
+    let lastCountoutSec = 10;
   function updateImmobilizationAndCountout(dt) {
     const warnContainer = document.getElementById('flip-warning-container');
     const warnWho = document.getElementById('flip-who-text');
@@ -4673,7 +5305,8 @@
   let smoothCameraInitialized = false;
 
   function updateCamera(dt) {
-    if (!playerBot) {
+    const activeTargetBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
+    if (!activeTargetBot) {
       camera.position.set(0, 20, 18);
       camera.lookAt(0, 0, 0);
       return;
@@ -4683,14 +5316,13 @@
     const lookTarget = new THREE.Vector3();
 
     if (!smoothCameraInitialized) {
-      smoothCamHeading = playerBot.yaw;
-      currentCamLookTarget.set(playerBot.x, 0.75, playerBot.z);
+      smoothCamHeading = activeTargetBot.yaw;
+      currentCamLookTarget.set(activeTargetBot.x, 0.75, activeTargetBot.z);
       smoothCameraInitialized = true;
     }
 
     // Smooth heading angle with 2*PI wrap-around handling
-    // (Prevents camera from twitching when collision impulses jerk the robot's yaw)
-    let headingDiff = playerBot.yaw - smoothCamHeading;
+    let headingDiff = activeTargetBot.yaw - smoothCamHeading;
     while (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
     while (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
     smoothCamHeading += headingDiff * Math.min(1, dt * 5.2);
@@ -4886,22 +5518,42 @@
       let t = sliderThrottleVal;
       let s = sliderSteerVal;
 
-      if (keys['KeyW'] || (keys['ArrowUp'] && gameMode !== '1v1')) t = 1;
-      if (keys['KeyS'] || (keys['ArrowDown'] && gameMode !== '1v1')) t = -1;
-      if (keys['KeyA'] || (keys['ArrowLeft'] && gameMode !== '1v1')) s = -1;
-      if (keys['KeyD'] || (keys['ArrowRight'] && gameMode !== '1v1')) s = 1;
+      if (NetworkSys.isOnline && !NetworkSys.isHost) {
+        // GUEST MODE: Send local controls to Host, receive remote physics
+        if (keys['KeyW'] || keys['ArrowUp']) t = 1;
+        if (keys['KeyS'] || keys['ArrowDown']) t = -1;
+        if (keys['KeyA'] || keys['ArrowLeft']) s = -1;
+        if (keys['KeyD'] || keys['ArrowRight']) s = 1;
 
-      playerBot.throttleInput = t;
-      playerBot.steerInput = s;
+        throttleKnob.style.transform = `translateY(${-t * 42}px)`;
+        steerKnob.style.transform = `translateX(${s * 46}px)`;
 
-      throttleKnob.style.transform = `translateY(${-t * 42}px)`;
-      steerKnob.style.transform = `translateX(${s * 46}px)`;
+        NetworkSys.sendInput(t, s);
+      } else {
+        // HOST OR SINGLE-PLAYER / LOCAL / PRACTICE MODE:
+        if (keys['KeyW'] || (keys['ArrowUp'] && gameMode !== '1v1')) t = 1;
+        if (keys['KeyS'] || (keys['ArrowDown'] && gameMode !== '1v1')) t = -1;
+        if (keys['KeyA'] || (keys['ArrowLeft'] && gameMode !== '1v1')) s = -1;
+        if (keys['KeyD'] || (keys['ArrowRight'] && gameMode !== '1v1')) s = 1;
 
-      updateEnemyAI(dt);
-      updateBotPhysics(playerBot, dt);
-      updateBotPhysics(enemyBot, dt);
-      handleBotCollision();
-      updateImmobilizationAndCountout(dt);
+        playerBot.throttleInput = t;
+        playerBot.steerInput = s;
+
+        throttleKnob.style.transform = `translateY(${-t * 42}px)`;
+        steerKnob.style.transform = `translateX(${s * 46}px)`;
+
+        if (!NetworkSys.isOnline) {
+          updateEnemyAI(dt);
+        }
+        updateBotPhysics(playerBot, dt);
+        updateBotPhysics(enemyBot, dt);
+        handleBotCollision();
+        updateImmobilizationAndCountout(dt);
+
+        if (NetworkSys.isOnline && NetworkSys.isHost) {
+          NetworkSys.broadcastState();
+        }
+      }
 
       // Update Weapon RPM Gauge in HUD
       const rpmPct = Math.min(100, Math.round((playerBot.weaponSpinSpeed / 95.0) * 100));

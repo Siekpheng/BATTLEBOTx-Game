@@ -32,7 +32,13 @@ A high-fidelity 3D robot combat simulator built with Three.js and the Web Audio 
 - **Smart Sportsmanship**: When an opponent is flipped, disabled, or undergoing a 10-count knockout, the AI respects the rules by backing off to neutral corner distance and circling instead of repeatedly pummeling an incapacitated robot.
 - **Dynamic Tactics**: Angles around wedge defenses, maneuvers to flank exposed rear armor, and activates weapon overdrive on closing dashes.
 
-### 5. Desktop-Optimized Side UI & Camera
+### 5. Online 1v1 Room Codes (WebRTC Peer-to-Peer)
+- **Zero-Server Online Multiplayer**: Directly connects two players browser-to-browser via WebRTC DataChannels over free STUN brokers.
+- **Room Code Creation**: Click **1V1 BATTLE** → **Create Online Room** to generate a 4-digit battle code.
+- **1-Click Invite Links**: Copy the invite link (`https://...?room=XXXX`) to let your friend join automatically with one click.
+- **Ultra-Low Latency**: Packets travel machine-to-machine (typically 15–30 ms) with client perspective camera and real-time audio sync.
+
+### 6. Desktop-Optimized Side UI & Camera
 - **Side Panel Controls**: Camera and match info are cleanly placed on the side to give an unobstructed view of the combat arena.
 - **Multi-Angle Camera**: Dynamic chase cam with mouse-wheel elevation zoom, plus overhead and arena spectator modes (`C` key).
 
