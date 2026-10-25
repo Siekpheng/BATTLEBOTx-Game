@@ -4346,6 +4346,16 @@
     AudioSys.init();
     cleanupBots();
 
+    // 1. Force hide the main menu screen and every overlay/modal
+    const menuEl = document.getElementById('menu-screen');
+    if (menuEl) menuEl.classList.add('hidden');
+    const allModals = ['modal-1v1', 'modal-select', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover'];
+    allModals.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+    document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
+
     let botTypeChoice = selectedBotType || 'robot1';
     const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
@@ -4361,6 +4371,19 @@
 
     playerBot = createBotInstance(botTypeChoice, 0, 7.5, Math.PI);
     enemyBot = createBotInstance(enemyType, 0, -7.5, 0);
+
+    // Immediately attach high-res CAD models
+    if (playerBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(playerBot);
+    if (playerBot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(playerBot);
+    if (playerBot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(playerBot);
+    if (playerBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(playerBot);
+    if (playerBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(playerBot);
+
+    if (enemyBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(enemyBot);
+    if (enemyBot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(enemyBot);
+    if (enemyBot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(enemyBot);
+    if (enemyBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(enemyBot);
+    if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
 
     matchTimeRemaining = 180;
     updateTimerDisplay();
@@ -5303,6 +5326,44 @@
   let smoothCamHeading = 0;
   let smoothCameraInitialized = false;
 
+
+  function updateBotVisuals(bot, dt) {
+    if (!bot || !bot.root) return;
+    bot.root.position.set(bot.x, (bot.airY || 0) + (bot.groundElevation || 0), bot.z);
+    bot.root.rotation.y = bot.yaw;
+    if (bot.tiltGroup) {
+      bot.tiltGroup.rotation.x = bot.pitch;
+      bot.tiltGroup.rotation.z = bot.roll;
+    }
+    if (bot.weaponMesh && bot.weaponSpinSpeed) {
+      if (bot.type === 'robot1') {
+        const robot1SpindleAxis = new THREE.Vector3(0, Math.cos((10.0 * Math.PI) / 180), Math.sin((10.0 * Math.PI) / 180)).normalize();
+        bot.weaponAngle = ((bot.weaponAngle || 0) + bot.weaponSpinSpeed * dt) % (Math.PI * 2);
+        bot.weaponMesh.quaternion.setFromAxisAngle(robot1SpindleAxis, bot.weaponAngle);
+      } else if (bot.type === 'robot2') {
+        bot.weaponMesh.rotation.x -= bot.weaponSpinSpeed * dt;
+      } else if (bot.type === 'robot3') {
+        bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
+      } else {
+        bot.weaponMesh.rotation.x += bot.weaponSpinSpeed * dt;
+      }
+    }
+    if (bot.wheels) {
+      const fwdVel = Math.hypot(bot.vx || 0, bot.vz || 0);
+      const spinAngle = (fwdVel / 0.45) * dt;
+      bot.wheels.forEach(w => {
+        if (w.mesh && w.attached) w.mesh.rotation.x += spinAngle;
+      });
+    }
+    if (!bot.cadAttached) {
+      if (bot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(bot);
+      if (bot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(bot);
+      if (bot.type === 'robot3' && typeof attachCadToRobot3 === 'function') attachCadToRobot3(bot);
+      if (bot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(bot);
+      if (bot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(bot);
+    }
+  }
+
   function updateCamera(dt) {
     const activeTargetBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
     if (!activeTargetBot) {
@@ -5334,12 +5395,12 @@
       const followDist = 10.5;
       const followHeight = 5.2;
 
-      let camX = playerBot.x - Math.sin(smoothCamHeading) * followDist;
-      let camZ = playerBot.z - Math.cos(smoothCamHeading) * followDist;
-      let camY = playerBot.root.position.y + followHeight;
+      let camX = activeTargetBot.x - Math.sin(smoothCamHeading) * followDist;
+      let camZ = activeTargetBot.z - Math.cos(smoothCamHeading) * followDist;
+      let camY = (activeTargetBot.root ? activeTargetBot.root.position.y : 0) + followHeight;
 
       // Dynamic wall clearance: if behind-camera goes near/past wall, adjust smoothly
-      const pDistCenter = Math.max(Math.abs(playerBot.x), Math.abs(playerBot.z));
+      const pDistCenter = Math.max(Math.abs(activeTargetBot.x), Math.abs(activeTargetBot.z));
       const wallNear = Math.max(0, pDistCenter - (ARENA_HALF - 3.8));
       if (wallNear > 0) {
         camY += wallNear * 1.5;
@@ -5350,9 +5411,9 @@
       // Look ahead along smoothed heading
       const forwardLead = 4.8;
       lookTarget.set(
-        playerBot.x + Math.sin(smoothCamHeading) * forwardLead,
-        playerBot.root.position.y + 0.85,
-        playerBot.z + Math.cos(smoothCamHeading) * forwardLead
+        activeTargetBot.x + Math.sin(smoothCamHeading) * forwardLead,
+        (activeTargetBot.root ? activeTargetBot.root.position.y : 0) + 0.85,
+        activeTargetBot.z + Math.cos(smoothCamHeading) * forwardLead
       );
     } else if (cameraMode === 1) {
       // ========================================================
@@ -5528,6 +5589,9 @@
         steerKnob.style.transform = `translateX(${s * 46}px)`;
 
         NetworkSys.sendInput(t, s);
+
+        updateBotVisuals(playerBot, dt);
+        updateBotVisuals(enemyBot, dt);
       } else {
         // HOST OR SINGLE-PLAYER / LOCAL / PRACTICE MODE:
         if (keys['KeyW'] || (keys['ArrowUp'] && gameMode !== '1v1')) t = 1;
