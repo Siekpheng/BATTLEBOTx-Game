@@ -1,1 +1,1 @@
-# 🤖 BATTLEBOTx — AI FARM Combat Simulator (https://siekpheng.github.io/BATTLEBOTx-Game/)
+# [🤖 BATTLEBOTx — AI FARM Combat Simulato](https://siekpheng.github.io/BATTLEBOTx-Game/)
