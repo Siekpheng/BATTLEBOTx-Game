@@ -2842,7 +2842,6 @@
 
   function optimizeRobotMaterial(mesh) {
     if (!mesh || !mesh.material) return;
-    fixMeshWinding(mesh);
     mesh.castShadow = true;
     mesh.receiveShadow = false; // Robot casts crisp contact shadow on floor, but never self-shadows top surfaces
 
@@ -2855,12 +2854,12 @@
 
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     mats.forEach(mat => {
-      // 1. Guarantee 100% solid, fully opaque exterior rendering (completely hides internal cavity & edges)
+      // 1. Guarantee 100% solid, fully opaque rendering with DoubleSide (completely eliminates see-through on all CAD plates & cavity)
       mat.transparent = false;
       mat.opacity = 1.0;
       mat.depthWrite = true;
       mat.depthTest = true;
-      mat.side = THREE.FrontSide; // Solid outer armor surface
+      mat.side = THREE.DoubleSide; // Render both sides so CAD sheet metal panels & interior cavity are 100% solid
       mat.needsUpdate = true;
 
       // 2. Soften robot model reflectance so it's not too bright while keeping arena floor perfect:
