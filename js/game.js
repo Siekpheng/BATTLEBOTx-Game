@@ -393,15 +393,16 @@
         ensureBotModelLoaded(selectedP2BotType);
       }
     });
-  // Idle preloader: seamlessly stream default combatants (Robot 1 & 2) in background after menu renders
+  });
+
+  // Idle preloader: preload all 6 robots in background so menu swaps are instant
   setTimeout(() => {
     if (typeof ensureBotModelLoaded === 'function') {
-      ensureBotModelLoaded('robot1');
-      setTimeout(() => ensureBotModelLoaded('robot2'), 800);
+      ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'].forEach((t, i) => {
+        setTimeout(() => ensureBotModelLoaded(t), i * 650);
+      });
     }
-  }, 1500);
-
-  });
+  }, 1000);
 
   // HUD Touch Controls Toggle
   const btnToggleTouch = document.getElementById('btn-toggle-touch');
@@ -807,6 +808,7 @@
   }
 
   function triggerDamageVignette() {
+    if (matchState === 'menu') return;
     const vig = document.getElementById('damage-vignette');
     vig.style.opacity = '1';
     setTimeout(() => { vig.style.opacity = '0'; }, 240);
@@ -860,11 +862,13 @@
         Math.sin(orbitAngle) * radius
       );
 
-      // Look-at point drifts dynamically across arena highlights
+      // Dynamically track fighting bots in menu background
+      const bMidX = (playerBot && enemyBot) ? (playerBot.x + enemyBot.x) * 0.5 : 0;
+      const bMidZ = (playerBot && enemyBot) ? (playerBot.z + enemyBot.z) * 0.5 : 0;
       menuCamTargetLook.set(
-        Math.sin(t * 1.2) * 3.2,
-        0.8 + Math.max(0, Math.sin(t * 0.8 + 1.0)) * 1.6,
-        Math.cos(t * 0.9) * 3.5 - 1.2
+        bMidX * 0.70,
+        0.85,
+        bMidZ * 0.70
       );
     } else if (menuCameraMode === 'broadcast') {
       // High-angle sweeping stadium broadcast orbit
@@ -1044,6 +1048,155 @@
   }
 
   // ========================================================
+  // 10.5 MENU AI EXHIBITION BATTLE SYSTEM
+  // ========================================================
+  const MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
+  let menuP1Type = 'robot1';
+  let menuP2Type = 'robot2';
+  let menuRespawnCooldown = 0.0;
+
+  function driveMenuBotAI(bot, target, dt) {
+    if (!bot || !target) return;
+    if (bot.driveHealth <= 0 || bot.flipped) {
+      bot.throttleInput = 0;
+      bot.steerInput = 0;
+      return;
+    }
+
+    const dx = target.x - bot.x;
+    const dz = target.z - bot.z;
+    const targetYaw = Math.atan2(dx, dz);
+    let diff = targetYaw - bot.yaw;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+
+    const dist = Math.hypot(dx, dz);
+    const weaponReady = ((bot.weaponSpinSpeed || 0) >= 35.0);
+
+    // If weapon stalled on impact and close, reverse briefly to build kinetic RPM
+    if (!weaponReady && dist < 2.4) {
+      bot.throttleInput = -0.60;
+      bot.steerInput = Math.sin(performance.now() * 0.003) > 0 ? 0.70 : -0.70;
+    } else {
+      // Steer smoothly towards target
+      const steerTarget = Math.max(-1, Math.min(1, -diff * 2.2));
+      bot.steerInput += (steerTarget - bot.steerInput) * Math.min(1, dt * 6.0);
+
+      // Aggressive charge scaling
+      if (Math.abs(diff) < 0.45) {
+        bot.throttleInput = 1.0; // Full kinetic charge
+      } else if (Math.abs(diff) < 1.0) {
+        bot.throttleInput = 0.70;
+      } else {
+        bot.throttleInput = 0.38;
+      }
+    }
+
+    // Keep within arena bounds (turn back toward center if approaching kickplates)
+    const wallBound = ARENA_HALF - 1.6;
+    if (Math.abs(bot.x) > wallBound || Math.abs(bot.z) > wallBound) {
+      const centerYaw = Math.atan2(-bot.x, -bot.z);
+      let cDiff = centerYaw - bot.yaw;
+      while (cDiff > Math.PI) cDiff -= Math.PI * 2;
+      while (cDiff < -Math.PI) cDiff += Math.PI * 2;
+      bot.steerInput = Math.max(-1, Math.min(1, -cDiff * 2.5));
+      bot.throttleInput = Math.max(0.5, bot.throttleInput);
+    }
+  }
+
+  function isMenuBotImmobilized(bot, dt) {
+    if (!bot) return true;
+    if (bot.driveHealth <= 0) return true;
+    if (bot.flipped) return true;
+    const noWheels = bot.wheels && bot.wheels.length > 0 && bot.wheels.filter(w => w.attached).length === 0;
+    if (noWheels) return true;
+
+    const speed = Math.hypot(bot.vx, bot.vz);
+    if (speed < 0.35) {
+      bot.stoppedTimer = (bot.stoppedTimer || 0) + dt;
+      if (bot.stoppedTimer > 1.0) return true;
+    } else {
+      bot.stoppedTimer = 0.0;
+    }
+    return false;
+  }
+
+  function pickNextMenuRobot(exclude1, exclude2) {
+    const pool = MENU_ROBOT_ROSTER.filter(t => t !== exclude1 && t !== exclude2);
+    if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
+    return MENU_ROBOT_ROSTER.filter(t => t !== exclude1)[0] || 'robot1';
+  }
+
+  function startMenuDemoFight() {
+    if (matchState !== 'menu') return;
+    cleanupBots();
+
+    if (!menuP1Type) menuP1Type = 'robot1';
+    if (!menuP2Type) menuP2Type = 'robot2';
+
+    playerBot = createBotInstance(menuP1Type, -7.5, 0, Math.PI / 2);
+    enemyBot = createBotInstance(menuP2Type, 7.5, 0, -Math.PI / 2);
+
+    playerBot.weaponActive = true;
+    enemyBot.weaponActive = true;
+
+    if (playerBot.type === enemyBot.type) {
+      applyMirrorMatchRivalStyle(enemyBot);
+    }
+    menuRespawnCooldown = 0.4;
+  }
+
+  function checkMenuBotKnockout(dt) {
+    if (menuRespawnCooldown > 0) {
+      menuRespawnCooldown -= dt;
+      return;
+    }
+
+    const pStopped = isMenuBotImmobilized(playerBot, dt);
+    const eStopped = isMenuBotImmobilized(enemyBot, dt);
+
+    if (pStopped || eStopped) {
+      // Instant robot replacement — no 10s countdown!
+      AudioSys.metalClashSound(2.2, true);
+
+      let nextP1 = menuP1Type;
+      let nextP2 = menuP2Type;
+
+      if (pStopped && eStopped) {
+        nextP1 = pickNextMenuRobot(menuP1Type, menuP2Type);
+        nextP2 = pickNextMenuRobot(nextP1, menuP2Type);
+      } else if (pStopped) {
+        nextP1 = pickNextMenuRobot(menuP1Type, menuP2Type);
+      } else if (eStopped) {
+        nextP2 = pickNextMenuRobot(menuP2Type, menuP1Type);
+      }
+
+      menuP1Type = nextP1;
+      menuP2Type = nextP2;
+
+      // Spawn knockout sparks at defeated location
+      const defeatedBot = pStopped ? playerBot : enemyBot;
+      if (defeatedBot && defeatedBot.root) {
+        spawnCollisionSparks(new THREE.Vector3(defeatedBot.x, 0.4, defeatedBot.z), 50);
+      }
+
+      cleanupBots();
+
+      playerBot = createBotInstance(menuP1Type, -7.5, 0, Math.PI / 2);
+      enemyBot = createBotInstance(menuP2Type, 7.5, 0, -Math.PI / 2);
+
+      playerBot.weaponActive = true;
+      enemyBot.weaponActive = true;
+
+      if (playerBot.type === enemyBot.type) {
+        applyMirrorMatchRivalStyle(enemyBot);
+      }
+
+      menuRespawnCooldown = 0.6;
+    }
+  }
+
+  // ========================================================
   // 11. MAIN ANIMATION LOOP
   // ========================================================
   let lastTime = performance.now();
@@ -1171,7 +1324,18 @@
     // Always poll Controller 1 every frame (LB weapon toggle and RB camera cycle respond during countdown & playing)
     const gp1 = pollGamepadControls(0);
 
-    if (matchState === 'playing' && playerBot && enemyBot) {
+    if (matchState === 'menu') {
+      if (!playerBot || !enemyBot) {
+        startMenuDemoFight();
+      } else {
+        driveMenuBotAI(playerBot, enemyBot, simDt);
+        driveMenuBotAI(enemyBot, playerBot, simDt);
+        updateBotPhysics(playerBot, simDt);
+        updateBotPhysics(enemyBot, simDt);
+        handleBotCollision();
+        checkMenuBotKnockout(dt);
+      }
+    } else if (matchState === 'playing' && playerBot && enemyBot) {
       let t = sliderThrottleVal;
       let s = sliderSteerVal;
 
@@ -1374,6 +1538,9 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
+    // Launch initial Menu Exhibition Fight
+  startMenuDemoFight();
 
   requestAnimationFrame(animate);
 

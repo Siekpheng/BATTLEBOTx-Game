@@ -589,7 +589,8 @@
     updateCombatAudio(pBot, eBot, matchState, dt) {
       if (!this.ctx || this.ctx.state !== 'running' || !this.loopsInitialized) return;
       const now = this.ctx.currentTime;
-      const isCombatActive = (matchState === 'playing' || matchState === 'countdown');
+      const isCombatActive = (matchState === 'playing' || matchState === 'countdown' || (matchState === 'menu' && pBot && eBot));
+      const menuVol = (matchState === 'menu') ? 0.35 : 1.0;
 
       // --- PLAYER WEAPON WINDING & SPIN SOUND ---
       const pSpeed = (pBot && isCombatActive) ? (pBot.weaponSpinSpeed || 0) : 0;
@@ -600,7 +601,7 @@
         const motorFreq = 110 + Math.pow(pRpm, 1.45) * 880;
         this.pMotorOsc.frequency.setTargetAtTime(motorFreq, now, 0.035);
         this.pMotorFilter.frequency.setTargetAtTime(motorFreq * 1.6, now, 0.035);
-        this.pMotorGain.gain.setTargetAtTime(0.025 + pRpm * 0.15, now, 0.04);
+        this.pMotorGain.gain.setTargetAtTime((0.025 + pRpm * 0.15) * menuVol, now, 0.04);
 
         // Aerodynamic air rush filter tracking RPM
         if (this.pAirFilter && this.pAirGain) {
@@ -630,7 +631,7 @@
         const eMotorFreq = 95 + Math.pow(eRpm, 1.45) * 820;
         this.eMotorOsc.frequency.setTargetAtTime(eMotorFreq, now, 0.035);
         this.eMotorFilter.frequency.setTargetAtTime(eMotorFreq * 1.5, now, 0.035);
-        this.eMotorGain.gain.setTargetAtTime(0.02 + eRpm * 0.12, now, 0.04);
+        this.eMotorGain.gain.setTargetAtTime((0.02 + eRpm * 0.12) * menuVol, now, 0.04);
 
         if (this.eAirFilter && this.eAirGain) {
           const eAirFreq = 280 + Math.pow(eRpm, 1.3) * 1750;
@@ -1403,14 +1404,20 @@
   let hitStopRemaining = 0.0;
 
   function addCameraTrauma(amount) {
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      cameraTrauma = Math.min(0.22, cameraTrauma + amount * 0.22);
+      return;
+    }
     cameraTrauma = Math.min(1.0, cameraTrauma + amount);
   }
 
   function triggerHitStop(durationSec = 0.055) {
+    if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     hitStopRemaining = Math.max(hitStopRemaining, durationSec);
   }
 
   function triggerGamepadRumble(intensity = 0.7, durationMs = 200) {
+    if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     // 1. Dual-Motor Gamepad Haptics (Xbox / PlayStation / USB Controller)
     if (typeof navigator.getGamepads === 'function') {
       try {
