@@ -487,14 +487,27 @@
           enemyBot.vz += nz * clashImpulse;
 
           // Head-on kinetic explosion: vertical lift and rotational torque for both robots
-          playerBot.vy = 3.2 + Math.random() * 1.4;
-          enemyBot.vy = 3.2 + Math.random() * 1.4;
-          playerBot.airY = 0.35;
-          enemyBot.airY = 0.35;
-          playerBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
-          enemyBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
-          if (Math.random() < 0.42) playerBot.flipped = true;
-          if (Math.random() < 0.42) enemyBot.flipped = true;
+          const bothWeaponsMax = (playerBot.weaponSpinSpeed >= 88.0 && enemyBot.weaponSpinSpeed >= 88.0);
+          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 5.5 && eSpeedBefore >= 5.5);
+          const canClashFlip = bothWeaponsMax && bothTravelFast;
+
+          if (canClashFlip) {
+            playerBot.vy = 4.2 + Math.random() * 1.2;
+            enemyBot.vy = 4.2 + Math.random() * 1.2;
+            playerBot.airY = 0.40;
+            enemyBot.airY = 0.40;
+            playerBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
+            enemyBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
+            playerBot.flipped = true;
+            enemyBot.flipped = true;
+          } else {
+            playerBot.vy = 1.2;
+            enemyBot.vy = 1.2;
+            playerBot.airY = 0.10;
+            enemyBot.airY = 0.10;
+            playerBot.pitchVel = (Math.random() < 0.5 ? -4.5 : 4.5);
+            enemyBot.pitchVel = (Math.random() < 0.5 ? -4.5 : 4.5);
+          }
 
           spawnCollisionSparks(midPos, 65);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
@@ -540,14 +553,16 @@
           // (Enemy takes kinetic damage, sparks, flings. Player takes 0 damage!)
           // ========================================================
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
-          const isWeaponSpinning = (playerBot.weaponSpinSpeed >= 38.0);
-          const isSolidHit = (impactSpeed >= 2.2 || pApproach >= 1.8 || pSpeedBefore >= 2.6);
-          const canSendFlying = isWeaponSpinning && isSolidHit;
+          
+          // Realistic flipping criteria: ONLY flip when weapon is spinning at MAX and robot travel speed is FAST!
+          const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= 88.0);
+          const isPTravelFast = (pSpeedBefore >= 6.0 && (pApproach >= 4.2 || impactSpeed >= 7.5));
+          const canFlipEnemy = isPWeaponMax && isPTravelFast;
           const wasEnemyFlipped = enemyBot.flipped;
 
-          AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
+          AudioSys.metalClashSound(canFlipEnemy ? 2.4 : 1.9, true);
           AudioSys.weaponSliceSound();
-          if (canSendFlying) {
+          if (canFlipEnemy) {
             AudioSys.crowdCheer(0.85, 1.6);
             addCameraTrauma(0.85);
             triggerGamepadRumble(1.0, 360);
@@ -558,19 +573,19 @@
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const pRecoil = canSendFlying ? 4.2 : 2.0;
+          const pRecoil = canFlipEnemy ? 4.2 : 2.0;
           playerBot.vx -= nx * pRecoil;
           playerBot.vz -= nz * pRecoil;
-          playerBot.vy = Math.max(playerBot.vy, canSendFlying ? 0.9 : 0.35);
+          playerBot.vy = Math.max(playerBot.vy, canFlipEnemy ? 0.9 : 0.35);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: canFlipEnemy ? 2.4 : 1.9, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
           }
 
-          if (canSendFlying) {
-            // UNIVERSAL FLIPPING & LAUNCH PHYSICS FOR ALL 6 ROBOTS:
-            enemyBot.vy = 4.6 + Math.random() * 1.6;
+          if (canFlipEnemy) {
+            // MAXIMUM KINETIC IMPACT: HIGH-SPEED LAUNCH & FLIP!
+            enemyBot.vy = 4.8 + Math.random() * 1.5;
             enemyBot.airY = 0.45;
             enemyBot.vx += nx * (9.0 + impactSpeed * 0.7);
             enemyBot.vz += nz * (9.0 + impactSpeed * 0.7);
@@ -589,23 +604,24 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
             }
           } else {
-            enemyBot.vy = 2.0;
-            enemyBot.airY = 0.22;
-            enemyBot.vx += nx * (4.5 + impactSpeed * 0.6);
-            enemyBot.vz += nz * (4.5 + impactSpeed * 0.6);
+            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
+            enemyBot.vy = 1.0;
+            enemyBot.airY = 0.08;
+            enemyBot.vx += nx * (4.2 + impactSpeed * 0.55);
+            enemyBot.vz += nz * (4.2 + impactSpeed * 0.55);
 
             if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -16.0 : 16.0);
+              enemyBot.pitchVel = (eHitForward > 0 ? -4.5 : 4.5);
               enemyBot.rollVel = 0;
             } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -15.0 : 15.0);
+              enemyBot.rollVel = (eHitRight > 0 ? -4.5 : 4.5);
               enemyBot.pitchVel = 0;
             }
-            if (Math.random() < 0.40) enemyBot.flipped = true;
+            // Firmly remains on wheels: NO enemyBot.flipped = true
 
-            spawnCollisionSparks(midPos, 22);
+            spawnCollisionSparks(midPos, 24);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 24 });
             }
           }
 
@@ -654,14 +670,16 @@
           // ENEMY WEAPON STRIKE ON PLAYER (Non-practice mode only)
           // ========================================================
           const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
-          const isWeaponSpinning = (enemyBot.weaponSpinSpeed >= 38.0);
-          const isSolidHit = (impactSpeed >= 2.2 || eApproach >= 1.8 || eSpeedBefore >= 2.6);
-          const canSendFlying = isWeaponSpinning && isSolidHit;
+
+          // Realistic flipping criteria: ONLY flip when weapon is spinning at MAX and robot travel speed is FAST!
+          const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= 88.0);
+          const isETravelFast = (eSpeedBefore >= 6.0 && (eApproach >= 4.2 || impactSpeed >= 7.5));
+          const canFlipPlayer = isEWeaponMax && isETravelFast;
           const wasPlayerFlipped = playerBot.flipped;
 
-          AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
+          AudioSys.metalClashSound(canFlipPlayer ? 2.4 : 1.9, true);
           AudioSys.weaponSliceSound();
-          if (canSendFlying) {
+          if (canFlipPlayer) {
             AudioSys.crowdCheer(0.85, 1.6);
             addCameraTrauma(0.85);
             triggerGamepadRumble(1.0, 360);
@@ -672,19 +690,19 @@
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const eRecoil = canSendFlying ? 4.2 : 2.0;
+          const eRecoil = canFlipPlayer ? 4.2 : 2.0;
           enemyBot.vx += nx * eRecoil;
           enemyBot.vz += nz * eRecoil;
-          enemyBot.vy = Math.max(enemyBot.vy, canSendFlying ? 0.9 : 0.35);
+          enemyBot.vy = Math.max(enemyBot.vy, canFlipPlayer ? 0.9 : 0.35);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: canFlipPlayer ? 2.4 : 1.9, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
           }
 
-          if (canSendFlying) {
-            // UNIVERSAL FLIPPING & LAUNCH PHYSICS FOR ALL 6 ROBOTS:
-            playerBot.vy = 4.6 + Math.random() * 1.6;
+          if (canFlipPlayer) {
+            // MAXIMUM KINETIC IMPACT: HIGH-SPEED LAUNCH & FLIP!
+            playerBot.vy = 4.8 + Math.random() * 1.5;
             playerBot.airY = 0.45;
             playerBot.vx -= nx * (9.0 + impactSpeed * 0.7);
             playerBot.vz -= nz * (9.0 + impactSpeed * 0.7);
@@ -703,23 +721,24 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
             }
           } else {
-            playerBot.vy = 2.0;
-            playerBot.airY = 0.22;
-            playerBot.vx -= nx * (4.5 + impactSpeed * 0.6);
-            playerBot.vz -= nz * (4.5 + impactSpeed * 0.6);
+            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
+            playerBot.vy = 1.0;
+            playerBot.airY = 0.08;
+            playerBot.vx -= nx * (4.2 + impactSpeed * 0.55);
+            playerBot.vz -= nz * (4.2 + impactSpeed * 0.55);
 
             if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -16.0 : 16.0);
+              playerBot.pitchVel = (pHitForward > 0 ? -4.5 : 4.5);
               playerBot.rollVel = 0;
             } else {
-              playerBot.rollVel = (pHitRight > 0 ? -15.0 : 15.0);
+              playerBot.rollVel = (pHitRight > 0 ? -4.5 : 4.5);
               playerBot.pitchVel = 0;
             }
-            if (Math.random() < 0.40) playerBot.flipped = true;
+            // Firmly remains on wheels: NO playerBot.flipped = true
 
-            spawnCollisionSparks(midPos, 22);
+            spawnCollisionSparks(midPos, 24);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 24 });
             }
           }
 
@@ -797,10 +816,9 @@
               const driveDmg = Math.max(0, impactSpeed * 0.85);
               enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
               if (impactSpeed > 4.2) {
-                enemyBot.vy = 2.6;
-                enemyBot.airY = 0.32;
-                enemyBot.rollVel = (eHitRight > 0 ? -18.0 : 18.0);
-                if (Math.random() < 0.50) enemyBot.flipped = true;
+                enemyBot.vy = 0.8;
+                enemyBot.airY = 0.08;
+                enemyBot.rollVel = (eHitRight > 0 ? -4.5 : 4.5);
               }
               if (impactSpeed > 5.5 && Math.random() < 0.45) {
                 detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
@@ -818,10 +836,9 @@
               playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
               triggerDamageVignette();
               if (impactSpeed > 4.2) {
-                playerBot.vy = 2.6;
-                playerBot.airY = 0.32;
-                playerBot.rollVel = (pHitRight > 0 ? -18.0 : 18.0);
-                if (Math.random() < 0.50) playerBot.flipped = true;
+                playerBot.vy = 0.8;
+                playerBot.airY = 0.08;
+                playerBot.rollVel = (pHitRight > 0 ? -4.5 : 4.5);
               }
               if (impactSpeed > 5.5 && Math.random() < 0.45) {
                 detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
