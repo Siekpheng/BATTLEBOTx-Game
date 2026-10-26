@@ -1827,7 +1827,7 @@
   // ========================================================
   // 1.0 NON-COPYRIGHT PROCEDURAL COMBAT SOUNDTRACK (BgmSys)
   // 100% Original Code-Synthesized Cyberpunk Industrial Soundtrack
-  // 0 KB Download Footprint, Adaptive To Match Combat State
+  // 0 KB Footprint, Loud & Punchy Mastered Mix, Adaptive To Match Combat State
   // ========================================================
   const BgmSys = {
     ctx: null,
@@ -1837,7 +1837,7 @@
 
     enabled: true,
     isPlaying: false,
-    tempo: 126, // High-energy industrial combat tempo
+    tempo: 128, // High-energy cyberpunk combat tempo
     step: 0,
     nextNoteTime: 0,
     timerId: null,
@@ -1853,7 +1853,8 @@
         let saved = null;
         try { saved = localStorage.getItem('battlebotx_bgm_enabled'); } catch(e){}
         this.enabled = (saved !== null) ? (saved === 'true') : true;
-        this.bgmGain.gain.setValueAtTime(this.enabled ? 0.22 : 0.0001, this.ctx.currentTime);
+        // Punchy, studio-mastered soundtrack level (0.70)
+        this.bgmGain.gain.setValueAtTime(this.enabled ? 0.70 : 0.0001, this.ctx.currentTime);
         this.bgmGain.connect(this.masterOut);
       }
       this.updateUI();
@@ -1862,7 +1863,7 @@
     start() {
       if (!this.ctx || this.isPlaying) return;
       this.isPlaying = true;
-      this.nextNoteTime = this.ctx.currentTime + 0.1;
+      this.nextNoteTime = this.ctx.currentTime + 0.05;
       this.step = 0;
       this.scheduleLoop();
     },
@@ -1879,13 +1880,18 @@
       this.mode = mode; // 'menu' | 'combat' | 'climax'
     },
 
+    updateGain() {
+      if (this.bgmGain && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.bgmGain.gain.cancelScheduledValues(now);
+        this.bgmGain.gain.setTargetAtTime(this.enabled ? 0.70 : 0.0001, now, 0.05);
+      }
+    },
+
     toggle() {
       this.enabled = !this.enabled;
       try { localStorage.setItem('battlebotx_bgm_enabled', String(this.enabled)); } catch(e){}
-      if (this.bgmGain && this.ctx) {
-        const now = this.ctx.currentTime;
-        this.bgmGain.gain.setTargetAtTime(this.enabled ? 0.22 : 0.0001, now, 0.08);
-      }
+      this.updateGain();
       this.updateUI();
       return this.enabled;
     },
@@ -1893,9 +1899,19 @@
     updateUI() {
       const menuBtn = document.getElementById('btn-menu-music');
       const hudBtn = document.getElementById('btn-hud-music');
+      const isSuspended = (this.ctx && this.ctx.state === 'suspended');
+
       if (menuBtn) {
-        menuBtn.textContent = this.enabled ? '🎵 Music: ON' : '🔇 Music: OFF';
-        menuBtn.style.color = this.enabled ? '#38bdf8' : '#94a3b8';
+        if (!this.enabled) {
+          menuBtn.innerHTML = '🔇 Music: <strong>OFF</strong>';
+          menuBtn.style.color = '#94a3b8';
+        } else if (isSuspended) {
+          menuBtn.innerHTML = '🎵 Music: <strong>CLICK TO PLAY</strong>';
+          menuBtn.style.color = '#38bdf8';
+        } else {
+          menuBtn.innerHTML = '🎵 Music: <strong>ON</strong>';
+          menuBtn.style.color = '#38bdf8';
+        }
       }
       if (hudBtn) {
         hudBtn.textContent = this.enabled ? '🎵' : '🔇';
@@ -1915,7 +1931,7 @@
         this.nextNoteTime += secondsPer16th;
       }
 
-      this.timerId = setTimeout(() => this.scheduleLoop(), 40);
+      this.timerId = setTimeout(() => this.scheduleLoop(), 35);
     },
 
     scheduleStep(step, time) {
@@ -1925,45 +1941,46 @@
       const isMenu = (this.mode === 'menu');
       const isClimax = (this.mode === 'climax');
 
-      // 1. DRUMS (Kick, Snare, Hi-Hats)
+      // 1. DRUMS (Punchy Kick, Snappy Snare, Crisp Hi-Hats)
       const isKickStep = isMenu
-        ? (stepInBar === 0 || stepInBar === 8)
+        ? (stepInBar === 0 || stepInBar === 8 || stepInBar === 14)
         : (stepInBar === 0 || stepInBar === 4 || stepInBar === 8 || stepInBar === 12 || (isClimax && stepInBar === 14));
 
       if (isKickStep) {
-        this.playKick(time, isMenu ? 0.18 : 0.38, isMenu ? 100 : 145);
+        this.playKick(time, isMenu ? 0.52 : (isClimax ? 0.68 : 0.60), isMenu ? 130 : 160);
       }
 
-      if (!isMenu && (stepInBar === 4 || stepInBar === 12)) {
-        this.playSnare(time, isClimax ? 0.30 : 0.24);
+      // Snare on beats 4 and 12 (both in Menu and Combat for clear rhythmic pulse!)
+      if (stepInBar === 4 || stepInBar === 12) {
+        this.playSnare(time, isMenu ? 0.36 : (isClimax ? 0.50 : 0.44));
       }
 
-      if (!isMenu) {
+      // Hi-Hats & Shakers
+      const isHatStep = isMenu ? (stepInBar % 2 === 0) : (isClimax || stepInBar % 2 === 0);
+      if (isHatStep) {
         const isOpen = (stepInBar === 2 || stepInBar === 6 || stepInBar === 10 || stepInBar === 14);
-        const isEvery = isClimax || (stepInBar % 2 === 0);
-        if (isEvery) {
-          this.playHat(time, isOpen ? 0.12 : 0.07, isOpen);
-        }
+        this.playHat(time, isOpen ? 0.20 : 0.12, isOpen);
       }
 
       // 2. HEAVY INDUSTRIAL CYBERPUNK BASSLINE
-      // Bar 0: D (Root D1 = 36.71 Hz / D2 = 73.42 Hz)
-      // Bar 1: F (Root F1 = 43.65 Hz / F2 = 87.31 Hz)
-      // Bar 2: G (Root G1 = 49.00 Hz / G2 = 98.00 Hz)
-      // Bar 3: C -> A (C1 = 32.70 Hz, step >= 8: A0 = 27.50 Hz)
+      // 4-Bar Chord Progression in D-Minor:
+      // Bar 0: D (D1 = 36.71 Hz / D2 = 73.42 Hz)
+      // Bar 1: F (F1 = 43.65 Hz / F2 = 87.31 Hz)
+      // Bar 2: G (G1 = 49.00 Hz / G2 = 98.00 Hz)
+      // Bar 3: Bb -> A (Bb0 = 29.14 Hz, step >= 8: A0 = 27.50 Hz)
       let rootHz = 36.71;
       if (bar === 1) rootHz = 43.65;
       else if (bar === 2) rootHz = 49.00;
-      else if (bar === 3) rootHz = (stepInBar < 8) ? 32.70 : 27.50;
+      else if (bar === 3) rootHz = (stepInBar < 8) ? 29.14 : 27.50;
 
       const isOctave = (stepInBar % 2 === 1);
       const bassFreq = isOctave ? rootHz * 2.0 : rootHz;
 
-      const cutoff = isMenu ? 260 : (isClimax ? 820 : 520);
-      const bassVol = isMenu ? 0.15 : (isKickStep ? 0.18 : 0.25); // Natural sidechain ducking on kick beats!
+      const cutoff = isMenu ? 580 : (isClimax ? 1200 : 850);
+      const bassVol = isKickStep ? 0.38 : (isMenu ? 0.44 : 0.52);
       this.playBass(time, bassFreq, cutoff, bassVol);
 
-      // 3. MELODIC SYNTH ARPEGGIO & BATTLE HOOK
+      // 3. MELODIC SYNTH ARPEGGIO & BATTLE HOOK (Lush, Audible, Sparkling Lead)
       const arpNotes = [
         146.83, 220.00, 293.66, 349.23,  220.00, 293.66, 349.23, 440.00,
         146.83, 220.00, 293.66, 349.23,  293.66, 349.23, 440.00, 523.25,
@@ -1971,74 +1988,81 @@
         174.61, 220.00, 261.63, 349.23,  261.63, 349.23, 440.00, 523.25,
         196.00, 233.08, 293.66, 392.00,  233.08, 293.66, 392.00, 466.16,
         196.00, 233.08, 293.66, 392.00,  293.66, 392.00, 466.16, 587.33,
-        164.81, 220.00, 261.63, 329.63,  220.00, 261.63, 329.63, 440.00,
+        233.08, 293.66, 349.23, 466.16,  220.00, 261.63, 329.63, 440.00,
         220.00, 261.63, 329.63, 440.00,  261.63, 329.63, 440.00, 587.33
       ];
 
-      if (stepInBar % 2 === 0 || (isClimax && stepInBar % 2 === 1)) {
+      // In Menu: 8th note arpeggios; in Combat: driving 16ths
+      if (stepInBar % 2 === 0 || !isMenu) {
         const leadFreq = arpNotes[step % arpNotes.length];
-        this.playLead(time, leadFreq, isMenu ? 0.08 : (isClimax ? 0.17 : 0.12), isMenu);
+        this.playLead(time, leadFreq, isMenu ? 0.32 : (isClimax ? 0.44 : 0.38), isMenu);
       }
     },
 
-    playKick(time, vol = 0.35, startFreq = 145) {
+    playKick(time, vol = 0.60, startFreq = 160) {
       if (!this.ctx || !this.bgmGain) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
+      // Pitch punch: snappy dive from startFreq down to deep sub 42 Hz
       osc.frequency.setValueAtTime(startFreq, time);
-      osc.frequency.exponentialRampToValueAtTime(36, time + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(42, time + 0.08);
 
+      // Volume envelope: strong transient attack decaying over 0.14s
       gain.gain.setValueAtTime(vol, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
 
       osc.connect(gain);
       gain.connect(this.bgmGain);
 
       osc.start(time);
-      osc.stop(time + 0.10);
+      osc.stop(time + 0.15);
     },
 
-    playSnare(time, vol = 0.25) {
-      if (!this.ctx || !this.bgmGain || !this.noiseBuffer) return;
+    playSnare(time, vol = 0.44) {
+      if (!this.ctx || !this.bgmGain) return;
 
-      const nNode = this.ctx.createBufferSource();
-      const nFilter = this.ctx.createBiquadFilter();
-      const nGain = this.ctx.createGain();
-      nNode.buffer = this.noiseBuffer;
-      nFilter.type = 'bandpass';
-      nFilter.frequency.setValueAtTime(1800, time);
-      nFilter.Q.setValueAtTime(2.0, time);
-      nGain.gain.setValueAtTime(vol, time);
-      nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
-      nNode.connect(nFilter);
-      nFilter.connect(nGain);
-      nGain.connect(this.bgmGain);
-      nNode.start(time);
-      nNode.stop(time + 0.15);
+      // Noise body
+      if (this.noiseBuffer) {
+        const nNode = this.ctx.createBufferSource();
+        const nFilter = this.ctx.createBiquadFilter();
+        const nGain = this.ctx.createGain();
+        nNode.buffer = this.noiseBuffer;
+        nFilter.type = 'bandpass';
+        nFilter.frequency.setValueAtTime(1900, time);
+        nFilter.Q.setValueAtTime(1.4, time);
+        nGain.gain.setValueAtTime(vol * 0.9, time);
+        nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+        nNode.connect(nFilter);
+        nFilter.connect(nGain);
+        nGain.connect(this.bgmGain);
+        nNode.start(time);
+        nNode.stop(time + 0.18);
+      }
 
+      // Tonal body (snappy electronic snap)
       const osc = this.ctx.createOscillator();
       const oGain = this.ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(210, time);
-      osc.frequency.exponentialRampToValueAtTime(80, time + 0.06);
-      oGain.gain.setValueAtTime(vol * 0.7, time);
-      oGain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+      osc.frequency.setValueAtTime(240, time);
+      osc.frequency.exponentialRampToValueAtTime(95, time + 0.07);
+      oGain.gain.setValueAtTime(vol * 0.85, time);
+      oGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
       osc.connect(oGain);
       oGain.connect(this.bgmGain);
       osc.start(time);
-      osc.stop(time + 0.08);
+      osc.stop(time + 0.09);
     },
 
-    playHat(time, vol = 0.09, isOpen = false) {
+    playHat(time, vol = 0.14, isOpen = false) {
       if (!this.ctx || !this.bgmGain || !this.noiseBuffer) return;
       const node = this.ctx.createBufferSource();
       const filter = this.ctx.createBiquadFilter();
       const gain = this.ctx.createGain();
       node.buffer = this.noiseBuffer;
       filter.type = 'highpass';
-      filter.frequency.setValueAtTime(6800, time);
-      const dur = isOpen ? 0.09 : 0.035;
+      filter.frequency.setValueAtTime(5500, time);
+      const dur = isOpen ? 0.12 : 0.045;
       gain.gain.setValueAtTime(vol, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
       node.connect(filter);
@@ -2048,48 +2072,60 @@
       node.stop(time + dur + 0.01);
     },
 
-    playBass(time, freq, cutoff = 520, vol = 0.24) {
+    playBass(time, freq, cutoff = 850, vol = 0.48) {
       if (!this.ctx || !this.bgmGain) return;
-      const osc = this.ctx.createOscillator();
+      // Dual oscillators: Sawtooth for rich audible harmonics on laptops + Triangle for deep subwoofer punch
+      const oscSaw = this.ctx.createOscillator();
+      const oscTri = this.ctx.createOscillator();
       const filter = this.ctx.createBiquadFilter();
       const gain = this.ctx.createGain();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, time);
+      oscSaw.type = 'sawtooth';
+      oscTri.type = 'triangle';
+
+      // Mid harmonics (octave 2/3 for clear presence on small speakers)
+      oscSaw.frequency.setValueAtTime(freq * 2.0, time);
+      // Subwoofer foundation
+      oscTri.frequency.setValueAtTime(freq, time);
 
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(cutoff, time);
-      filter.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.45), time + 0.10);
-      filter.Q.setValueAtTime(3.2, time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(160, cutoff * 0.40), time + 0.12);
+      filter.Q.setValueAtTime(2.8, time);
 
       gain.gain.setValueAtTime(vol, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.11);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
 
-      osc.connect(filter);
+      oscSaw.connect(filter);
+      oscTri.connect(filter);
       filter.connect(gain);
       gain.connect(this.bgmGain);
 
-      osc.start(time);
-      osc.stop(time + 0.12);
+      oscSaw.start(time);
+      oscTri.start(time);
+      oscSaw.stop(time + 0.15);
+      oscTri.stop(time + 0.15);
     },
 
-    playLead(time, freq, vol = 0.12, isMenu = false) {
+    playLead(time, freq, vol = 0.36, isMenu = false) {
       if (!this.ctx || !this.bgmGain) return;
+      // Dual detuned oscillators for lush cyberpunk stereo-feel
       const osc1 = this.ctx.createOscillator();
       const osc2 = this.ctx.createOscillator();
       const filter = this.ctx.createBiquadFilter();
       const gain = this.ctx.createGain();
 
-      osc1.type = isMenu ? 'sine' : 'sawtooth';
-      osc2.type = 'triangle';
+      osc1.type = 'sawtooth';
+      osc2.type = 'square';
       osc1.frequency.setValueAtTime(freq, time);
-      osc2.frequency.setValueAtTime(freq * 1.004, time);
+      osc2.frequency.setValueAtTime(freq * 1.005, time); // Subtle rich chorus detune
 
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(isMenu ? 900 : 1600, time);
-      filter.Q.setValueAtTime(2.2, time);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(isMenu ? 2600 : 3800, time);
+      filter.frequency.exponentialRampToValueAtTime(isMenu ? 1200 : 1800, time + (isMenu ? 0.22 : 0.14));
+      filter.Q.setValueAtTime(1.8, time);
 
-      const dur = isMenu ? 0.22 : 0.14;
+      const dur = isMenu ? 0.24 : 0.16;
       gain.gain.setValueAtTime(vol, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
@@ -3114,8 +3150,15 @@
     }
   };
   // Global pointer/keyboard interaction triggers to unlock AudioContext seamlessly
-  ['click', 'keydown', 'touchstart'].forEach(evt => {
-    window.addEventListener(evt, () => AudioSys.init(), { once: true, passive: true });
+  const unlockAudioContext = () => {
+    AudioSys.init();
+    if (AudioSys.ctx && AudioSys.ctx.state === 'running') {
+      if (BgmSys.enabled && !BgmSys.isPlaying) BgmSys.start();
+      BgmSys.updateUI();
+    }
+  };
+  ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(evt => {
+    window.addEventListener(evt, unlockAudioContext, { passive: true });
   });
 
   // ========================================================
@@ -5096,17 +5139,42 @@
   // BGM Soundtrack Toggle Buttons (Menu & In-Game HUD)
   const btnMenuMusic = document.getElementById('btn-menu-music');
   if (btnMenuMusic) {
-    btnMenuMusic.addEventListener('click', () => {
+    btnMenuMusic.addEventListener('click', (e) => {
+      e.stopPropagation();
       AudioSys.init();
-      BgmSys.toggle();
+      if (AudioSys.ctx && AudioSys.ctx.state === 'suspended') {
+        AudioSys.ctx.resume().then(() => {
+          BgmSys.enabled = true;
+          BgmSys.updateGain();
+          if (!BgmSys.isPlaying) BgmSys.start();
+          BgmSys.updateUI();
+        });
+      } else if (!BgmSys.isPlaying) {
+        BgmSys.enabled = true;
+        BgmSys.updateGain();
+        BgmSys.start();
+        BgmSys.updateUI();
+      } else {
+        BgmSys.toggle();
+      }
     });
   }
 
   const btnHudMusic = document.getElementById('btn-hud-music');
   if (btnHudMusic) {
-    btnHudMusic.addEventListener('click', () => {
+    btnHudMusic.addEventListener('click', (e) => {
+      e.stopPropagation();
       AudioSys.init();
-      BgmSys.toggle();
+      if (AudioSys.ctx && AudioSys.ctx.state === 'suspended') {
+        AudioSys.ctx.resume().then(() => {
+          BgmSys.enabled = true;
+          BgmSys.updateGain();
+          if (!BgmSys.isPlaying) BgmSys.start();
+          BgmSys.updateUI();
+        });
+      } else {
+        BgmSys.toggle();
+      }
     });
   }
 
