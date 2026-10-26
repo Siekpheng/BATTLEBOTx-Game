@@ -4166,6 +4166,9 @@
   function togglePlayerWeapon(bot = playerBot) {
     if (!bot) return;
     bot.weaponActive = (bot.weaponActive === false) ? true : false;
+    if (!bot.weaponActive) {
+      bot.weaponSpinSpeed = 0; // Strictly cut kinetic spin speed when weapon is disabled
+    }
     if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
       if (bot.weaponActive) {
         AudioSys.beep(840, 0.08); // High chirp for Weapon ON
@@ -4342,6 +4345,7 @@
 
   window.pollGamepadControls = pollGamepadControls;
   window.togglePlayerWeapon = togglePlayerWeapon;
+  window.handleBotCollision = handleBotCollision;
 
   // HUD Side Dock Toggle (Left / Right)
   const btnDockToggle = document.getElementById('btn-dock-toggle');
@@ -5674,8 +5678,8 @@
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 1);
         }
       } else if (bot.weaponActive === false) {
-        // Weapon motor turned OFF by player: decelerate to zero
-        bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - 32.0 * dt);
+        // Weapon motor turned OFF by player: strictly 0 RPM & 0 kinetic power
+        bot.weaponSpinSpeed = 0;
       } else {
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s)
         const targetSpin = 95.0;
@@ -5895,8 +5899,8 @@
       const isPractice = (gameMode === 'practice');
 
       if (impactSpeed > 1.8) {
-        const isPWeaponHit = (pForwardDot > 0.35 && playerBot.weaponSpinSpeed >= minWeaponSpin);
-        const isEWeaponHit = (!isPractice && eForwardDot > 0.35 && enemyBot.weaponSpinSpeed >= minWeaponSpin);
+        const isPWeaponHit = (playerBot.weaponActive !== false && pForwardDot > 0.35 && playerBot.weaponSpinSpeed >= minWeaponSpin);
+        const isEWeaponHit = (!isPractice && enemyBot.weaponActive !== false && eForwardDot > 0.35 && enemyBot.weaponSpinSpeed >= minWeaponSpin);
         const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
 
         if (isBothWeaponClash) {
@@ -6138,22 +6142,24 @@
           }
 
           if (isPractice) {
-            // Practice dummy is a stationary punching bag - NEVER damages player!
-            const driveDmg = Math.max(0, impactSpeed * 0.85);
-            enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
-            if (impactSpeed > 6.5 && Math.random() < 0.35) {
-              detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
-            }
-            if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
-              if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+            // Practice dummy: only takes damage if player weapon is enabled
+            if (playerBot.weaponActive !== false) {
+              const driveDmg = Math.max(0, impactSpeed * 0.85);
+              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+              if (impactSpeed > 6.5 && Math.random() < 0.35) {
+                detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
+              }
+              if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
+                if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+              }
             }
           } else {
-            // Real combat: attribute ramming damage based on closing velocity momentum
+            // Real combat: only inflict damage if attacking robot has weapon enabled
             const pIsAttacker = (pApproach > 1.2 && pApproach > eApproach * 1.15);
             const eIsAttacker = (eApproach > 1.2 && eApproach > pApproach * 1.15);
 
-            if (pIsAttacker) {
-              // Player rammed Enemy!
+            if (pIsAttacker && playerBot.weaponActive !== false) {
+              // Player rammed Enemy with active weapon!
               const driveDmg = Math.max(0, impactSpeed * 0.85);
               enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
               if (impactSpeed > 6.8 && Math.random() < 0.35) {
@@ -6162,8 +6168,8 @@
               if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
                 if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
               }
-            } else if (eIsAttacker) {
-              // Enemy rammed Player!
+            } else if (eIsAttacker && enemyBot.weaponActive !== false) {
+              // Enemy rammed Player with active weapon!
               const driveDmg = Math.max(0, impactSpeed * 0.85);
               playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
               triggerDamageVignette();
@@ -6173,8 +6179,8 @@
               if (impactSpeed > 5.0 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
                 if (Math.random() < 0.35) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
               }
-            } else {
-              // Mutual bumper crunch: both were driving into each other
+            } else if (playerBot.weaponActive !== false && enemyBot.weaponActive !== false) {
+              // Mutual bumper crunch: only damages if both robots have active weapons
               const pRam = Math.max(0, eApproach * 0.55);
               const eRam = Math.max(0, pApproach * 0.55);
               playerBot.driveHealth = Math.max(0, playerBot.driveHealth - pRam);
