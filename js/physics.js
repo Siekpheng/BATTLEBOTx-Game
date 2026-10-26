@@ -111,9 +111,11 @@
         const minWallStallSpin = 45.0; // Equal threshold for both robots
         if (wallFrontDot > 0.4 && bot.weaponSpinSpeed >= minWallStallSpin) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(outNx * 0.8, 0.3, outNz * 0.8)), 25);
-          AudioSys.metalClashSound(1.6, true);
-          bot.weaponSpinSpeed = 0; // Stops weapon on wall impact!
-          AudioSys.weaponStallSound();
+          if (typeof matchState === 'undefined' || matchState !== 'menu') {
+            AudioSys.metalClashSound(1.6, true);
+            bot.weaponSpinSpeed = 0; // Stops weapon on wall impact!
+            AudioSys.weaponStallSound();
+          }
         }
       }
     }
@@ -229,23 +231,24 @@
 
     // Active Weapon Rotation & Continuous Electric Motor Wind-Up
     if (bot.weaponMesh) {
-      if (gameMode === 'practice' && bot === enemyBot) {
+      const isMenu = (typeof matchState !== 'undefined' && matchState === 'menu');
+      if (!isMenu && gameMode === 'practice' && bot === enemyBot) {
         // Practice dummy weapon stays completely disarmed & inactive (0 RPM)
         bot.weaponSpinSpeed = 0;
-      } else if (bot.drivePower <= 0) {
+      } else if (!isMenu && bot.drivePower <= 0) {
         // Internal motor burnout spins down kinetic weapon
         bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - 20.0 * dt);
         if (Math.random() < 0.05) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 1);
         }
-      } else if (bot.weaponActive === false) {
+      } else if (!isMenu && bot.weaponActive === false) {
         // Weapon motor turned OFF by player: smooth mechanical inertia spindown until stopped
         const spinDownDecel = 24.0; // Smooth realistic deceleration (~4.0s from full 95 rad/s)
         bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - spinDownDecel * dt);
       } else {
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s)
         const targetSpin = 95.0;
-        const windUpRate = 38.0; // Equal balanced wind-up rate for both bots (~2.5s)
+        const windUpRate = isMenu ? 190.0 : 38.0; // Instant aggressive wind-up in menu demo fight!
         if (bot.weaponSpinSpeed < targetSpin) {
           bot.weaponSpinSpeed = Math.min(targetSpin, bot.weaponSpinSpeed + windUpRate * dt);
         }
@@ -469,8 +472,13 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          playerBot.weaponSpinSpeed = 0;
-          enemyBot.weaponSpinSpeed = 0;
+          if (typeof matchState === 'undefined' || matchState !== 'menu') {
+            playerBot.weaponSpinSpeed = 0;
+            enemyBot.weaponSpinSpeed = 0;
+          } else {
+            playerBot.weaponSpinSpeed = 95.0;
+            enemyBot.weaponSpinSpeed = 95.0;
+          }
 
           const clashImpulse = Math.min(8.0, 3.2 + impactSpeed * 0.45);
           playerBot.vx -= nx * clashImpulse;
@@ -601,9 +609,14 @@
             }
           }
 
-          playerBot.weaponSpinSpeed = 0;
-          enemyBot.weaponSpinSpeed = 0;
-          AudioSys.weaponStallSound();
+          if (typeof matchState === 'undefined' || matchState !== 'menu') {
+            playerBot.weaponSpinSpeed = 0;
+            enemyBot.weaponSpinSpeed = 0;
+            AudioSys.weaponStallSound();
+          } else {
+            playerBot.weaponSpinSpeed = 95.0;
+            enemyBot.weaponSpinSpeed = 95.0;
+          }
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'stall' });
           }
@@ -710,9 +723,14 @@
             }
           }
 
-          enemyBot.weaponSpinSpeed = 0;
-          playerBot.weaponSpinSpeed = 0;
-          AudioSys.weaponStallSound();
+          if (typeof matchState === 'undefined' || matchState !== 'menu') {
+            enemyBot.weaponSpinSpeed = 0;
+            playerBot.weaponSpinSpeed = 0;
+            AudioSys.weaponStallSound();
+          } else {
+            enemyBot.weaponSpinSpeed = 95.0;
+            playerBot.weaponSpinSpeed = 95.0;
+          }
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'stall' });
           }

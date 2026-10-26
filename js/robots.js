@@ -707,7 +707,7 @@
     bot.armorPanels = [];
     bot.wheels = [];
     clone.traverse(obj => {
-      if (obj.name === 'Weapon_Pivot') {
+      if (obj.name === 'Weapon_Pivot' || (!bot.weaponMesh && obj.name && obj.name.toLowerCase().includes('weapon') && !obj.name.includes('_Mesh'))) {
         bot.weaponMesh = obj;
         bot.weaponMesh.rotation.set(0, 0, 0);
         bot.weaponMesh.quaternion.set(0, 0, 0, 1);
@@ -724,6 +724,11 @@
       }
     });
     bot.cadAttached = true;
+    bot.drivePower = 1.0;
+    bot.weaponActive = true;
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      bot.weaponSpinSpeed = 95.0;
+    }
   }
 
   function attachCadToRobot1(bot) { attachCadToBot(bot, 'robot1'); }
@@ -789,6 +794,6 @@
       });
     }
 
-    return { root, tiltGroup, weaponMesh: weaponMesh || tiltGroup, armorPanels, wheels, cadAttached };
+    return { root, tiltGroup, weaponMesh: weaponMesh, armorPanels, wheels, cadAttached };
   }
 

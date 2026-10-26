@@ -7,6 +7,7 @@
   // ========================================================
   function togglePlayerWeapon(bot = playerBot) {
     if (!bot) return;
+    if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     bot.weaponActive = (bot.weaponActive === false) ? true : false;
     // When turning off, do not stop abruptly: let mechanical inertia smoothly coast down in updateRobotPhysics
     if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
@@ -158,7 +159,7 @@
 
     // 3. Left button (LB / buttons[4]) for turning weapon on/off
     const lbPressed = !!(pad.buttons && pad.buttons[4] && (pad.buttons[4].pressed || pad.buttons[4].value > 0.5));
-    if (lbPressed && !prev.lb) {
+    if (lbPressed && !prev.lb && (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'))) {
       if (playerIndex === 0 && playerBot) {
         togglePlayerWeapon(playerBot);
       } else if (playerIndex === 1 && enemyBot && gameMode === '1v1') {

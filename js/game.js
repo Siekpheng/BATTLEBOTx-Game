@@ -24,7 +24,7 @@
       pitchVel: 0,
       roll: 0,
       rollVel: 0,
-      weaponSpinSpeed: 0.0,
+      weaponSpinSpeed: (typeof matchState !== 'undefined' && matchState === 'menu') ? 95.0 : 0.0,
       weaponActive: true,
       halfWidth: 1.02,
       halfLength: 1.25,
@@ -594,6 +594,7 @@
     hud.classList.add('hidden');
     menuScreen.classList.remove('hidden');
     matchState = 'menu';
+    gameMode = 'bot';
     cleanupBots();
   });
 
@@ -623,6 +624,7 @@
     hud.classList.add('hidden');
     menuScreen.classList.remove('hidden');
     matchState = 'menu';
+    gameMode = 'bot';
     cleanupBots();
     if (NetworkSys.isOnline) {
       NetworkSys.handleDisconnect('Exited online match.');
@@ -1195,11 +1197,41 @@
     }
 
     if (bot.driveHealth <= 0) {
-      if (typeof destroyRobotEntirely === 'function') {
+      if (typeof destroyRobotEntirely === 'function' && !bot.isEntirelyDestroyed) {
         destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
       }
       bot.menuDestroyedTimer = 0.0;
       return false;
+    }
+
+    // If all wheels are lost, bot is immobilized — explode into debris and replace!
+    const activeWheels = (bot.wheels && bot.wheels.length > 0) ? bot.wheels.filter(w => w.attached).length : 2;
+    if (activeWheels === 0 && !bot.isEntirelyDestroyed) {
+      bot.menuNoWheelTimer = (bot.menuNoWheelTimer || 0) + dt;
+      if (bot.menuNoWheelTimer > 0.8) {
+        if (typeof destroyRobotEntirely === 'function') {
+          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
+        }
+        bot.menuDestroyedTimer = 0.0;
+        return false;
+      }
+    } else {
+      bot.menuNoWheelTimer = 0.0;
+    }
+
+    // If bot has been motionless/stuck against wall/opponent for > 3.5s, replace it!
+    const botSpeed = Math.hypot(bot.vx || 0, bot.vz || 0);
+    if (botSpeed < 0.25 && !bot.isEntirelyDestroyed) {
+      bot.menuStuckTimer = (bot.menuStuckTimer || 0) + dt;
+      if (bot.menuStuckTimer > 3.5) {
+        if (typeof destroyRobotEntirely === 'function') {
+          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
+        }
+        bot.menuDestroyedTimer = 0.0;
+        return false;
+      }
+    } else {
+      bot.menuStuckTimer = 0.0;
     }
 
     const isBurning = (typeof isBotFlaming === 'function' && isBotFlaming(bot));
@@ -1240,6 +1272,8 @@
 
     playerBot.weaponActive = true;
     enemyBot.weaponActive = true;
+    playerBot.weaponSpinSpeed = 95.0;
+    enemyBot.weaponSpinSpeed = 95.0;
 
     if (playerBot.type === enemyBot.type) {
       applyMirrorMatchRivalStyle(enemyBot);
@@ -1288,6 +1322,8 @@
 
       playerBot.weaponActive = true;
       enemyBot.weaponActive = true;
+      playerBot.weaponSpinSpeed = 95.0;
+      enemyBot.weaponSpinSpeed = 95.0;
 
       if (playerBot.type === enemyBot.type) {
         applyMirrorMatchRivalStyle(enemyBot);
@@ -1426,6 +1462,18 @@
     const gp1 = pollGamepadControls(0);
 
     if (matchState === 'menu') {
+      if (playerBot) {
+        playerBot.weaponActive = true;
+        if (playerBot.weaponSpinSpeed < 90.0 && !playerBot.isEntirelyDestroyed) {
+          playerBot.weaponSpinSpeed = 95.0;
+        }
+      }
+      if (enemyBot) {
+        enemyBot.weaponActive = true;
+        if (enemyBot.weaponSpinSpeed < 90.0 && !enemyBot.isEntirelyDestroyed) {
+          enemyBot.weaponSpinSpeed = 95.0;
+        }
+      }
       if (typeof updateMenuIdleSpectate === 'function') {
         updateMenuIdleSpectate(dt);
       }
