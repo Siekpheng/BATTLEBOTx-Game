@@ -3372,54 +3372,227 @@
     c.width = 1024;
     c.height = 1024;
     const ctx = c.getContext('2d');
-
-    // Clean matte slate-steel combat floor (#4a525d, sampled directly from screenshot)
-    ctx.fillStyle = '#2b3544';
-    ctx.fillRect(0, 0, 1024, 1024);
-
-    // Subtle arena floor tile seams
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.lineWidth = 1.5;
-    const step = 64;
-    for (let i = 0; i <= 1024; i += step) {
-      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1024); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1024, i); ctx.stroke();
-    }
-
-    // Outer perimeter boundary caution line
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(36, 36, 952, 952);
-
-    // Center AI FARM & BATTLEBOTX Decal
-    ctx.save();
-    ctx.translate(512, 512);
-    ctx.textAlign = 'center';
-
-    // Stars
-    ctx.fillStyle = 'rgba(241, 245, 249, 0.70)';
-    ctx.font = '700 24px Orbitron, sans-serif';
-    ctx.fillText('★   ★   ★', 0, -42);
-
-    // AI FARM
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.92)';
-    ctx.font = '900 44px Orbitron, sans-serif';
-    ctx.fillText('AI FARM', 0, 0);
-
-    // BATTLEBOTX
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.font = '900 64px Orbitron, sans-serif';
-    ctx.fillText('BATTLEBOTX', 0, 58);
-
-    // COMBAT ROBOTICS ARENA
-    ctx.fillStyle = 'rgba(203, 213, 225, 0.70)';
-    ctx.font = '700 18px Orbitron, sans-serif';
-    ctx.fillText('COMBAT ROBOTICS ARENA', 0, 88);
-
-    ctx.restore();
-
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 8;
+
+    const bbxImg = new Image();
+    bbxImg.src = 'logo_battlebotx.png';
+    const afImg = new Image();
+    afImg.src = 'logo_aifarm_dark.png';
+
+    const renderFloor = () => {
+      // 1. Clean matte slate-steel combat floor (#2b3544)
+      ctx.fillStyle = '#2b3544';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // 2. Subtle arena floor tile seams
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.lineWidth = 1.5;
+      const step = 64;
+      for (let i = 0; i <= 1024; i += step) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1024); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1024, i); ctx.stroke();
+      }
+
+      // 3. Outer perimeter boundary caution line
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(36, 36, 952, 952);
+
+      // Inner subtle border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(48, 48, 928, 928);
+
+      // ========================================================
+      // 4. RED STARTING SQUARE (North Spawn: x=0, z=-7.5 -> canvas 512, 198)
+      // ========================================================
+      const redX = 512, redY = 198, sqSize = 220, halfSq = sqSize / 2;
+      const rx = redX - halfSq, ry = redY - halfSq;
+
+      // Subtle red glow fill
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+      ctx.fillRect(rx, ry, sqSize, sqSize);
+
+      // Outer Red Border
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(rx, ry, sqSize, sqSize);
+
+      // Inner Red Accent Frame
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(rx + 8, ry + 8, sqSize - 16, sqSize - 16);
+
+      // High-tech Corner Brackets
+      const bLen = 22;
+      ctx.strokeStyle = '#fca5a5';
+      ctx.lineWidth = 3.5;
+      // Top-Left
+      ctx.beginPath(); ctx.moveTo(rx, ry + bLen); ctx.lineTo(rx, ry); ctx.lineTo(rx + bLen, ry); ctx.stroke();
+      // Top-Right
+      ctx.beginPath(); ctx.moveTo(rx + sqSize, ry + bLen); ctx.lineTo(rx + sqSize, ry); ctx.lineTo(rx + sqSize - bLen, ry); ctx.stroke();
+      // Bottom-Left
+      ctx.beginPath(); ctx.moveTo(rx, ry + sqSize - bLen); ctx.lineTo(rx, ry + sqSize); ctx.lineTo(rx + bLen, ry + sqSize); ctx.stroke();
+      // Bottom-Right
+      ctx.beginPath(); ctx.moveTo(rx + sqSize, ry + sqSize - bLen); ctx.lineTo(rx + sqSize, ry + sqSize); ctx.lineTo(rx - bLen + sqSize, ry + sqSize); ctx.stroke();
+
+      // Red Square Start Label
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText('RED SQUARE', redX, ry + 22);
+
+      // Start alignment chevron pointing South (towards center)
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.75)';
+      ctx.font = '700 13px Orbitron, sans-serif';
+      ctx.fillText('▼ START ▼', redX, ry + sqSize - 18);
+
+      // Crosshair center pip
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(redX - 18, redY); ctx.lineTo(redX + 18, redY);
+      ctx.moveTo(redX, redY - 18); ctx.lineTo(redX, redY + 18);
+      ctx.stroke();
+
+      // ========================================================
+      // 5. BLUE STARTING SQUARE (South Spawn: x=0, z=+7.5 -> canvas 512, 826)
+      // ========================================================
+      const blueX = 512, blueY = 826;
+      const bx = blueX - halfSq, by = blueY - halfSq;
+
+      // Subtle blue glow fill
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.12)';
+      ctx.fillRect(bx, by, sqSize, sqSize);
+
+      // Outer Blue Border
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(bx, by, sqSize, sqSize);
+
+      // Inner Blue Accent Frame
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx + 8, by + 8, sqSize - 16, sqSize - 16);
+
+      // High-tech Corner Brackets
+      ctx.strokeStyle = '#bae6fd';
+      ctx.lineWidth = 3.5;
+      // Top-Left
+      ctx.beginPath(); ctx.moveTo(bx, by + bLen); ctx.lineTo(bx, by); ctx.lineTo(bx + bLen, by); ctx.stroke();
+      // Top-Right
+      ctx.beginPath(); ctx.moveTo(bx + sqSize, by + bLen); ctx.lineTo(bx + sqSize, by); ctx.lineTo(bx + sqSize - bLen, by); ctx.stroke();
+      // Bottom-Left
+      ctx.beginPath(); ctx.moveTo(bx, by + sqSize - bLen); ctx.lineTo(bx, by + sqSize); ctx.lineTo(bx + bLen, by + sqSize); ctx.stroke();
+      // Bottom-Right
+      ctx.beginPath(); ctx.moveTo(bx + sqSize, by + sqSize - bLen); ctx.lineTo(bx + sqSize, by + sqSize); ctx.lineTo(bx - bLen + sqSize, by + sqSize); ctx.stroke();
+
+      // Blue Square Start Label
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText('BLUE SQUARE', blueX, by + sqSize - 22);
+
+      // Start alignment chevron pointing North (towards center)
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.75)';
+      ctx.font = '700 13px Orbitron, sans-serif';
+      ctx.fillText('▲ START ▲', blueX, by + 18);
+
+      // Crosshair center pip
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(blueX - 18, blueY); ctx.lineTo(blueX + 18, blueY);
+      ctx.moveTo(blueX, blueY - 18); ctx.lineTo(blueX, blueY + 18);
+      ctx.stroke();
+
+      // ========================================================
+      // 6. ARENA CENTER DECAL & BATTLEBOTx LOGO
+      // ========================================================
+      const cx = 512, cy = 512;
+
+      // Outer circular tournament ring
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, 195, 0, Math.PI * 2); ctx.stroke();
+
+      // Inner gold hazard ring
+      ctx.strokeStyle = 'rgba(253, 201, 17, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath(); ctx.arc(cx, cy, 180, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Subtle center circle fill
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.40)';
+      ctx.beginPath(); ctx.arc(cx, cy, 175, 0, Math.PI * 2); ctx.fill();
+
+      // Draw BATTLEBOTx Logo emblem
+      if (bbxImg.complete && bbxImg.naturalWidth > 0) {
+        const logoW = 145;
+        const logoH = Math.round(logoW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
+        ctx.drawImage(bbxImg, cx - logoW / 2, cy - logoH / 2 - 32, logoW, logoH);
+      } else {
+        // Fallback procedural chevron
+        ctx.fillStyle = '#fdc911';
+        ctx.strokeStyle = '#7d973c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cx - 50, cy - 70);
+        ctx.lineTo(cx + 40, cy - 35);
+        ctx.lineTo(cx - 10, cy - 35);
+        ctx.lineTo(cx + 40, cy);
+        ctx.lineTo(cx - 50, cy);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      }
+
+      // Exact Capitalization: BATTLEBOTx (capital BATTLEBOT, lowercase x)
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Drop shadow for crisp contrast against any floor lighting
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 3;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 44px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx', cx, cy + 62);
+
+      // AI FARM ROBOTICS sub-brand
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '800 16px Orbitron, sans-serif';
+      ctx.fillText('AI FARM ROBOTICS', cx, cy + 104);
+
+      // Championship Arena subtitle
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.65)';
+      ctx.font = '700 11px Orbitron, sans-serif';
+      ctx.fillText('OFFICIAL COMBAT ARENA', cx, cy + 128);
+      ctx.restore();
+
+      // ========================================================
+      // 7. ARENA FLOOR FLANK DECALS (AI FARM ROBOTICS)
+      // ========================================================
+      if (afImg.complete && afImg.naturalWidth > 0) {
+        const afW = 95;
+        const afH = Math.round(afW * (afImg.naturalHeight / afImg.naturalWidth));
+        ctx.drawImage(afImg, 195 - afW / 2, cy - afH / 2, afW, afH);
+        ctx.drawImage(afImg, 829 - afW / 2, cy - afH / 2, afW, afH);
+      }
+    };
+
+    bbxImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
+    afImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
+    renderFloor();
+
     return tex;
   }
 
@@ -3428,42 +3601,68 @@
     c.width = 1024;
     c.height = 512;
     const ctx = c.getContext('2d');
-
-    // Stage LED Big Screen Background
-    ctx.fillStyle = '#060a12';
-    ctx.fillRect(0, 0, 1024, 512);
-
-    // Glowing border frame
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(16, 16, 992, 480);
-
-    // Header: AI Farm Robotics
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = '700 36px Orbitron, sans-serif';
-    ctx.fillText('AI FARM ROBOTICS', 512, 90);
-
-    // Main Logo
-    ctx.fillStyle = '#ef4444';
-    ctx.font = '900 84px Orbitron, sans-serif';
-    ctx.fillText('BATTLEBOTX', 512, 195);
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '700 32px Orbitron, sans-serif';
-    ctx.fillText('4x4m TOURNAMENT ARENA', 512, 265);
-
-    // High-Performance Combat Championship
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '600 26px Orbitron, sans-serif';
-    ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 512, 350);
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = '700 32px Orbitron, sans-serif';
-    ctx.fillText('AI FARM  ·  BATTLEBOTX', 512, 420);
-
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
+
+    const bbxImg = new Image();
+    bbxImg.src = 'logo_battlebotx.png';
+    const afImg = new Image();
+    afImg.src = 'logo_aifarm_dark.png';
+
+    const renderBillboard = () => {
+      // Stage LED Big Screen Background
+      ctx.fillStyle = '#060a12';
+      ctx.fillRect(0, 0, 1024, 512);
+
+      // Glowing border frame
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(16, 16, 992, 480);
+
+      // Header: AI Farm Robotics
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '700 36px Orbitron, sans-serif';
+      ctx.fillText('AI FARM ROBOTICS', 512, 90);
+
+      // Main Logo Title: Exact Casing BATTLEBOTx
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '900 84px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx', 512, 195);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '700 32px Orbitron, sans-serif';
+      ctx.fillText('4x4m TOURNAMENT ARENA', 512, 265);
+
+      // High-Performance Combat Championship
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '600 26px Orbitron, sans-serif';
+      ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 512, 350);
+
+      // Exact Casing: AI FARM  ·  BATTLEBOTx
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '700 32px Orbitron, sans-serif';
+      ctx.fillText('AI FARM  ·  BATTLEBOTx', 512, 420);
+
+      // Left Flank Logo: AI FARM ROBOTICS
+      if (afImg.complete && afImg.naturalWidth > 0) {
+        const afW = 120;
+        const afH = Math.round(afW * (afImg.naturalHeight / afImg.naturalWidth));
+        ctx.drawImage(afImg, 105 - afW / 2, 256 - afH / 2, afW, afH);
+      }
+
+      // Right Flank Logo: BATTLEBOTx
+      if (bbxImg.complete && bbxImg.naturalWidth > 0) {
+        const bbxW = 125;
+        const bbxH = Math.round(bbxW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
+        ctx.drawImage(bbxImg, 919 - bbxW / 2, 256 - bbxH / 2, bbxW, bbxH);
+      }
+    };
+
+    bbxImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
+    afImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
+    renderBillboard();
+
     return tex;
   }
 
