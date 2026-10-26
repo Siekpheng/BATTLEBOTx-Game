@@ -1754,6 +1754,14 @@
     lastSkidTime: 0,
     lastCrackleTime: 0,
 
+    fireRumbleNode: null,
+    fireRumbleFilter: null,
+    fireRumbleGain: null,
+    fireAirNode: null,
+    fireAirFilter: null,
+    fireAirGain: null,
+    fireSoundEnabled: true,
+
     init() {
       if (!this.ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -1928,6 +1936,45 @@
         this.pDriveGain.connect(this.masterGain);
         this.pDriveOsc.start(now);
 
+        // --- 4. REALISTIC COMBUSTION FIRE ROAR & DRAFT ---
+        if (this.noiseBuffer) {
+          // Layer A: Low-frequency turbulent combustion draft / deep fire rumble (70 - 180 Hz)
+          this.fireRumbleNode = this.ctx.createBufferSource();
+          this.fireRumbleNode.buffer = this.noiseBuffer;
+          this.fireRumbleNode.loop = true;
+
+          this.fireRumbleFilter = this.ctx.createBiquadFilter();
+          this.fireRumbleFilter.type = 'lowpass';
+          this.fireRumbleFilter.frequency.setValueAtTime(140, now);
+          this.fireRumbleFilter.Q.setValueAtTime(1.5, now);
+
+          this.fireRumbleGain = this.ctx.createGain();
+          this.fireRumbleGain.gain.setValueAtTime(0.0001, now);
+
+          this.fireRumbleNode.connect(this.fireRumbleFilter);
+          this.fireRumbleFilter.connect(this.fireRumbleGain);
+          this.fireRumbleGain.connect(this.masterGain);
+          this.fireRumbleNode.start(now);
+
+          // Layer B: Mid-frequency turbulent air draft rush (250 - 550 Hz)
+          this.fireAirNode = this.ctx.createBufferSource();
+          this.fireAirNode.buffer = this.noiseBuffer;
+          this.fireAirNode.loop = true;
+
+          this.fireAirFilter = this.ctx.createBiquadFilter();
+          this.fireAirFilter.type = 'bandpass';
+          this.fireAirFilter.frequency.setValueAtTime(360, now);
+          this.fireAirFilter.Q.setValueAtTime(1.8, now);
+
+          this.fireAirGain = this.ctx.createGain();
+          this.fireAirGain.gain.setValueAtTime(0.0001, now);
+
+          this.fireAirNode.connect(this.fireAirFilter);
+          this.fireAirFilter.connect(this.fireAirGain);
+          this.fireAirGain.connect(this.masterGain);
+          this.fireAirNode.start(now);
+        }
+
         this.loopsInitialized = true;
       } catch (err) {
         console.warn('Continuous audio nodes init:', err);
@@ -2017,6 +2064,28 @@
       }
     },
 
+    setFireActive(active) {
+      if (!this.ctx || !this.loopsInitialized) return;
+      const now = this.ctx.currentTime;
+      if (active && this.fireSoundEnabled !== false) {
+        // Natural turbulent breathing of active combustion blaze
+        const time = now * 3.2;
+        const rumbleMod = 0.08 + Math.sin(time * 0.75) * 0.02 + Math.cos(time * 1.4) * 0.015;
+        const airMod = 0.04 + Math.cos(time * 0.95) * 0.015;
+
+        if (this.fireRumbleGain) this.fireRumbleGain.gain.setTargetAtTime(rumbleMod, now, 0.08);
+        if (this.fireAirGain) this.fireAirGain.gain.setTargetAtTime(airMod, now, 0.08);
+
+        if (this.fireRumbleFilter) {
+          const rumbleFreq = 135 + Math.sin(time * 0.8) * 25;
+          this.fireRumbleFilter.frequency.setTargetAtTime(rumbleFreq, now, 0.08);
+        }
+      } else {
+        if (this.fireRumbleGain) this.fireRumbleGain.gain.setTargetAtTime(0.0001, now, 0.15);
+        if (this.fireAirGain) this.fireAirGain.gain.setTargetAtTime(0.0001, now, 0.15);
+      }
+    },
+
     stopCombatAudio() {
       if (!this.ctx || !this.loopsInitialized) return;
       const now = this.ctx.currentTime;
@@ -2027,6 +2096,8 @@
       if (this.eAirGain) this.eAirGain.gain.setTargetAtTime(0.0001, now, 0.05);
       if (this.eTurbineGain) this.eTurbineGain.gain.setTargetAtTime(0.0001, now, 0.05);
       if (this.pDriveGain) this.pDriveGain.gain.setTargetAtTime(0.0001, now, 0.05);
+      if (this.fireRumbleGain) this.fireRumbleGain.gain.setTargetAtTime(0.0001, now, 0.05);
+      if (this.fireAirGain) this.fireAirGain.gain.setTargetAtTime(0.0001, now, 0.05);
     },
 
     // --- REALISTIC ONE-SHOT COMBAT SOUND EFFECTS ---
@@ -2321,39 +2392,48 @@
       sNode.stop(actNow + 0.15);
     },
 
-    // 6. Battery Fire Arc Sizzle & Crackle
+    // 6. Realistic Thermal Ember Snap & LiPo Cell Rupture Pop
     playFireCrackle() {
-      if (!this.ctx) return;
+      if (!this.ctx || this.fireSoundEnabled === false) return;
       const now = performance.now();
-      if (now - this.lastCrackleTime < 65) return;
+      // Natural, organic cadence (~3-5 pops per second instead of 15/sec machine-gun)
+      if (now - this.lastCrackleTime < 180 + Math.random() * 140) return;
       this.lastCrackleTime = now;
 
       const actNow = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(1400 + Math.random() * 2600, actNow);
-      gain.gain.setValueAtTime(0.045, actNow);
-      gain.gain.exponentialRampToValueAtTime(0.001, actNow + 0.035);
-      osc.connect(gain);
-      gain.connect(this.masterGain || this.ctx.destination);
-      osc.start(actNow);
-      osc.stop(actNow + 0.04);
+      const dest = this.masterGain || this.ctx.destination;
 
-      if (Math.random() < 0.45 && this.noiseBuffer) {
+      // Layer A: Soft organic ember pop (damped bandpass noise burst, 550-1200 Hz, fast 25ms decay)
+      if (this.noiseBuffer && Math.random() < 0.70) {
         const nNode = this.ctx.createBufferSource();
         const nFilter = this.ctx.createBiquadFilter();
         const nGain = this.ctx.createGain();
         nNode.buffer = this.noiseBuffer;
-        nFilter.type = 'highpass';
-        nFilter.frequency.setValueAtTime(2800, actNow);
-        nGain.gain.setValueAtTime(0.035, actNow);
-        nGain.exponentialRampToValueAtTime(0.001, actNow + 0.06);
+        nFilter.type = 'bandpass';
+        nFilter.frequency.setValueAtTime(550 + Math.random() * 650, actNow);
+        nFilter.Q.setValueAtTime(3.8, actNow);
+        nGain.gain.setValueAtTime(0.024 + Math.random() * 0.018, actNow);
+        nGain.gain.exponentialRampToValueAtTime(0.0001, actNow + 0.028);
         nNode.connect(nFilter);
         nFilter.connect(nGain);
-        nGain.connect(this.masterGain || this.ctx.destination);
+        nGain.connect(dest);
         nNode.start(actNow);
-        nNode.stop(actNow + 0.07);
+        nNode.stop(actNow + 0.035);
+      }
+
+      // Layer B: Miniature thermal cell rupture "whump" / puff (sub-mid pitch drop 160Hz -> 45Hz)
+      if (Math.random() < 0.40) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle'; // Warm organic hollow tone, ZERO harsh buzzy sawtooth
+        osc.frequency.setValueAtTime(160 + Math.random() * 50, actNow);
+        osc.frequency.exponentialRampToValueAtTime(45, actNow + 0.035);
+        gain.gain.setValueAtTime(0.032, actNow);
+        gain.gain.exponentialRampToValueAtTime(0.0001, actNow + 0.04);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(actNow);
+        osc.stop(actNow + 0.045);
       }
     },
 
@@ -4379,6 +4459,7 @@
     }
   });
 
+  window.AudioSys = AudioSys;
   window.addRobotMeshOutline = addRobotMeshOutline;
   window.pollGamepadControls = pollGamepadControls;
   window.togglePlayerWeapon = togglePlayerWeapon;
@@ -6767,6 +6848,7 @@
     // Update Flames (80%+ Damage Fire Effect)
     const isPBurning = checkAndSpawnBotFlames(playerBot, playerFireLight, dt);
     const isEBurning = checkAndSpawnBotFlames(enemyBot, enemyFireLight, dt);
+    AudioSys.setFireActive((isPBurning || isEBurning) && (matchState === 'playing' || matchState === 'countdown'));
     updateFlames(dt);
 
     const fireWarnContainer = document.getElementById('fire-warning-container');
