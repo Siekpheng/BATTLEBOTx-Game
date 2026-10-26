@@ -34,49 +34,95 @@
   }
 
   // ========================================================
-  // 5. PROGRESSIVE 1-BY-1 PIECE DETACHMENT SYSTEM
-  // (Parts fly off 1 by 1 with each hit until NOTHING is left!)
+  // 5. PROGRESSIVE 1-BY-1 PIECE DETACHMENT & EXPLOSION SYSTEM
+  // (Outside-in breakdown progression + 20% catastrophic explosion)
   // ========================================================
   function initBotDetachableParts(bot) {
     if (!bot || !bot.tiltGroup) return;
     bot.detachableParts = [];
 
+    const meshes = [];
     bot.tiltGroup.traverse(obj => {
       if (obj.isMesh && obj.name !== 'CAD_Outline') {
-        const name = obj.name || '';
-        let category = 'chassis';
-        let priority = 2; // 1 = armor, 2 = body panels, 3 = weapon, 4 = wheels, 5 = chassis core
-
-        const isWheel = (name.startsWith('Wheel_') || name.includes('Wheel') || name.includes('Tire') || name.includes('Rim') || (typeof isWheelMesh === 'function' && isWheelMesh(obj)));
-        const isWeapon = (name.startsWith('Weapon_') || name.includes('Weapon') || name.includes('Blade') || name.includes('Drum') || name.includes('Disc') || name.includes('Spinner'));
-        const isArmor = (name.startsWith('Armor_') || name.includes('Armor') || name.includes('Wedge') || name.includes('Shield'));
-        const isCore = (name === 'Chassis_Mesh' || name === 'Chassis_Mesh_1');
-
-        if (isArmor) {
-          category = 'armor';
-          priority = 1; // Outermost armor panels & wedges
-        } else if (isCore) {
-          category = 'chassis_core';
-          priority = 5; // Final core chassis skeleton
-        } else if (isWheel) {
-          category = 'wheel';
-          priority = 4; // Wheels detach late so robot stays mobile & fighting back!
-        } else if (isWeapon) {
-          category = 'weapon';
-          priority = 3; // Weapon teeth & spinning components
-        } else {
-          category = 'chassis';
-          priority = 2; // Exterior chassis panels & cladding
-        }
-
-        bot.detachableParts.push({
-          name: name,
-          mesh: obj,
-          category: category,
-          priority: priority,
-          attached: true
-        });
+        meshes.push(obj);
       }
+    });
+
+    meshes.forEach(obj => {
+      const name = obj.name || '';
+      const parentName = obj.parent ? (obj.parent.name || '') : '';
+
+      // Compute bounding box and local radial distance relative to bot.root
+      const box = new THREE.Box3().setFromObject(obj);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const localCenter = bot.root ? bot.root.worldToLocal(center.clone()) : center.clone();
+      const radialDist = Math.hypot(localCenter.x, localCenter.z);
+
+      const isGenuineWheel = (
+        name.startsWith('Wheel_') || name.includes('Wheel') ||
+        name.includes('Tire') || name.includes('Rim') ||
+        parentName.startsWith('Wheel_') || parentName.includes('Wheel') ||
+        parentName.startsWith('Belt_') || parentName.includes('Belt') ||
+        ((typeof isWheelMesh === 'function' && isWheelMesh(obj)) && (radialDist > 0.55 || name.includes('Wheel')))
+      );
+      const isWeapon = (
+        name.startsWith('Weapon_') || name.includes('Weapon') ||
+        name.includes('Blade') || name.includes('Drum') ||
+        name.includes('Disc') || name.includes('Spinner') ||
+        parentName.startsWith('Weapon_') || parentName.includes('Weapon')
+      );
+      const isArmor = (
+        name.startsWith('Armor_') || name.includes('Armor') ||
+        name.includes('Wedge') || name.includes('Shield') ||
+        name.includes('Bumper') || name.includes('Skirt')
+      );
+      const isCore = (name === 'Chassis_Mesh' || name === 'Chassis_Mesh_1' || name === 'Chassis_Core');
+
+      // Realistic outside-to-inside progression:
+      // Priority 1: Outermost boundary elements — Wheels, exterior armor panels, wedges, shields, bumpers
+      // Priority 2: Exterior chassis cladding, top covers, front weapon blade
+      // Priority 3: Mid-chassis structure, secondary brackets, weapon mounts
+      // Priority 4: Inner chassis frame & motor mounts
+      // Priority 5: Innermost central core chassis spine
+      let category = 'chassis';
+      let priority = 3;
+
+      if (isCore) {
+        category = 'chassis_core';
+        priority = 5; // Innermost structural spine remains until the absolute core
+      } else if (isGenuineWheel) {
+        category = 'wheel';
+        priority = 1; // Wheels are on the far lateral outside! Struck early when hit on flanks/sides.
+      } else if (isArmor) {
+        category = 'armor';
+        priority = 1; // Outermost armor panels, wedges & bumpers take initial exterior impacts
+      } else if (isWeapon) {
+        category = 'weapon';
+        priority = (radialDist > 0.70) ? 2 : 3;
+      } else {
+        if (radialDist > 0.75) {
+          category = 'chassis_exterior';
+          priority = 2; // Outer chassis panels
+        } else if (radialDist > 0.40) {
+          category = 'chassis_mid';
+          priority = 3; // Mid chassis structure
+        } else {
+          category = 'chassis_inner';
+          priority = 4; // Inner chassis frame
+        }
+      }
+
+      bot.detachableParts.push({
+        name: name,
+        parentName: parentName,
+        mesh: obj,
+        category: category,
+        priority: priority,
+        radialDist: radialDist,
+        localCenter: localCenter,
+        attached: true
+      });
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
@@ -84,6 +130,112 @@
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
+
+  function explodeRobot(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
+    if (!bot || bot.isEntirelyDestroyed) return [];
+    if (!bot.detachableParts || bot.detachableParts.length === 0) {
+      initBotDetachableParts(bot);
+    }
+    const remaining = bot.detachableParts ? bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent) : [];
+    if (remaining.length === 0) {
+      bot.isEntirelyDestroyed = true;
+      bot.driveHealth = 0;
+      bot.drivePower = 0;
+      return [];
+    }
+
+    const botPos = new THREE.Vector3();
+    if (bot.root) bot.root.getWorldPosition(botPos);
+
+    const explodedParts = [];
+
+    // Detach all remaining parts simultaneously in a massive radial blast!
+    remaining.forEach(p => {
+      p.attached = false;
+
+      const worldPos = new THREE.Vector3();
+      const worldQuat = new THREE.Quaternion();
+      const worldScale = new THREE.Vector3();
+      p.mesh.getWorldPosition(worldPos);
+      p.mesh.getWorldQuaternion(worldQuat);
+      p.mesh.getWorldScale(worldScale);
+
+      // Remove outline children
+      if (p.mesh.children && p.mesh.children.length > 0) {
+        const toRemove = p.mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
+        toRemove.forEach(c => p.mesh.remove(c));
+      }
+
+      if (p.mesh.parent) {
+        p.mesh.parent.remove(p.mesh);
+      }
+
+      p.mesh.position.copy(worldPos);
+      p.mesh.quaternion.copy(worldQuat);
+      p.mesh.scale.copy(worldScale);
+      p.mesh.visible = true;
+      scene.add(p.mesh);
+
+      // Radial blast outward from bot center
+      const blastDx = (worldPos.x - botPos.x) + (Math.random() - 0.5) * 0.8 + (impactDir.x || 0) * 0.5;
+      const blastDz = (worldPos.z - botPos.z) + (Math.random() - 0.5) * 0.8 + (impactDir.z || 0) * 0.5;
+      const blastDist = Math.hypot(blastDx, blastDz) || 1.0;
+      const blastSpeed = 8.5 + Math.random() * 6.5;
+
+      const isWheelPart = (p.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(p.mesh)));
+
+      detachedDebris.push({
+        mesh: p.mesh,
+        isWheel: isWheelPart,
+        vx: (blastDx / blastDist) * blastSpeed + (bot.vx ? bot.vx * 0.35 : 0),
+        vy: 5.5 + Math.random() * 4.5,
+        vz: (blastDz / blastDist) * blastSpeed + (bot.vz ? bot.vz * 0.35 : 0),
+        rx: (Math.random() - 0.5) * 26,
+        ry: (Math.random() - 0.5) * 26,
+        rz: (Math.random() - 0.5) * 26
+      });
+
+      explodedParts.push(p);
+    });
+
+    // Synchronize legacy structures
+    if (bot.armorPanels) {
+      bot.armorPanels.forEach(a => { a.attached = false; });
+    }
+    if (bot.wheels) {
+      bot.wheels.forEach(w => { w.attached = false; });
+    }
+
+    // Robot completely dismantled
+    bot.isEntirelyDestroyed = true;
+    bot.driveHealth = 0;
+    bot.drivePower = 0;
+    bot.throttleInput = 0;
+    bot.steerInput = 0;
+    bot.weaponSpinSpeed = 0;
+    bot.weaponActive = false;
+
+    // Catastrophic explosion FX
+    const explosionCenter = hitPoint || botPos;
+    spawnCollisionSparks(explosionCenter, 95);
+    if (typeof AudioSys !== 'undefined') {
+      if (AudioSys.metalClashSound) AudioSys.metalClashSound(3.0, true);
+      if (AudioSys.weaponStallSound) AudioSys.weaponStallSound();
+      if (AudioSys.crowdCheer) AudioSys.crowdCheer(1.0, 5.0);
+    }
+    if (typeof addCameraTrauma === 'function') addCameraTrauma(1.0);
+    if (typeof triggerGamepadRumble === 'function') triggerGamepadRumble(1.0, 500);
+    if (typeof triggerHitStop === 'function') triggerHitStop(0.08);
+    if (typeof triggerDamageVignette === 'function') triggerDamageVignette();
+
+    if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+      NetworkSys.queueEvent({ t: 'sparks', x: explosionCenter.x, y: explosionCenter.y, z: explosionCenter.z, c: 95 });
+      NetworkSys.queueEvent({ t: 'clash', i: 3.0, h: true });
+    }
+
+    return explodedParts;
+  }
+  window.explodeRobot = explodeRobot;
 
   function detachSinglePart(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
     if (!bot || bot.isEntirelyDestroyed) return null;
@@ -94,7 +246,6 @@
 
     const remaining = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent);
     if (remaining.length === 0) {
-      // ZERO PARTS LEFT! Robot is completely dismantled!
       if (!bot.isEntirelyDestroyed) {
         bot.isEntirelyDestroyed = true;
         bot.driveHealth = 0;
@@ -106,41 +257,75 @@
       return null;
     }
 
-    // Progressive demolition by layer:
-    // (Layer 1 Armor -> Layer 2 Body Panels -> Layer 3 Weapons -> Layer 4 Wheels -> Layer 5 Core)
-    const minPriority = Math.min(...remaining.map(p => p.priority));
-    let pool = remaining.filter(p => p.priority === minPriority);
+    // 20% EXPLOSION RULE per user specification:
+    // If <= 20% parts remain and the robot gets hit, IT JUST EXPLODES!
+    const threshold20 = Math.max(1, Math.round(bot.totalInitialParts * 0.20));
+    if (remaining.length <= threshold20) {
+      explodeRobot(bot, impactDir, hitPoint);
+      return null;
+    }
 
-    let chosen = pool[0];
-    if (hitPoint && bot.root) {
-      const localHit = bot.root.worldToLocal(hitPoint.clone());
-      // Direct precision strike: allow striking nearby parts up to minPriority + 1
-      const candidatePool = remaining.filter(p => p.priority <= minPriority + 1);
+    // Progressive demolition by layer (Outside-In):
+    // (Layer 1 Armor & Wheels -> Layer 2 Exterior Cladding & Blade -> Layer 3 Mid Structure -> Layer 4 Inner Frame -> Layer 5 Core Spine)
+    const minPriority = Math.min(...remaining.map(p => p.priority));
+    let candidatePool = remaining.filter(p => p.priority <= minPriority + 1);
+
+    let chosen = null;
+    if (hitPoint) {
+      // Precision strike: select candidate part whose world center is closest to impact point!
       let minDistSq = Infinity;
+      const partCenter = new THREE.Vector3();
+      const pBox = new THREE.Box3();
+
       for (const p of candidatePool) {
-        const dSq = p.mesh.position.distanceToSquared(localHit);
-        if (dSq < minDistSq) {
-          minDistSq = dSq;
+        pBox.setFromObject(p.mesh);
+        pBox.getCenter(partCenter);
+        const dSq = partCenter.distanceToSquared(hitPoint);
+        const priorityPenalty = (p.priority - minPriority) * 0.75;
+        const effectiveDistSq = dSq + priorityPenalty;
+        if (effectiveDistSq < minDistSq) {
+          minDistSq = effectiveDistSq;
           chosen = p;
         }
       }
-    } else {
-      chosen = pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    if (!chosen) {
+      // Fallback: outermost radial distance first within lowest priority layer
+      const pool = remaining.filter(p => p.priority === minPriority);
+      pool.sort((a, b) => (b.radialDist || 0) - (a.radialDist || 0));
+      chosen = pool[0];
     }
 
     chosen.attached = false;
 
-    // Synchronize legacy armor and wheel arrays if relevant
+    // Synchronize legacy armor and wheel arrays
     if (bot.armorPanels) {
       const ap = bot.armorPanels.find(p => p.mesh === chosen.mesh || p.name === chosen.name);
       if (ap) ap.attached = false;
     }
     if (bot.wheels) {
-      const wh = bot.wheels.find(w => w.mesh === chosen.mesh || (w.mesh && w.mesh.parent === chosen.mesh) || w.name === chosen.name);
-      if (wh) wh.attached = false;
-    }
-    if (bot.weaponMesh === chosen.mesh || (bot.weaponMesh && bot.weaponMesh.children && bot.weaponMesh.children.includes(chosen.mesh))) {
-      // Weapon piece detached
+      bot.wheels.forEach(w => {
+        if (
+          w.mesh === chosen.mesh ||
+          (chosen.mesh && chosen.mesh.parent === w.mesh) ||
+          (w.mesh && w.mesh.parent === chosen.mesh) ||
+          w.name === chosen.name ||
+          (chosen.mesh && chosen.mesh.parent && w.name === chosen.mesh.parent.name) ||
+          (chosen.name && w.name && (chosen.name.startsWith(w.name) || w.name.startsWith(chosen.name)))
+        ) {
+          const hasRemaining = bot.detachableParts.some(p =>
+            p !== chosen && p.attached && (
+              p.mesh === w.mesh ||
+              (p.mesh && p.mesh.parent === w.mesh) ||
+              (p.name && p.name.startsWith(w.name))
+            )
+          );
+          if (!hasRemaining) {
+            w.attached = false;
+          }
+        }
+      });
     }
 
     // Capture exact world position, orientation, scale
@@ -192,11 +377,17 @@
     addCameraTrauma(0.26);
     triggerGamepadRumble(0.60, 190);
 
-    // Update remaining count & driveHealth to reflect parts remaining
+    // Update remaining count & driveHealth
     const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
     bot.driveHealth = (remainingCount / bot.totalInitialParts) * bot.maxDriveHealth;
 
-    // Check if NOTHING LEFT!
+    // If remaining parts dropped to <= 20%, kill drive power immediately so lone scraps cannot move
+    if (remainingCount <= threshold20) {
+      bot.drivePower = 0;
+      bot.throttleInput = 0;
+      bot.steerInput = 0;
+    }
+
     if (remainingCount === 0) {
       bot.isEntirelyDestroyed = true;
       bot.driveHealth = 0;
@@ -220,17 +411,7 @@
 
   function destroyRobotEntirely(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
     if (!bot || bot.isEntirelyDestroyed) return;
-    if (!bot.detachableParts || bot.detachableParts.length === 0) {
-      initBotDetachableParts(bot);
-    }
-    while (bot.detachableParts && bot.detachableParts.some(p => p.attached && p.mesh && p.mesh.parent)) {
-      detachSinglePart(bot, impactDir, hitPoint);
-    }
-    bot.isEntirelyDestroyed = true;
-    bot.driveHealth = 0;
-    bot.drivePower = 0;
-    bot.weaponSpinSpeed = 0;
-    bot.weaponActive = false;
+    explodeRobot(bot, impactDir, hitPoint);
   }
   window.destroyRobotEntirely = destroyRobotEntirely;
 

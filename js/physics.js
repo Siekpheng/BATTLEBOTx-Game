@@ -39,24 +39,46 @@
   window.getBotGroundElevation = getBotGroundElevation;
 
   function updateBotPhysics(bot, dt) {
-    const leftWheels = bot.wheels ? bot.wheels.filter(w => w.attached && w.side === 'left').length : 1;
-    const rightWheels = bot.wheels ? bot.wheels.filter(w => w.attached && w.side === 'right').length : 1;
+    const remainingParts = (bot.detachableParts && bot.detachableParts.length > 0)
+      ? bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length
+      : 999;
+    const threshold20 = (bot.totalInitialParts && bot.totalInitialParts > 0)
+      ? Math.max(1, Math.round(bot.totalInitialParts * 0.20))
+      : 2;
+
+    // Check attached wheels dynamically synchronized with detachable parts
+    let leftWheels = 0;
+    let rightWheels = 0;
+    if (bot.wheels && bot.wheels.length > 0) {
+      bot.wheels.forEach(w => {
+        if (w.attached) {
+          const hasMeshesAttached = bot.detachableParts
+            ? bot.detachableParts.some(p => p.attached && (p.mesh === w.mesh || (p.mesh && p.mesh.parent === w.mesh) || (p.name && p.name.startsWith(w.name))))
+            : true;
+          if (!hasMeshesAttached) {
+            w.attached = false;
+          } else {
+            if (w.side === 'left') leftWheels++;
+            else rightWheels++;
+          }
+        }
+      });
+    } else {
+      leftWheels = 1;
+      rightWheels = 1;
+    }
     const totalWheels = leftWheels + rightWheels;
     const maxWheels = (bot.wheels && bot.wheels.length > 0) ? bot.wheels.length : 2;
 
-    if (totalWheels === 0) {
-      bot.drivePower = 0;
-      bot.throttleInput = 0;
-      bot.steerInput = 0;
-    } else if (bot.driveHealth <= 0) {
+    // A robot with no wheels, depleted drive health, <= 20% parts remaining, or entirely destroyed CANNOT move!
+    if (totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) {
       bot.drivePower = 0;
       bot.throttleInput = 0;
       bot.steerInput = 0;
     } else {
-      const isR2 = (bot.type === 'robot2');
       // Symmetrically balanced wheel factor for both robots
       const wheelFactor = Math.min(1.0, (totalWheels / maxWheels) * 0.70 + 0.30);
-      bot.drivePower = Math.max(0.12, (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor));
+      bot.drivePower = (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor);
     }
 
     const maxSpeed = 15.0 * (0.35 + 0.65 * bot.drivePower);
