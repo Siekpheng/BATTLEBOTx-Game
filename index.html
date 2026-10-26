@@ -1349,6 +1349,7 @@
     </div>
     <div class="menu-top-right-bar">
       <button id="btn-menu-music" class="menu-music-btn" type="button" title="Toggle Background Music">🎵 Music: ON</button>
+      <button id="btn-menu-announcer" class="menu-music-btn" type="button" title="Toggle Broadcast Announcer">🎙 Announcer: ON</button>
       <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
     </div>
     <button id="btn-menu-restore" class="menu-restore-pill hidden" type="button">✕ Return to Menu</button>
@@ -3159,11 +3160,251 @@
       [330, 290, 240, 180].forEach((f, idx) => {
         setTimeout(() => this.beep(f, 0.32, 'sawtooth', 0.2), idx * 130);
       });
+    },
+
+    // 9. Synthesized Stadium Crowd Roar / Arena Cheering
+    crowdCheer(intensity = 1.0, duration = 1.8) {
+      if (!this.ctx || !this.noiseBuffer) return;
+      const now = this.ctx.currentTime;
+      const dest = this.masterGain || this.ctx.destination;
+
+      // Layer A: Low-mid vocal crowd resonance swell (620Hz)
+      const nNodeA = this.ctx.createBufferSource();
+      const nFilterA = this.ctx.createBiquadFilter();
+      const nGainA = this.ctx.createGain();
+      nNodeA.buffer = this.noiseBuffer;
+      nFilterA.type = 'bandpass';
+      nFilterA.frequency.setValueAtTime(620, now);
+      nFilterA.Q.setValueAtTime(2.4, now);
+      const volA = Math.min(0.35, 0.20 * intensity);
+      nGainA.gain.setValueAtTime(0.001, now);
+      nGainA.gain.linearRampToValueAtTime(volA, now + 0.18);
+      nGainA.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      nNodeA.connect(nFilterA);
+      nFilterA.connect(nGainA);
+      nGainA.connect(dest);
+      nNodeA.start(now);
+      nNodeA.stop(now + duration + 0.05);
+
+      // Layer B: Bright excitement crowd formant (1650Hz)
+      const nNodeB = this.ctx.createBufferSource();
+      const nFilterB = this.ctx.createBiquadFilter();
+      const nGainB = this.ctx.createGain();
+      nNodeB.buffer = this.noiseBuffer;
+      nFilterB.type = 'bandpass';
+      nFilterB.frequency.setValueAtTime(1650, now);
+      nFilterB.Q.setValueAtTime(3.2, now);
+      const volB = Math.min(0.24, 0.13 * intensity);
+      nGainB.gain.setValueAtTime(0.001, now);
+      nGainB.gain.linearRampToValueAtTime(volB, now + 0.22);
+      nGainB.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.85);
+      nNodeB.connect(nFilterB);
+      nFilterB.connect(nGainB);
+      nGainB.connect(dest);
+      nNodeB.start(now);
+      nNodeB.stop(now + duration + 0.05);
+    },
+
+    // 10. Synthesized Arena Crowd Gasp / Collective Shock ("OHHH!")
+    crowdGasp(intensity = 0.8) {
+      if (!this.ctx || !this.noiseBuffer) return;
+      const now = this.ctx.currentTime;
+      const dest = this.masterGain || this.ctx.destination;
+
+      const nNode = this.ctx.createBufferSource();
+      const nFilter = this.ctx.createBiquadFilter();
+      const nGain = this.ctx.createGain();
+      nNode.buffer = this.noiseBuffer;
+      nFilter.type = 'bandpass';
+      nFilter.frequency.setValueAtTime(450, now);
+      nFilter.frequency.exponentialRampToValueAtTime(820, now + 0.14);
+      nFilter.Q.setValueAtTime(2.8, now);
+      const vol = Math.min(0.28, 0.16 * intensity);
+      nGain.gain.setValueAtTime(0.001, now);
+      nGain.gain.linearRampToValueAtTime(vol, now + 0.08);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      nNode.connect(nFilter);
+      nFilter.connect(nGain);
+      nGain.connect(dest);
+      nNode.start(now);
+      nNode.stop(now + 0.45);
     }
   };
+
+  // ========================================================
+  // 1.5 BROADCAST VOICE ANNOUNCER ENGINE (Web Speech API)
+  // ========================================================
+  const AnnouncerSys = {
+    enabled: true,
+    voices: [],
+    selectedVoice: null,
+    lastCommentTime: 0,
+    minCommentInterval: 3200,
+
+    init() {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const updateVoices = () => {
+          try {
+            this.voices = window.speechSynthesis.getVoices() || [];
+            if (this.voices.length > 0) {
+              this.selectedVoice = this.voices.find(v => v.lang && v.lang.startsWith('en') && (
+                v.name.includes('Natural') || v.name.includes('David') || v.name.includes('Guy') || 
+                v.name.includes('Google') || v.name.includes('Mark') || v.name.includes('Daniel')
+              )) || this.voices.find(v => v.lang && v.lang.startsWith('en')) || this.voices[0];
+            }
+          } catch (e) {}
+        };
+        updateVoices();
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+          window.speechSynthesis.onvoiceschanged = updateVoices;
+        }
+      }
+      this.updateUI();
+    },
+
+    toggle() {
+      this.enabled = !this.enabled;
+      if (!this.enabled && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
+      this.updateUI();
+      return this.enabled;
+    },
+
+    updateUI() {
+      const btn = document.getElementById('btn-menu-announcer');
+      if (btn) {
+        btn.textContent = this.enabled ? '🎙 Announcer: ON' : '🎙 Announcer: OFF';
+        btn.style.borderColor = this.enabled ? 'rgba(56, 189, 248, 0.45)' : 'rgba(255, 255, 255, 0.2)';
+        btn.style.color = this.enabled ? '#38bdf8' : '#94a3b8';
+      }
+    },
+
+    speak(text, options = {}) {
+      if (!this.enabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      try {
+        const priority = options.priority || false;
+        const now = performance.now();
+        if (!priority) {
+          if (now - this.lastCommentTime < this.minCommentInterval) return;
+          if (window.speechSynthesis.speaking) return;
+        } else {
+          window.speechSynthesis.cancel();
+        }
+        this.lastCommentTime = now;
+
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = options.rate || 1.12;
+        utter.pitch = options.pitch || 1.08;
+        utter.volume = options.volume !== undefined ? options.volume : 1.0;
+        if (this.selectedVoice) utter.voice = this.selectedVoice;
+
+        window.speechSynthesis.speak(utter);
+      } catch (err) {}
+    },
+
+    commentCountdown(step) {
+      if (step === 3) this.speak('Three', { rate: 1.15, pitch: 1.05, priority: true });
+      else if (step === 2) this.speak('Two', { rate: 1.15, pitch: 1.10, priority: true });
+      else if (step === 1) this.speak('One', { rate: 1.18, pitch: 1.18, priority: true });
+      else if (step === 0 || step === 'fight') this.speak('Activate!', { rate: 1.25, pitch: 1.25, priority: true });
+    },
+
+    commentBigHit() {
+      const phrases = ['Huge hit!', 'Massive strike!', 'Devastating blow!', 'Direct impact!'];
+      const pick = phrases[Math.floor(Math.random() * phrases.length)];
+      this.speak(pick, { rate: 1.18, pitch: 1.12 });
+    },
+
+    commentClash() {
+      const phrases = ['Weapon collision!', 'Head on clash!'];
+      const pick = phrases[Math.floor(Math.random() * phrases.length)];
+      this.speak(pick, { rate: 1.18, pitch: 1.15 });
+    },
+
+    commentArmorDetached() {
+      const phrases = ['Armor shredded!', 'Debris on the arena floor!'];
+      const pick = phrases[Math.floor(Math.random() * phrases.length)];
+      this.speak(pick, { rate: 1.15, pitch: 1.1 });
+    },
+
+    commentWheelDetached() {
+      this.speak('Wheel torn off!', { rate: 1.2, pitch: 1.15 });
+    },
+
+    commentFlipped() {
+      const phrases = ['Robot inverted!', 'Flipped on its back!'];
+      const pick = phrases[Math.floor(Math.random() * phrases.length)];
+      this.speak(pick, { rate: 1.18, pitch: 1.12 });
+    },
+
+    commentCountDownStart() {
+      this.speak('Ten second countdown!', { rate: 1.2, pitch: 1.18, priority: true });
+    },
+
+    commentMatchEnd(didIWin, isKO, isDraw) {
+      if (isDraw) {
+        this.speak('Cease! Match is a draw!', { rate: 1.1, pitch: 1.05, priority: true });
+      } else if (didIWin) {
+        this.speak(isKO ? 'Knockout! Victory!' : 'Winner by judges decision!', { rate: 1.15, pitch: 1.2, priority: true });
+      } else {
+        this.speak(isKO ? 'Knockout! Defeat!' : 'Defeat by judges decision!', { rate: 1.1, pitch: 0.95, priority: true });
+      }
+    }
+  };
+
+  // ========================================================
+  // 1.6 COMBAT IMPACT JUICE: CAMERA SHAKE, GAMEPAD RUMBLE, HIT-STOP
+  // ========================================================
+  let cameraTrauma = 0.0;
+  let hitStopRemaining = 0.0;
+
+  function addCameraTrauma(amount) {
+    cameraTrauma = Math.min(1.0, cameraTrauma + amount);
+  }
+
+  function triggerHitStop(durationSec = 0.055) {
+    hitStopRemaining = Math.max(hitStopRemaining, durationSec);
+  }
+
+  function triggerGamepadRumble(intensity = 0.7, durationMs = 200) {
+    // 1. Dual-Motor Gamepad Haptics (Xbox / PlayStation / USB Controller)
+    if (typeof navigator.getGamepads === 'function') {
+      try {
+        const pads = navigator.getGamepads();
+        if (pads) {
+          for (let i = 0; i < pads.length; i++) {
+            const pad = pads[i];
+            if (pad && pad.connected && pad.vibrationActuator && pad.vibrationActuator.type === 'dual-rumble') {
+              pad.vibrationActuator.playEffect('dual-rumble', {
+                startDelay: 0,
+                duration: Math.min(1000, durationMs),
+                weakMagnitude: Math.min(1.0, intensity * 0.75),
+                strongMagnitude: Math.min(1.0, intensity)
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {}
+    }
+
+    // 2. Mobile Device Vibration Haptics
+    if (typeof navigator.vibrate === 'function') {
+      try {
+        navigator.vibrate(Math.min(350, durationMs));
+      } catch (err) {}
+    }
+  }
+
+  window.AnnouncerSys = AnnouncerSys;
+  window.addCameraTrauma = addCameraTrauma;
+  window.triggerHitStop = triggerHitStop;
+  window.triggerGamepadRumble = triggerGamepadRumble;
+
   // Global pointer/keyboard interaction triggers to unlock AudioContext seamlessly
   const unlockAudioContext = () => {
     AudioSys.init();
+    AnnouncerSys.init();
     if (AudioSys.ctx && AudioSys.ctx.state === 'running') {
       if (BgmSys.enabled && !BgmSys.isPlaying) BgmSys.start();
       BgmSys.updateUI();
@@ -4363,6 +4604,10 @@
 
     AudioSys.metalClashSound(1.8, true);
     spawnCollisionSparks(worldPos, 22);
+    AudioSys.crowdGasp(0.75);
+    AnnouncerSys.commentArmorDetached();
+    addCameraTrauma(0.24);
+    triggerGamepadRumble(0.55, 180);
   }
 
   function detachWheel(bot, impactDir, hitPoint) {
@@ -4448,6 +4693,10 @@
 
     AudioSys.metalClashSound(1.9, true);
     spawnCollisionSparks(worldPos, 34);
+    AudioSys.crowdGasp(0.85);
+    AnnouncerSys.commentWheelDetached();
+    addCameraTrauma(0.35);
+    triggerGamepadRumble(0.75, 240);
   }
 
   function clearArenaDebris() {
@@ -5178,6 +5427,15 @@
       } else {
         BgmSys.toggle();
       }
+    });
+  }
+
+  const btnMenuAnnouncer = document.getElementById('btn-menu-announcer');
+  if (btnMenuAnnouncer) {
+    btnMenuAnnouncer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      AnnouncerSys.init();
+      AnnouncerSys.toggle();
     });
   }
 
@@ -6259,6 +6517,7 @@
     let idx = 0;
     countdownText.textContent = steps[0];
     AudioSys.countdownBeat(3);
+    AnnouncerSys.commentCountdown(3);
 
     const interval = setInterval(() => {
       idx++;
@@ -6270,8 +6529,10 @@
 
         if (idx === 3) {
           AudioSys.arenaBuzzer();
+          AnnouncerSys.commentCountdown('fight');
         } else {
           AudioSys.countdownBeat(3 - idx);
+          AnnouncerSys.commentCountdown(3 - idx);
         }
       } else {
         clearInterval(interval);
@@ -6318,12 +6579,15 @@
       heading.className = 'result-title win';
       if (detail) detail.textContent = isKO ? 'Opponent robot immobilized! (K.O.)' : 'Won by Judges\' Decision!';
       AudioSys.winFanfare();
+      AudioSys.crowdCheer(1.0, 2.5);
     } else {
       heading.textContent = isKO ? 'DEFEAT BY K.O.!' : 'DEFEAT';
       heading.className = 'result-title lose';
       if (detail) detail.textContent = isKO ? 'Your robot immobilized! (K.O.)' : 'Lost by Judges\' Decision!';
       AudioSys.loseSound();
     }
+
+    AnnouncerSys.commentMatchEnd(didIWin, isKO, isDraw);
 
     document.getElementById('result-score').textContent = `YOU ${playerScore} - ${enemyScore} OPPONENT`;
     modalGameover.classList.remove('hidden');
@@ -6816,6 +7080,11 @@
           AudioSys.metalClashSound(2.5, true);
           AudioSys.weaponSliceSound();
           AudioSys.weaponStallSound();
+          AudioSys.crowdCheer(0.95, 1.9);
+          AnnouncerSys.commentClash();
+          addCameraTrauma(0.95);
+          triggerGamepadRumble(1.0, 420);
+          triggerHitStop(0.065);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: 2.5, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
@@ -6831,8 +7100,8 @@
           enemyBot.vx += nx * clashImpulse;
           enemyBot.vz += nz * clashImpulse;
 
-          playerBot.vy = 0.6;
-          enemyBot.vy = 0.6;
+          playerBot.vy = 1.3;
+          enemyBot.vy = 1.3;
 
           spawnCollisionSparks(midPos, 60);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
@@ -6871,9 +7140,27 @@
           const isWeaponFullSpeed = (playerBot.weaponSpinSpeed >= 78.0);
           const isMovingFullSpeedToward = (pForwardDot > 0.45 && (pApproach >= 5.0 || pSpeedBefore >= 6.5));
           const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
+          const wasEnemyFlipped = enemyBot.flipped;
 
           AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
           AudioSys.weaponSliceSound();
+          if (canSendFlying) {
+            AudioSys.crowdCheer(0.85, 1.6);
+            AnnouncerSys.commentBigHit();
+            addCameraTrauma(0.85);
+            triggerGamepadRumble(1.0, 360);
+            triggerHitStop(0.055);
+          } else {
+            addCameraTrauma(0.42);
+            triggerGamepadRumble(0.70, 220);
+          }
+
+          // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          const pRecoil = canSendFlying ? 4.6 : 2.2;
+          playerBot.vx -= nx * pRecoil;
+          playerBot.vz -= nz * pRecoil;
+          playerBot.vy = Math.max(playerBot.vy, canSendFlying ? 0.9 : 0.35);
+
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
@@ -6949,6 +7236,10 @@
               detachWheel(enemyBot, { x: nx, z: nz }, midPos);
             }
           }
+          if (!wasEnemyFlipped && enemyBot.flipped) {
+            AnnouncerSys.commentFlipped();
+            AudioSys.crowdGasp(0.8);
+          }
           // Player takes strictly ZERO damage!
         } else if (isEWeaponHit) {
           // ========================================================
@@ -6958,9 +7249,27 @@
           const isWeaponFullSpeed = (enemyBot.weaponSpinSpeed >= 78.0);
           const isMovingFullSpeedToward = (eForwardDot > 0.45 && (eApproach >= 5.0 || eSpeedBefore >= 6.5));
           const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
+          const wasPlayerFlipped = playerBot.flipped;
 
           AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
           AudioSys.weaponSliceSound();
+          if (canSendFlying) {
+            AudioSys.crowdCheer(0.85, 1.6);
+            AnnouncerSys.commentBigHit();
+            addCameraTrauma(0.85);
+            triggerGamepadRumble(1.0, 360);
+            triggerHitStop(0.055);
+          } else {
+            addCameraTrauma(0.42);
+            triggerGamepadRumble(0.70, 220);
+          }
+
+          // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          const eRecoil = canSendFlying ? 4.6 : 2.2;
+          enemyBot.vx += nx * eRecoil;
+          enemyBot.vz += nz * eRecoil;
+          enemyBot.vy = Math.max(enemyBot.vy, canSendFlying ? 0.9 : 0.35);
+
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canSendFlying ? 2.4 : 1.9, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
@@ -7038,11 +7347,17 @@
               detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
             }
           }
+          if (!wasPlayerFlipped && playerBot.flipped) {
+            AnnouncerSys.commentFlipped();
+            AudioSys.crowdGasp(0.8);
+          }
         } else {
           // ========================================================
           // CHASSIS / BUMPER / WEDGE COLLISION (RAMMING)
           // ========================================================
           AudioSys.metalClashSound(Math.min(1.8, 0.55 + impactSpeed * 0.22), false);
+          addCameraTrauma(Math.min(0.35, 0.08 + impactSpeed * 0.04));
+          triggerGamepadRumble(Math.min(0.55, 0.2 + impactSpeed * 0.06), 140);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: Math.min(1.8, 0.55 + impactSpeed * 0.22), h: false });
           }
@@ -7153,6 +7468,8 @@
       // Sound intense referee warning horn the instant the countdown starts!
       if (!countoutHornPlayed) {
         AudioSys.refereeWarningHorn();
+        AnnouncerSys.commentCountDownStart();
+        addCameraTrauma(0.25);
         countoutHornPlayed = true;
       }
 
@@ -7467,6 +7784,16 @@
     // Smooth position interpolation
     camera.position.lerp(desiredPos, Math.min(1, dt * 6.0));
 
+    // Dynamic Combat Camera Shake Trauma
+    if (cameraTrauma > 0) {
+      const shake = cameraTrauma * cameraTrauma; // Quadratic trauma curve
+      const maxOffset = 0.95; // Maximum offset in meters
+      camera.position.x += (Math.random() * 2 - 1) * maxOffset * shake;
+      camera.position.y += (Math.random() * 2 - 1) * (maxOffset * 0.7) * shake;
+      camera.position.z += (Math.random() * 2 - 1) * maxOffset * shake;
+      cameraTrauma = Math.max(0, cameraTrauma - dt * 2.8);
+    }
+
     // Smooth lookTarget interpolation (completely filters out collision vibration / shaking!)
     currentCamLookTarget.lerp(lookTarget, Math.min(1, dt * 5.0));
     camera.lookAt(currentCamLookTarget);
@@ -7481,6 +7808,13 @@
     requestAnimationFrame(animate);
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
+
+    // Cinematic Hit-Stop (Freeze-frame on catastrophic weapon impacts)
+    let simDt = dt;
+    if (hitStopRemaining > 0) {
+      hitStopRemaining -= dt;
+      simDt = 0.0001; // Freeze physics integration for high-impact crunch
+    }
 
     // ----------------------------------------------------
     // DYNAMIC TOURNAMENT ARENA LIGHTING UPDATE
@@ -7640,10 +7974,10 @@
         steerKnob.style.transform = `translateX(${s * 46}px)`;
 
         if (!NetworkSys.isOnline) {
-          updateEnemyAI(dt);
+          updateEnemyAI(simDt);
         }
-        updateBotPhysics(playerBot, dt);
-        updateBotPhysics(enemyBot, dt);
+        updateBotPhysics(playerBot, simDt);
+        updateBotPhysics(enemyBot, simDt);
         handleBotCollision();
         updateImmobilizationAndCountout(dt);
 
