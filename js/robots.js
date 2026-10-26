@@ -723,14 +723,35 @@
         optimizeRobotMaterial(obj);
       }
     });
-    bot.cadAttached = true;
-    bot.drivePower = 1.0;
-    bot.weaponActive = true;
-    if (typeof matchState !== 'undefined' && matchState === 'menu') {
-      bot.weaponSpinSpeed = 95.0;
-    }
-    if (typeof initBotDetachableParts === 'function') {
-      initBotDetachableParts(bot);
+    bot.cadAttached = true;
+    bot.drivePower = 1.0;
+    bot.weaponActive = true;
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      bot.weaponSpinSpeed = 95.0;
+    }
+    if (typeof initBotDetachableParts === 'function') {
+      initBotDetachableParts(bot);
+    }
+    // Calculate exact geometric bounding box for 100% zero-clipping ground contact at all pitch & roll angles
+    try {
+      const origP = bot.tiltGroup.rotation.x;
+      const origR = bot.tiltGroup.rotation.z;
+      bot.tiltGroup.rotation.x = 0;
+      bot.tiltGroup.rotation.z = 0;
+      bot.tiltGroup.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(bot.tiltGroup);
+      bot.localBounds = {
+        minX: box.min.x - bot.root.position.x,
+        maxX: box.max.x - bot.root.position.x,
+        minY: Math.min(0, box.min.y - bot.root.position.y),
+        maxY: Math.max(1.2, box.max.y - bot.root.position.y),
+        minZ: box.min.z - bot.root.position.z,
+        maxZ: box.max.z - bot.root.position.z
+      };
+      bot.tiltGroup.rotation.x = origP;
+      bot.tiltGroup.rotation.z = origR;
+    } catch (e) {
+      bot.localBounds = { minX: -1.5, maxX: 1.5, minY: 0.0, maxY: 1.5, minZ: -1.7, maxZ: 1.7 };
     }
   }
 

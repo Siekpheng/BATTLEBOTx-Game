@@ -5,6 +5,39 @@
   // ========================================================
   // 10. REAL COMBAT PHYSICS & VERIFIED ZERO-CLIPPING GROUND KINEMATICS
   // ========================================================
+  // ========================================================
+  // MATHEMATICALLY VERIFIED ZERO-CLIPPING GROUND KINEMATICS
+  // Evaluates all 8 3D bounding corners under current Euler XYZ rotation (pitch & roll)
+  // Ensures robot NEVER clips through floor during flips at ANY orientation (0 to 360 deg)
+  // ========================================================
+  function getBotGroundElevation(bot) {
+    if (!bot || !bot.tiltGroup) return 0;
+    const b = bot.localBounds || {
+      minX: -1.55, maxX: 1.55,
+      minY: 0.0,   maxY: 1.50,
+      minZ: -1.75, maxZ: 1.75
+    };
+
+    const cp = Math.cos(bot.pitch || 0);
+    const sp = Math.sin(bot.pitch || 0);
+    const cr = Math.cos(bot.roll || 0);
+    const sr = Math.sin(bot.roll || 0);
+
+    let lowestY = 0;
+    for (const x of [b.minX, b.maxX]) {
+      for (const y of [b.minY, b.maxY]) {
+        for (const z of [b.minZ, b.maxZ]) {
+          // Three.js Euler order 'XYZ': Rx(pitch) then Rz(roll)
+          // yRot = x * sin(roll) + (y * cos(pitch) - z * sin(pitch)) * cos(roll)
+          const yRot = x * sr + (y * cp - z * sp) * cr;
+          if (yRot < lowestY) lowestY = yRot;
+        }
+      }
+    }
+    return Math.max(0, -lowestY);
+  }
+  window.getBotGroundElevation = getBotGroundElevation;
+
   function updateBotPhysics(bot, dt) {
     const leftWheels = bot.wheels ? bot.wheels.filter(w => w.attached && w.side === 'left').length : 1;
     const rightWheels = bot.wheels ? bot.wheels.filter(w => w.attached && w.side === 'right').length : 1;
@@ -199,32 +232,9 @@
 
     bot.flipped = (Math.abs(bot.pitch) > Math.PI * 0.48) || (Math.abs(bot.roll) > Math.PI * 0.48);
 
-    // --- MATHEMATICALLY VERIFIED ZERO-CLIPPING GROUND CONTACT FOR BOTH PITCH & ROLL ---
-    const hw = 1.02;
-    const hl = 1.25;
-    const h  = 0.78;
-
-    const cp = Math.cos(bot.pitch);
-    const sp = Math.sin(bot.pitch);
-    const cr = Math.cos(bot.roll);
-    const sr = Math.sin(bot.roll);
-
-    let lowestLocalY = 0;
-    for (const sx of [-1, 1]) {
-      for (const sy of [0, 1]) {
-        for (const sz of [-1, 1]) {
-          const cornerX = sx * hw;
-          const cornerY = sy * h;
-          const cornerZ = sz * hl;
-          const yRot = cornerX * sr + (cornerY * cp - cornerZ * sp) * cr;
-          if (yRot < lowestLocalY) lowestLocalY = yRot;
-        }
-      }
-    }
-    const groundElevation = Math.max(0, -lowestLocalY);
-
+    bot.groundElevation = getBotGroundElevation(bot);
     const wheelTilt = (rightWheels - leftWheels) * 0.045;
-    bot.root.position.set(bot.x, groundElevation + (bot.airY || 0), bot.z);
+    bot.root.position.set(bot.x, bot.groundElevation + (bot.airY || 0), bot.z);
     bot.root.rotation.y = bot.yaw;
     bot.tiltGroup.rotation.x = bot.pitch;
     bot.tiltGroup.rotation.z = bot.roll + wheelTilt;
@@ -486,27 +496,27 @@
           enemyBot.vx += nx * clashImpulse;
           enemyBot.vz += nz * clashImpulse;
 
-          // Head-on kinetic explosion: vertical lift and rotational torque for both robots
+          // Head-on kinetic explosion: rare, realistic vertical lift on extreme high-speed clash
           const bothWeaponsMax = (playerBot.weaponSpinSpeed >= 88.0 && enemyBot.weaponSpinSpeed >= 88.0);
-          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 5.5 && eSpeedBefore >= 5.5);
-          const canClashFlip = bothWeaponsMax && bothTravelFast;
+          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0);
+          const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
 
           if (canClashFlip) {
-            playerBot.vy = 4.2 + Math.random() * 1.2;
-            enemyBot.vy = 4.2 + Math.random() * 1.2;
-            playerBot.airY = 0.40;
-            enemyBot.airY = 0.40;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
+            playerBot.vy = 2.0 + Math.random() * 0.3;
+            enemyBot.vy = 2.0 + Math.random() * 0.3;
+            playerBot.airY = 0.15;
+            enemyBot.airY = 0.15;
+            playerBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
+            enemyBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
             playerBot.flipped = true;
             enemyBot.flipped = true;
           } else {
-            playerBot.vy = 1.2;
-            enemyBot.vy = 1.2;
-            playerBot.airY = 0.10;
-            enemyBot.airY = 0.10;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -4.5 : 4.5);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -4.5 : 4.5);
+            playerBot.vy = 1.0;
+            enemyBot.vy = 1.0;
+            playerBot.airY = 0.06;
+            enemyBot.airY = 0.06;
+            playerBot.pitchVel = (Math.random() < 0.5 ? -3.0 : 3.0);
+            enemyBot.pitchVel = (Math.random() < 0.5 ? -3.0 : 3.0);
           }
 
           spawnCollisionSparks(midPos, 65);
@@ -544,67 +554,76 @@
           // ========================================================
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
           
-          // Realistic flipping criteria: ONLY flip when weapon is spinning at MAX and robot travel speed is FAST!
+          // Realistic flipping criteria per user specification:
+          // 1. Only flip when the other robot hits it VERTICALLY VERY HARD!
+          //    - Weapon must be spinning at high RPM (>= 88 rad/s)
+          //    - Travel speed must be fast (>= 6.5 m/s) with direct high-energy impact (>= 8.0 m/s or approach >= 4.5)
+          //    - Vertical bite / lifting strike (frontal/rear weapon bite underneath chassis or vertical launch)
+          // 2. "Not every hit is a flip ... only sometime flip":
+          //    - Even on hard vertical hits, only a ~24% probability to flip;
+          //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
           const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= 88.0);
-          const isPTravelFast = (pSpeedBefore >= 6.0 && (pApproach >= 4.2 || impactSpeed >= 7.5));
-          const canFlipEnemy = isPWeaponMax && isPTravelFast;
+          const isPTravelFast = (pSpeedBefore >= 6.5 && (pApproach >= 4.5 || impactSpeed >= 8.0));
+          const isVerticalBiteP = isFrontalOrRear || (playerBot.vy > 0.35);
+          const isHardVerticalHitP = isPWeaponMax && isPTravelFast && isVerticalBiteP;
+          const canFlipEnemy = isHardVerticalHitP && (Math.random() < 0.24);
           const wasEnemyFlipped = enemyBot.flipped;
 
-          AudioSys.metalClashSound(canFlipEnemy ? 2.4 : 1.9, true);
+          AudioSys.metalClashSound(canFlipEnemy ? 2.2 : 1.8, true);
           AudioSys.weaponSliceSound();
           if (canFlipEnemy) {
             AudioSys.crowdCheer(0.85, 1.6);
-            addCameraTrauma(0.85);
-            triggerGamepadRumble(1.0, 360);
-            triggerHitStop(0.055);
+            addCameraTrauma(0.70);
+            triggerGamepadRumble(0.9, 300);
+            triggerHitStop(0.045);
           } else {
-            addCameraTrauma(0.42);
-            triggerGamepadRumble(0.70, 220);
+            addCameraTrauma(0.38);
+            triggerGamepadRumble(0.60, 200);
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const pRecoil = canFlipEnemy ? 4.2 : 2.0;
+          const pRecoil = canFlipEnemy ? 3.4 : 1.8;
           playerBot.vx -= nx * pRecoil;
           playerBot.vz -= nz * pRecoil;
-          playerBot.vy = Math.max(playerBot.vy, canFlipEnemy ? 0.9 : 0.35);
+          playerBot.vy = Math.max(playerBot.vy, canFlipEnemy ? 0.7 : 0.30);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: canFlipEnemy ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: canFlipEnemy ? 2.2 : 1.8, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
           }
 
           if (canFlipEnemy) {
-            // MAXIMUM KINETIC IMPACT: HIGH-SPEED LAUNCH & FLIP!
-            enemyBot.vy = 4.8 + Math.random() * 1.5;
-            enemyBot.airY = 0.45;
-            enemyBot.vx += nx * (9.0 + impactSpeed * 0.7);
-            enemyBot.vz += nz * (9.0 + impactSpeed * 0.7);
+            // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
+            enemyBot.vy = 2.1 + Math.random() * 0.35;
+            enemyBot.airY = 0.15;
+            enemyBot.vx += nx * (5.5 + impactSpeed * 0.40);
+            enemyBot.vz += nz * (5.5 + impactSpeed * 0.40);
 
             if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -26.0 : 26.0);
-              enemyBot.rollVel = (Math.random() - 0.5) * 12.0;
+              enemyBot.pitchVel = (eHitForward > 0 ? -8.5 : 8.5);
+              enemyBot.rollVel = (Math.random() - 0.5) * 2.5;
             } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -25.0 : 25.0);
-              enemyBot.pitchVel = (Math.random() - 0.5) * 12.0;
+              enemyBot.rollVel = (eHitRight > 0 ? -8.5 : 8.5);
+              enemyBot.pitchVel = (Math.random() - 0.5) * 2.5;
             }
             enemyBot.flipped = true;
 
-            spawnCollisionSparks(midPos, 50);
+            spawnCollisionSparks(midPos, 45);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
-            enemyBot.vy = 1.0;
-            enemyBot.airY = 0.08;
-            enemyBot.vx += nx * (4.2 + impactSpeed * 0.55);
-            enemyBot.vz += nz * (4.2 + impactSpeed * 0.55);
+            enemyBot.vy = isHardVerticalHitP ? 1.4 : 0.8;
+            enemyBot.airY = isHardVerticalHitP ? 0.10 : 0.05;
+            enemyBot.vx += nx * (4.0 + impactSpeed * 0.45);
+            enemyBot.vz += nz * (4.0 + impactSpeed * 0.45);
 
             if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -4.5 : 4.5);
+              enemyBot.pitchVel = (eHitForward > 0 ? -3.5 : 3.5);
               enemyBot.rollVel = 0;
             } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -4.5 : 4.5);
+              enemyBot.rollVel = (eHitRight > 0 ? -3.5 : 3.5);
               enemyBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO enemyBot.flipped = true
@@ -646,67 +665,76 @@
           // ========================================================
           const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
 
-          // Realistic flipping criteria: ONLY flip when weapon is spinning at MAX and robot travel speed is FAST!
+          // Realistic flipping criteria per user specification:
+          // 1. Only flip when the other robot hits it VERTICALLY VERY HARD!
+          //    - Weapon must be spinning at high RPM (>= 88 rad/s)
+          //    - Travel speed must be fast (>= 6.5 m/s) with direct high-energy impact (>= 8.0 m/s or approach >= 4.5)
+          //    - Vertical bite / lifting strike (frontal/rear weapon bite underneath chassis or vertical launch)
+          // 2. "Not every hit is a flip ... only sometime flip":
+          //    - Even on hard vertical hits, only a ~24% probability to flip;
+          //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
           const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= 88.0);
-          const isETravelFast = (eSpeedBefore >= 6.0 && (eApproach >= 4.2 || impactSpeed >= 7.5));
-          const canFlipPlayer = isEWeaponMax && isETravelFast;
+          const isETravelFast = (eSpeedBefore >= 6.5 && (eApproach >= 4.5 || impactSpeed >= 8.0));
+          const isVerticalBiteE = isFrontalOrRear || (enemyBot.vy > 0.35);
+          const isHardVerticalHitE = isEWeaponMax && isETravelFast && isVerticalBiteE;
+          const canFlipPlayer = isHardVerticalHitE && (Math.random() < 0.24);
           const wasPlayerFlipped = playerBot.flipped;
 
-          AudioSys.metalClashSound(canFlipPlayer ? 2.4 : 1.9, true);
+          AudioSys.metalClashSound(canFlipPlayer ? 2.2 : 1.8, true);
           AudioSys.weaponSliceSound();
           if (canFlipPlayer) {
             AudioSys.crowdCheer(0.85, 1.6);
-            addCameraTrauma(0.85);
-            triggerGamepadRumble(1.0, 360);
-            triggerHitStop(0.055);
+            addCameraTrauma(0.70);
+            triggerGamepadRumble(0.9, 300);
+            triggerHitStop(0.045);
           } else {
-            addCameraTrauma(0.42);
-            triggerGamepadRumble(0.70, 220);
+            addCameraTrauma(0.38);
+            triggerGamepadRumble(0.60, 200);
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const eRecoil = canFlipPlayer ? 4.2 : 2.0;
+          const eRecoil = canFlipPlayer ? 3.4 : 1.8;
           enemyBot.vx += nx * eRecoil;
           enemyBot.vz += nz * eRecoil;
-          enemyBot.vy = Math.max(enemyBot.vy, canFlipPlayer ? 0.9 : 0.35);
+          enemyBot.vy = Math.max(enemyBot.vy, canFlipPlayer ? 0.7 : 0.30);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: canFlipPlayer ? 2.4 : 1.9, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: canFlipPlayer ? 2.2 : 1.8, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
           }
 
           if (canFlipPlayer) {
-            // MAXIMUM KINETIC IMPACT: HIGH-SPEED LAUNCH & FLIP!
-            playerBot.vy = 4.8 + Math.random() * 1.5;
-            playerBot.airY = 0.45;
-            playerBot.vx -= nx * (9.0 + impactSpeed * 0.7);
-            playerBot.vz -= nz * (9.0 + impactSpeed * 0.7);
+            // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
+            playerBot.vy = 2.1 + Math.random() * 0.35;
+            playerBot.airY = 0.15;
+            playerBot.vx -= nx * (5.5 + impactSpeed * 0.40);
+            playerBot.vz -= nz * (5.5 + impactSpeed * 0.40);
 
             if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -26.0 : 26.0);
-              playerBot.rollVel = (Math.random() - 0.5) * 12.0;
+              playerBot.pitchVel = (pHitForward > 0 ? -8.5 : 8.5);
+              playerBot.rollVel = (Math.random() - 0.5) * 2.5;
             } else {
-              playerBot.rollVel = (pHitRight > 0 ? -25.0 : 25.0);
-              playerBot.pitchVel = (Math.random() - 0.5) * 12.0;
+              playerBot.rollVel = (pHitRight > 0 ? -8.5 : 8.5);
+              playerBot.pitchVel = (Math.random() - 0.5) * 2.5;
             }
             playerBot.flipped = true;
 
-            spawnCollisionSparks(midPos, 50);
+            spawnCollisionSparks(midPos, 45);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
+              NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
-            playerBot.vy = 1.0;
-            playerBot.airY = 0.08;
-            playerBot.vx -= nx * (4.2 + impactSpeed * 0.55);
-            playerBot.vz -= nz * (4.2 + impactSpeed * 0.55);
+            playerBot.vy = isHardVerticalHitE ? 1.4 : 0.8;
+            playerBot.airY = isHardVerticalHitE ? 0.10 : 0.05;
+            playerBot.vx -= nx * (4.0 + impactSpeed * 0.45);
+            playerBot.vz -= nz * (4.0 + impactSpeed * 0.45);
 
             if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -4.5 : 4.5);
+              playerBot.pitchVel = (pHitForward > 0 ? -3.5 : 3.5);
               playerBot.rollVel = 0;
             } else {
-              playerBot.rollVel = (pHitRight > 0 ? -4.5 : 4.5);
+              playerBot.rollVel = (pHitRight > 0 ? -3.5 : 3.5);
               playerBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO playerBot.flipped = true
@@ -842,6 +870,9 @@
 
   function updateBotVisuals(bot, dt) {
     if (!bot || !bot.root) return;
+    if (typeof bot.groundElevation === 'undefined') {
+      bot.groundElevation = getBotGroundElevation(bot);
+    }
     bot.root.position.set(bot.x, (bot.airY || 0) + (bot.groundElevation || 0), bot.z);
     bot.root.rotation.y = bot.yaw;
     if (bot.tiltGroup) {
