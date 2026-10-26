@@ -2447,16 +2447,16 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05; // Bright, vivid professional arena tournament lighting
+  renderer.toneMappingExposure = 0.80; // Dark, moody, high-contrast atmospheric arena exposure
   container.appendChild(renderer.domElement);
 
-  // Professional Tournament Cinema Lighting (Bright, Vivid Robot CAD Colors & Clear Details):
-  // 1. Dual-tone hemisphere light: bright sky fill (0xe0f2fe, 0.58), deep ground fill (0x1e293b, 0.36)
-  const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.58);
+  // Professional Tournament Cinema Lighting (Dark Arena Atmosphere):
+  // 1. Dual-tone hemisphere light: soft sky tint (0xdbeafe, 0.22), deep floor contrast (0x0f172a, 0.16)
+  const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x0f172a, 0.22);
   scene.add(hemiLight);
 
   // 2. Main overhead tournament keylight (crisp neutral white shining straight down over arena center)
-  const topCenterLight = new THREE.DirectionalLight(0xffffff, 0.90);
+  const topCenterLight = new THREE.DirectionalLight(0xffffff, 0.52);
   topCenterLight.position.set(0, 32, 1);
   topCenterLight.target.position.set(0, 0, 0);
   topCenterLight.castShadow = true;
@@ -2475,14 +2475,14 @@
   scene.add(topCenterLight.target);
 
   // 3. Dual overhead arena combat spotlights focused on the fighting arena
-  const spot1 = new THREE.SpotLight(0xf8fafc, 0.75, 48, Math.PI / 3.2, 0.35, 1.0);
+  const spot1 = new THREE.SpotLight(0xf8fafc, 0.45, 42, Math.PI / 3.4, 0.35, 1.1);
   spot1.position.set(-4.0, 20.0, -1.0);
   spot1.target.position.set(-1.0, 0, 0);
   spot1.castShadow = false; // Prevents multi-shadow acne on robot assemblies
   scene.add(spot1);
   scene.add(spot1.target);
 
-  const spot2 = new THREE.SpotLight(0xf8fafc, 0.75, 48, Math.PI / 3.2, 0.35, 1.0);
+  const spot2 = new THREE.SpotLight(0xf8fafc, 0.45, 42, Math.PI / 3.4, 0.35, 1.1);
   spot2.position.set(4.0, 20.0, -1.0);
   spot2.target.position.set(1.0, 0, 0);
   spot2.castShadow = false;
@@ -2490,18 +2490,11 @@
   scene.add(spot2.target);
 
   // 4. Subtle metallic edge rim light from the North/rear: catches metallic bevels & armor silhouettes
-  const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.40);
+  const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.20);
   rimLight.position.set(0, 16, -16);
   rimLight.target.position.set(0, 0, 0);
   scene.add(rimLight);
   scene.add(rimLight.target);
-
-  // 5. Front combat fill light from South: clearly illuminates robot face, wedges, and weapons facing camera
-  const frontFillLight = new THREE.DirectionalLight(0xfff7ed, 0.35);
-  frontFillLight.position.set(0, 12, 16);
-  frontFillLight.target.position.set(0, 0, 0);
-  scene.add(frontFillLight);
-  scene.add(frontFillLight.target);
 
   // ========================================================
   // 4x4m SQUARE BATTLEBOX ENCLOSURE (CALIBRATED TO CAD SPECS)
@@ -2945,10 +2938,21 @@
       mat.side = THREE.DoubleSide; // Render both sides so CAD sheet metal panels & interior cavity are 100% solid
       mat.needsUpdate = true;
 
-      // 2. Crisp, vibrant industrial CAD material finish with specular highlights:
-      mat.roughness = 0.36; // Fine satin sheen (clear highlights and reflections)
+      // 2. Dedicated Robot Luminance Boost (Light ONLY on the robot, zero brightening of the arena):
+      if (mat.color && !mat._emissiveApplied) {
+        const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
+        if (lum < 0.15) {
+          // Dark parts (chassis frame, tires, carbon): clean lift so interior CAD cavity is clearly visible
+          mat.emissive = new THREE.Color(0x222a38);
+        } else {
+          // Vibrant painted body, armor, wedges, weapons: bright, self-radiant CAD coloration
+          mat.emissive = mat.color.clone().multiplyScalar(0.35);
+        }
+        mat._emissiveApplied = true;
+      }
+      mat.roughness = 0.32; // Crisp specular sheen
       if (mat.metalness !== undefined && mat.metalness > 0.05) {
-        mat.metalness = Math.min(0.50, mat.metalness * 1.20);
+        mat.metalness = Math.min(0.55, mat.metalness * 1.25);
       }
     });
   }
@@ -4142,7 +4146,7 @@
           if (!n.includes('tire') && !n.includes('rubber') && !n.includes('nut') && !n.includes('rim') && !n.includes('steel') && !n.includes('blade')) {
             if (mat.color) {
               mat.color.setHex(0xdc2626);
-              if (mat.emissive) mat.emissive.setHex(0x3f0a0a);
+              if (mat.emissive) mat.emissive.setHex(0x5a1010);
               mat.needsUpdate = true;
             }
           }
