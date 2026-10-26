@@ -23,7 +23,7 @@
       const isR2 = (bot.type === 'robot2');
       // Symmetrically balanced wheel factor for both robots
       const wheelFactor = Math.min(1.0, (totalWheels / maxWheels) * 0.70 + 0.30);
-      bot.drivePower = Math.max(0.12, (bot.driveHealth / 100) * (0.25 + 0.75 * wheelFactor));
+      bot.drivePower = Math.max(0.12, (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor));
     }
 
     const maxSpeed = 15.0 * (0.35 + 0.65 * bot.drivePower);
@@ -359,23 +359,10 @@
 
     const distToPlayer = Math.hypot(dx, dz);
 
-    // BattleBots Referee Countout Rule:
-    // If player is immobilized (countout started, flipped, drive burned out, or all wheels detached):
-    // Opponent MUST back off and hold a safe distance to let referee 10s countout proceed!
-    const pNoWheels = playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0;
-    const isPlayerImmobilized = (playerBot.stoppedTimer > 0.20) || playerBot.flipped || (playerBot.driveHealth <= 0) || pNoWheels;
-
-    if (isPlayerImmobilized) {
-      if (distToPlayer < 7.0) {
-        // Reverse away smoothly from the immobilized player
-        enemyBot.throttleInput = -0.55;
-        // Keep clear angle
-        enemyBot.steerInput = (diff > 0) ? -0.35 : 0.35;
-      } else {
-        // Stand by at neutral distance and idle
-        enemyBot.throttleInput = 0;
-        enemyBot.steerInput = 0;
-      }
+    // Relentless combat pursuit: no 10s countdown back-off! AI actively attacks to achieve total demolition.
+    if (playerBot.driveHealth <= 0 || playerBot.isEntirelyDestroyed) {
+      enemyBot.throttleInput = 0;
+      enemyBot.steerInput = 0;
       return;
     }
 
@@ -491,12 +478,19 @@
           enemyBot.vx += nx * clashImpulse;
           enemyBot.vz += nz * clashImpulse;
 
-          playerBot.vy = 1.3;
-          enemyBot.vy = 1.3;
+          // Head-on kinetic explosion: vertical lift and rotational torque for both robots
+          playerBot.vy = 3.2 + Math.random() * 1.4;
+          enemyBot.vy = 3.2 + Math.random() * 1.4;
+          playerBot.airY = 0.35;
+          enemyBot.airY = 0.35;
+          playerBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
+          enemyBot.pitchVel = (Math.random() < 0.5 ? -24.0 : 24.0);
+          if (Math.random() < 0.42) playerBot.flipped = true;
+          if (Math.random() < 0.42) enemyBot.flipped = true;
 
-          spawnCollisionSparks(midPos, 60);
+          spawnCollisionSparks(midPos, 65);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 60 });
+            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 65 });
           }
           triggerDamageVignette();
 
@@ -508,8 +502,8 @@
           const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
 
-          const clashMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
-          const clashDmg = (impactSpeed * 1.6 + 6.0) * clashMult;
+          const clashMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
+          const clashDmg = (impactSpeed * 1.1 + 3.8) * clashMult;
           if (!isPractice) {
             playerBot.driveHealth = Math.max(0, playerBot.driveHealth - clashDmg * pVuln);
           }
@@ -523,15 +517,24 @@
             if (!isPractice && playerBot.wheels && Math.random() < clashWheelProb) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
             if (enemyBot.wheels && Math.random() < clashWheelProb) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
           }
+
+          if (!isPractice && playerBot.driveHealth <= 0) {
+            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
+          }
+          if (enemyBot.driveHealth <= 0) {
+            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
+          }
         } else if (isPWeaponHit) {
           // ========================================================
           // PLAYER WEAPON STRIKE ON ENEMY
           // (Enemy takes kinetic damage, sparks, flings. Player takes 0 damage!)
           // ========================================================
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
-          const isWeaponFullSpeed = (playerBot.weaponSpinSpeed >= 78.0);
-          const isMovingFullSpeedToward = (pForwardDot > 0.45 && (pApproach >= 5.0 || pSpeedBefore >= 6.5));
-          const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
+          const isWeaponSpinning = (playerBot.weaponSpinSpeed >= 38.0);
+          const isSolidHit = (impactSpeed >= 2.2 || pApproach >= 1.8 || pSpeedBefore >= 2.6);
+          const canSendFlying = isWeaponSpinning && isSolidHit;
           const wasEnemyFlipped = enemyBot.flipped;
 
           AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
@@ -547,7 +550,7 @@
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const pRecoil = canSendFlying ? 4.6 : 2.2;
+          const pRecoil = canSendFlying ? 4.2 : 2.0;
           playerBot.vx -= nx * pRecoil;
           playerBot.vz -= nz * pRecoil;
           playerBot.vy = Math.max(playerBot.vy, canSendFlying ? 0.9 : 0.35);
@@ -558,44 +561,40 @@
           }
 
           if (canSendFlying) {
-            if (playerBot.type === 'robot3') {
-              enemyBot.vx += nx * 14.0;
-              enemyBot.vz += nz * 14.0;
-              enemyBot.yaw += (eHitRight > 0 ? 5.0 : -5.0);
-              enemyBot.rollVel = (eHitRight > 0 ? -12.0 : 12.0);
-              enemyBot.vy = 2.2;
-              enemyBot.airY = 0.35;
-              enemyBot.flipped = (Math.random() < 0.45);
+            // UNIVERSAL FLIPPING & LAUNCH PHYSICS FOR ALL 6 ROBOTS:
+            enemyBot.vy = 4.6 + Math.random() * 1.6;
+            enemyBot.airY = 0.45;
+            enemyBot.vx += nx * (9.0 + impactSpeed * 0.7);
+            enemyBot.vz += nz * (9.0 + impactSpeed * 0.7);
+
+            if (isFrontalOrRear) {
+              enemyBot.pitchVel = (eHitForward > 0 ? -26.0 : 26.0);
+              enemyBot.rollVel = (Math.random() - 0.5) * 12.0;
             } else {
-              enemyBot.vy = 4.8 + Math.random() * 0.7;
-              if (isFrontalOrRear) {
-                enemyBot.pitchVel = (eHitForward > 0 ? -25.0 : 25.0);
-                enemyBot.rollVel = 0;
-              } else {
-                enemyBot.rollVel = (eHitRight > 0 ? -20.0 : 20.0);
-                enemyBot.pitchVel = 0;
-              }
-              enemyBot.flipped = true;
+              enemyBot.rollVel = (eHitRight > 0 ? -25.0 : 25.0);
+              enemyBot.pitchVel = (Math.random() - 0.5) * 12.0;
             }
+            enemyBot.flipped = true;
+
             spawnCollisionSparks(midPos, 50);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
             }
           } else {
-            if (playerBot.type === 'robot3') {
-              enemyBot.vx += nx * (4.5 + impactSpeed * 0.8);
-              enemyBot.vz += nz * (4.5 + impactSpeed * 0.8);
-              enemyBot.yaw += (eHitRight > 0 ? 2.5 : -2.5);
+            enemyBot.vy = 2.0;
+            enemyBot.airY = 0.22;
+            enemyBot.vx += nx * (4.5 + impactSpeed * 0.6);
+            enemyBot.vz += nz * (4.5 + impactSpeed * 0.6);
+
+            if (isFrontalOrRear) {
+              enemyBot.pitchVel = (eHitForward > 0 ? -16.0 : 16.0);
+              enemyBot.rollVel = 0;
             } else {
-              enemyBot.vy = 0.5;
-              if (isFrontalOrRear) {
-                enemyBot.pitchVel = (eHitForward > 0 ? -5.0 : 5.0);
-                enemyBot.rollVel = 0;
-              } else {
-                enemyBot.rollVel = (eHitRight > 0 ? -5.0 : 5.0);
-                enemyBot.pitchVel = 0;
-              }
+              enemyBot.rollVel = (eHitRight > 0 ? -15.0 : 15.0);
+              enemyBot.pitchVel = 0;
             }
+            if (Math.random() < 0.40) enemyBot.flipped = true;
+
             spawnCollisionSparks(midPos, 22);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
@@ -612,10 +611,15 @@
           const eRemainingArmor = enemyBot.armorPanels.filter(p => p.attached).length;
           const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
-          const menuDmgMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
-          const baseDmg = (impactSpeed * 2.3 + (canSendFlying ? 14 : 6)) * menuDmgMult;
+          const menuDmgMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
+          const baseDmg = (impactSpeed * 1.5 + (canSendFlying ? 10 : 4.5)) * menuDmgMult;
           const driveDmg = baseDmg * eVuln;
           enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+
+          if (enemyBot.driveHealth <= 0) {
+            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
+          }
 
           if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
             detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
@@ -637,9 +641,9 @@
           // ENEMY WEAPON STRIKE ON PLAYER (Non-practice mode only)
           // ========================================================
           const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
-          const isWeaponFullSpeed = (enemyBot.weaponSpinSpeed >= 78.0);
-          const isMovingFullSpeedToward = (eForwardDot > 0.45 && (eApproach >= 5.0 || eSpeedBefore >= 6.5));
-          const canSendFlying = isWeaponFullSpeed && isMovingFullSpeedToward;
+          const isWeaponSpinning = (enemyBot.weaponSpinSpeed >= 38.0);
+          const isSolidHit = (impactSpeed >= 2.2 || eApproach >= 1.8 || eSpeedBefore >= 2.6);
+          const canSendFlying = isWeaponSpinning && isSolidHit;
           const wasPlayerFlipped = playerBot.flipped;
 
           AudioSys.metalClashSound(canSendFlying ? 2.4 : 1.9, true);
@@ -655,7 +659,7 @@
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
-          const eRecoil = canSendFlying ? 4.6 : 2.2;
+          const eRecoil = canSendFlying ? 4.2 : 2.0;
           enemyBot.vx += nx * eRecoil;
           enemyBot.vz += nz * eRecoil;
           enemyBot.vy = Math.max(enemyBot.vy, canSendFlying ? 0.9 : 0.35);
@@ -666,44 +670,40 @@
           }
 
           if (canSendFlying) {
-            if (enemyBot.type === 'robot3') {
-              playerBot.vx -= nx * 14.0;
-              playerBot.vz -= nz * 14.0;
-              playerBot.yaw += (pHitRight > 0 ? 5.0 : -5.0);
-              playerBot.rollVel = (pHitRight > 0 ? -12.0 : 12.0);
-              playerBot.vy = 2.2;
-              playerBot.airY = 0.35;
-              playerBot.flipped = (Math.random() < 0.45);
+            // UNIVERSAL FLIPPING & LAUNCH PHYSICS FOR ALL 6 ROBOTS:
+            playerBot.vy = 4.6 + Math.random() * 1.6;
+            playerBot.airY = 0.45;
+            playerBot.vx -= nx * (9.0 + impactSpeed * 0.7);
+            playerBot.vz -= nz * (9.0 + impactSpeed * 0.7);
+
+            if (isFrontalOrRear) {
+              playerBot.pitchVel = (pHitForward > 0 ? -26.0 : 26.0);
+              playerBot.rollVel = (Math.random() - 0.5) * 12.0;
             } else {
-              playerBot.vy = 4.8 + Math.random() * 0.7;
-              if (isFrontalOrRear) {
-                playerBot.pitchVel = (pHitForward > 0 ? -25.0 : 25.0);
-                playerBot.rollVel = 0;
-              } else {
-                playerBot.rollVel = (pHitRight > 0 ? -20.0 : 20.0);
-                playerBot.pitchVel = 0;
-              }
-              playerBot.flipped = true;
+              playerBot.rollVel = (pHitRight > 0 ? -25.0 : 25.0);
+              playerBot.pitchVel = (Math.random() - 0.5) * 12.0;
             }
+            playerBot.flipped = true;
+
             spawnCollisionSparks(midPos, 50);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 50 });
             }
           } else {
-            if (enemyBot.type === 'robot3') {
-              playerBot.vx -= nx * (4.5 + impactSpeed * 0.8);
-              playerBot.vz -= nz * (4.5 + impactSpeed * 0.8);
-              playerBot.yaw += (pHitRight > 0 ? 2.5 : -2.5);
+            playerBot.vy = 2.0;
+            playerBot.airY = 0.22;
+            playerBot.vx -= nx * (4.5 + impactSpeed * 0.6);
+            playerBot.vz -= nz * (4.5 + impactSpeed * 0.6);
+
+            if (isFrontalOrRear) {
+              playerBot.pitchVel = (pHitForward > 0 ? -16.0 : 16.0);
+              playerBot.rollVel = 0;
             } else {
-              playerBot.vy = 0.5;
-              if (isFrontalOrRear) {
-                playerBot.pitchVel = (pHitForward > 0 ? -5.0 : 5.0);
-                playerBot.rollVel = 0;
-              } else {
-                playerBot.rollVel = (pHitRight > 0 ? -5.0 : 5.0);
-                playerBot.pitchVel = 0;
-              }
+              playerBot.rollVel = (pHitRight > 0 ? -15.0 : 15.0);
+              playerBot.pitchVel = 0;
             }
+            if (Math.random() < 0.40) playerBot.flipped = true;
+
             spawnCollisionSparks(midPos, 22);
             if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 22 });
@@ -722,10 +722,15 @@
           const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
           const pMaxArmor = Math.max(1, playerBot.armorPanels.length);
           const pVuln = 1.0 + (1.0 - (pRemainingArmor / pMaxArmor)) * 1.25;
-          const menuDmgMultE = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
-          const baseDmg = (impactSpeed * 2.3 + (canSendFlying ? 14 : 6)) * menuDmgMultE;
+          const menuDmgMultE = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
+          const baseDmg = (impactSpeed * 1.5 + (canSendFlying ? 10 : 4.5)) * menuDmgMultE;
           const driveDmg = baseDmg * pVuln;
           playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
+
+          if (playerBot.driveHealth <= 0) {
+            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
+          }
 
           if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
             detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
@@ -773,22 +778,42 @@
               // Player rammed Enemy with active weapon!
               const driveDmg = Math.max(0, impactSpeed * 0.85);
               enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
-              if (impactSpeed > 6.8 && Math.random() < 0.35) {
+              if (impactSpeed > 4.2) {
+                enemyBot.vy = 2.6;
+                enemyBot.airY = 0.32;
+                enemyBot.rollVel = (eHitRight > 0 ? -18.0 : 18.0);
+                if (Math.random() < 0.50) enemyBot.flipped = true;
+              }
+              if (impactSpeed > 5.5 && Math.random() < 0.45) {
                 detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
               }
-              if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
-                if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+              if (impactSpeed > 4.5 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
+                if (Math.random() < 0.40) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+              }
+              if (enemyBot.driveHealth <= 0) {
+                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
               }
             } else if (eIsAttacker && enemyBot.weaponActive !== false) {
               // Enemy rammed Player with active weapon!
               const driveDmg = Math.max(0, impactSpeed * 0.85);
               playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
               triggerDamageVignette();
-              if (impactSpeed > 6.8 && Math.random() < 0.35) {
+              if (impactSpeed > 4.2) {
+                playerBot.vy = 2.6;
+                playerBot.airY = 0.32;
+                playerBot.rollVel = (pHitRight > 0 ? -18.0 : 18.0);
+                if (Math.random() < 0.50) playerBot.flipped = true;
+              }
+              if (impactSpeed > 5.5 && Math.random() < 0.45) {
                 detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
               }
-              if (impactSpeed > 5.0 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
-                if (Math.random() < 0.35) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
+              if (impactSpeed > 4.5 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
+                if (Math.random() < 0.40) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
+              }
+              if (playerBot.driveHealth <= 0) {
+                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
               }
             } else if (playerBot.weaponActive !== false && enemyBot.weaponActive !== false) {
               // Mutual bumper crunch: only damages if both robots have active weapons
@@ -797,6 +822,14 @@
               playerBot.driveHealth = Math.max(0, playerBot.driveHealth - pRam);
               enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - eRam);
               if (pRam > 2.5) triggerDamageVignette();
+              if (playerBot.driveHealth <= 0) {
+                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
+              }
+              if (enemyBot.driveHealth <= 0) {
+                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
+              }
             }
           }
         }
@@ -809,109 +842,25 @@
 
   function updateImmobilizationAndCountout(dt) {
     const warnContainer = document.getElementById('flip-warning-container');
-    const warnWho = document.getElementById('flip-who-text');
-    const warnNum = document.getElementById('flip-timer-num');
+    if (warnContainer) warnContainer.classList.add('hidden');
+    countoutHornPlayed = false;
 
-    if (!playerBot || !enemyBot) {
-      warnContainer.classList.add('hidden');
-      countoutHornPlayed = false;
-      return;
-    }
-
-    const pSpeed = Math.hypot(playerBot.vx, playerBot.vz);
-    const eSpeed = Math.hypot(enemyBot.vx, enemyBot.vz);
-
-    // BattleBots Rule: A bot is stopped / immobilized when:
-    // 1) All drive wheels detached (cannot move)
-    // 2) Motor/drive burnt out (driveHealth <= 0) and speed < 0.35
-    // 3) Flipped onto back and translational speed < 0.45
-    const pNoWheels = playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0;
-    const eNoWheels = enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.filter(w => w.attached).length === 0;
-
-    const isPStopped = (playerBot.driveHealth <= 0 && pSpeed < 0.35) || (playerBot.flipped && pSpeed < 0.45) || (pNoWheels && pSpeed < 0.35);
-    const isEStopped = (enemyBot.driveHealth <= 0 && eSpeed < 0.35) || (enemyBot.flipped && eSpeed < 0.45) || (eNoWheels && eSpeed < 0.35);
-
-    if (isPStopped) {
-      playerBot.stoppedTimer += dt;
-    } else {
-      playerBot.stoppedTimer = 0.0;
-    }
-
-    if (isEStopped) {
-      enemyBot.stoppedTimer += dt;
-    } else {
-      enemyBot.stoppedTimer = 0.0;
-    }
-
-    let activeBot = null;
-    let isPlayerTarget = false;
-
-    if (enemyBot.stoppedTimer > 0.4 && enemyBot.stoppedTimer >= playerBot.stoppedTimer) {
-      activeBot = enemyBot;
-      isPlayerTarget = false;
-    } else if (playerBot.stoppedTimer > 0.4) {
-      activeBot = playerBot;
-      isPlayerTarget = true;
-    }
-
-    if (activeBot) {
-      // Sound intense referee warning horn the instant the countdown starts!
-      if (!countoutHornPlayed) {
-        AudioSys.refereeWarningHorn();
-        addCameraTrauma(0.25);
-        countoutHornPlayed = true;
-      }
-
-      warnContainer.classList.remove('hidden');
-      const remainingTime = Math.max(0, 10.0 - activeBot.stoppedTimer);
-      const ceilSec = Math.max(1, Math.ceil(remainingTime));
-      warnNum.textContent = String(ceilSec);
-
-      if (isPlayerTarget) {
-        if (pNoWheels) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 ALL WHEELS DETACHED (IMMOBILIZED)!'
-            : 'PLAYER WHEELS DETACHED — REFEREE COUNTDOWN!';
-        } else if (playerBot.flipped) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 FLIPPED OVER — REFEREE COUNTDOWN!'
-            : 'PLAYER FLIPPED OVER — REFEREE COUNTDOWN!';
-        } else {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 MOTOR BURNOUT (IMMOBILIZED)!'
-            : 'PLAYER IMMOBILIZED — REFEREE COUNTDOWN!';
+    // Instant Win on Total Destruction or 0 HP — NO 10-Second Countdown!
+    if (typeof matchState !== 'undefined' && matchState === 'playing') {
+      if (playerBot && (playerBot.isEntirelyDestroyed || playerBot.driveHealth <= 0)) {
+        if (!playerBot.isEntirelyDestroyed && typeof destroyRobotEntirely === 'function') {
+          destroyRobotEntirely(playerBot, { x: 0, z: -1 });
         }
-      } else {
-        if (eNoWheels) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 ALL WHEELS DETACHED (IMMOBILIZED)!'
-            : 'ENEMY WHEELS DETACHED — REFEREE COUNTDOWN!';
-        } else if (enemyBot.flipped) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 FLIPPED OVER — REFEREE COUNTDOWN!'
-            : 'ENEMY FLIPPED OVER — REFEREE COUNTDOWN!';
-        } else {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 MOTOR BURNOUT (IMMOBILIZED)!'
-            : 'ENEMY IMMOBILIZED — REFEREE COUNTDOWN!';
+        endMatch(false, false, true);
+        return;
+      }
+      if (enemyBot && (enemyBot.isEntirelyDestroyed || enemyBot.driveHealth <= 0)) {
+        if (!enemyBot.isEntirelyDestroyed && typeof destroyRobotEntirely === 'function') {
+          destroyRobotEntirely(enemyBot, { x: 0, z: 1 });
         }
+        endMatch(true, false, true);
+        return;
       }
-
-      if (ceilSec !== lastCountoutSec) {
-        lastCountoutSec = ceilSec;
-        AudioSys.alarmBeep(ceilSec);
-      }
-
-      // 10-Second Count-Out Completed: KNOCKOUT!
-      if (activeBot.stoppedTimer >= 10.0) {
-        warnContainer.classList.add('hidden');
-        countoutHornPlayed = false;
-        endMatch(!isPlayerTarget, false, true);
-      }
-    } else {
-      lastCountoutSec = 10;
-      countoutHornPlayed = false;
-      warnContainer.classList.add('hidden');
     }
   }
 

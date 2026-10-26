@@ -30,7 +30,9 @@
       halfLength: 1.25,
       height: 0.78,
       flipped: false,
-      driveHealth: 100, // Equal balanced 100 HP for all robots
+      driveHealth: 220, // Equal balanced enhanced durability (220 HP)
+      maxDriveHealth: 220,
+      isEntirelyDestroyed: false,
       drivePower: 1.0,
       stoppedTimer: 0.0,
       throttleInput: 0,
@@ -788,15 +790,15 @@
       if (detail) detail.textContent = 'Time Expired — Both robots active!';
       AudioSys.beep(300, 0.3);
     } else if (didIWin) {
-      heading.textContent = isKO ? 'VICTORY BY K.O.!' : 'VICTORY';
+      heading.textContent = isKO ? 'TOTAL DESTRUCTION!' : 'VICTORY';
       heading.className = 'result-title win';
-      if (detail) detail.textContent = isKO ? 'Opponent robot immobilized! (K.O.)' : 'Won by Judges\' Decision!';
+      if (detail) detail.textContent = isKO ? 'Opponent robot obliterated! All parts destroyed!' : 'Won by Judges\' Decision!';
       AudioSys.winFanfare();
       AudioSys.crowdCheer(1.0, 2.5);
     } else {
-      heading.textContent = isKO ? 'DEFEAT BY K.O.!' : 'DEFEAT';
+      heading.textContent = isKO ? 'DEFEAT — DEMOLISHED!' : 'DEFEAT';
       heading.className = 'result-title lose';
-      if (detail) detail.textContent = isKO ? 'Your robot immobilized! (K.O.)' : 'Lost by Judges\' Decision!';
+      if (detail) detail.textContent = isKO ? 'Your robot was torn apart! All parts destroyed!' : 'Lost by Judges\' Decision!';
       AudioSys.loseSound();
     }
 
@@ -1186,13 +1188,28 @@
       bot.menuFlipTimer = 0.0;
     }
 
-    // A robot in the menu is ONLY replaced once it has caught on fire (80%+ damage)!
-    const isBurning = (typeof isBotFlaming === 'function' && isBotFlaming(bot)) || (bot.driveHealth <= 0);
+    // Total Destruction in Menu: parts explode and scatter
+    if (bot.isEntirelyDestroyed) {
+      bot.menuDestroyedTimer = (bot.menuDestroyedTimer || 0) + dt;
+      return bot.menuDestroyedTimer > 1.2;
+    }
+
+    if (bot.driveHealth <= 0) {
+      if (typeof destroyRobotEntirely === 'function') {
+        destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
+      }
+      bot.menuDestroyedTimer = 0.0;
+      return false;
+    }
+
+    const isBurning = (typeof isBotFlaming === 'function' && isBotFlaming(bot));
     if (isBurning) {
       bot.menuBurningTimer = (bot.menuBurningTimer || 0) + dt;
-      // Allow the defeated robot to blaze dramatically for 1.8s before bringing in the next challenger
-      if (bot.menuBurningTimer >= 1.8) {
-        return true;
+      if (bot.menuBurningTimer >= 2.0) {
+        if (typeof destroyRobotEntirely === 'function') {
+          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
+        }
+        return false;
       }
     } else {
       bot.menuBurningTimer = 0.0;

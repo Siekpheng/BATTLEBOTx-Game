@@ -85,6 +85,7 @@
     }
     return false;
   }
+  window.isWheelMesh = isWheelMesh;
 
   function addRobotMeshOutline(mesh, outlineColor = 0x050a12) {
     if (!mesh || !mesh.geometry) return;

@@ -184,6 +184,94 @@
     triggerGamepadRumble(0.75, 240);
   }
 
+
+  // ========================================================
+  // 5.0 CATASTROPHIC DEMOLITION (ALL PARTS BREAK APART)
+  // ========================================================
+  function destroyRobotEntirely(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
+    if (!bot || bot.isEntirelyDestroyed) return;
+    bot.isEntirelyDestroyed = true;
+    bot.driveHealth = 0;
+    bot.drivePower = 0;
+    bot.weaponSpinSpeed = 0;
+    bot.weaponActive = false;
+
+    const botPos = bot.root ? bot.root.position : new THREE.Vector3(bot.x, 0, bot.z);
+    const worldPos = new THREE.Vector3();
+    const worldQuat = new THREE.Quaternion();
+    const worldScale = new THREE.Vector3();
+
+    if (bot.armorPanels) {
+      bot.armorPanels.forEach(p => { p.attached = false; });
+    }
+    if (bot.wheels) {
+      bot.wheels.forEach(w => { w.attached = false; });
+    }
+
+    if (bot.tiltGroup) {
+      const meshes = [];
+      bot.tiltGroup.traverse(obj => {
+        if (obj.isMesh && obj.name !== 'CAD_Outline') {
+          meshes.push(obj);
+        }
+      });
+
+      meshes.forEach(mesh => {
+        mesh.getWorldPosition(worldPos);
+        mesh.getWorldQuaternion(worldQuat);
+        mesh.getWorldScale(worldScale);
+
+        if (mesh.parent) {
+          mesh.parent.remove(mesh);
+        }
+
+        mesh.position.copy(worldPos);
+        mesh.quaternion.copy(worldQuat);
+        mesh.scale.copy(worldScale);
+        mesh.visible = true;
+        scene.add(mesh);
+
+        const relX = worldPos.x - botPos.x;
+        const relZ = worldPos.z - botPos.z;
+        const dist = Math.hypot(relX, relZ) || 0.4;
+
+        const flySpeed = 4.8 + Math.random() * 5.4;
+        const dirX = (relX / dist) * 0.75 + (impactDir.x || 0) * 0.45 + (Math.random() - 0.5) * 0.5;
+        const dirZ = (relZ / dist) * 0.75 + (impactDir.z || 0) * 0.45 + (Math.random() - 0.5) * 0.5;
+        const norm = Math.hypot(dirX, dirZ) || 1;
+
+        const isWheelPart = typeof isWheelMesh === 'function' ? isWheelMesh(mesh) : false;
+
+        detachedDebris.push({
+          mesh: mesh,
+          isWheel: isWheelPart,
+          vx: (dirX / norm) * flySpeed + (bot.vx ? bot.vx * 0.35 : 0),
+          vy: 3.6 + Math.random() * 5.2,
+          vz: (dirZ / norm) * flySpeed + (bot.vz ? bot.vz * 0.35 : 0),
+          rx: (Math.random() - 0.5) * 22,
+          ry: (Math.random() - 0.5) * 22,
+          rz: (Math.random() - 0.5) * 22
+        });
+      });
+
+      while (bot.tiltGroup.children.length > 0) {
+        bot.tiltGroup.remove(bot.tiltGroup.children[0]);
+      }
+    }
+
+    const boomCenter = hitPoint || botPos.clone().add(new THREE.Vector3(0, 0.4, 0));
+    spawnCollisionSparks(boomCenter, 95);
+    if (typeof triggerImpactFlash === 'function') triggerImpactFlash(boomCenter, 5.0);
+    AudioSys.metalClashSound(3.0, true);
+    AudioSys.weaponStallSound();
+    AudioSys.crowdCheer(1.0, 3.0);
+    AudioSys.crowdGasp(0.9);
+    addCameraTrauma(0.95);
+    triggerGamepadRumble(1.0, 500);
+    triggerHitStop(0.08);
+  }
+  window.destroyRobotEntirely = destroyRobotEntirely;
+
   function clearArenaDebris() {
     while (sparks.length) {
       const s = sparks.pop();
@@ -392,7 +480,8 @@
 
   function getBotDamagePercent(bot) {
     if (!bot) return 0;
-    const hpLoss = Math.max(0, Math.min(100, 100 - (bot.driveHealth ?? 100)));
+    const maxHp = bot.maxDriveHealth || 100;
+    const hpLoss = Math.max(0, Math.min(100, ((maxHp - (bot.driveHealth ?? maxHp)) / maxHp) * 100));
     let armorLoss = hpLoss;
     if (bot.armorPanels && bot.armorPanels.length > 0) {
       const total = bot.armorPanels.length;
