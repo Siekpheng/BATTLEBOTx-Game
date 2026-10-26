@@ -1,5 +1,5 @@
 {
-  "name": "BATTLEBOTx · AI FARM",
+  "name": "BATTLEBOTx",
   "short_name": "BATTLEBOTx",
   "description": "High-octane 3D robot combat battle game",
   "start_url": "./index.html",
@@ -9,9 +9,9 @@
   "theme_color": "#080c12",
   "icons": [
     {
-      "src": "./favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "./Picture1.png",
+      "sizes": "642x678",
+      "type": "image/png"
     }
   ]
 }

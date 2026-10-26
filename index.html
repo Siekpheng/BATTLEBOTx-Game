@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#080c12" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" href="Picture1.png" />
   <title>BATTLEBOTx — AI FARM Combat Robotics</title>
   
   <meta property="og:title" content="BATTLEBOTx — AI FARM Combat Robotics" />
@@ -3377,8 +3377,6 @@
 
     const bbxImg = new Image();
     bbxImg.src = 'logo_battlebotx.png';
-    const afImg = new Image();
-    afImg.src = 'logo_aifarm_dark.png';
 
     const renderFloor = () => {
       // 1. Clean matte slate-steel combat floor (#2b3544)
@@ -3532,11 +3530,34 @@
       ctx.fillStyle = 'rgba(15, 23, 42, 0.40)';
       ctx.beginPath(); ctx.arc(cx, cy, 175, 0, Math.PI * 2); ctx.fill();
 
-      // Draw BATTLEBOTx Logo emblem
+      // Draw BATTLEBOTx Logo emblem with white background
       if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const logoW = 145;
+        const logoW = 150;
         const logoH = Math.round(logoW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
-        ctx.drawImage(bbxImg, cx - logoW / 2, cy - logoH / 2 - 32, logoW, logoH);
+        const badgePad = 8;
+        const badgeW = logoW + badgePad * 2;
+        const badgeH = logoH + badgePad * 2;
+        const badgeX = cx - badgeW / 2;
+        const badgeY = cy - badgeH / 2 - 34;
+
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#fdc911';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 14);
+        } else {
+          ctx.rect(badgeX, badgeY, badgeW, badgeH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.clip();
+        ctx.drawImage(bbxImg, cx - logoW / 2, cy - logoH / 2 - 34, logoW, logoH);
+        ctx.restore();
       } else {
         // Fallback procedural chevron
         ctx.fillStyle = '#fdc911';
@@ -3564,33 +3585,21 @@
       ctx.shadowOffsetY = 3;
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 44px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx', cx, cy + 62);
+      ctx.font = '900 46px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx', cx, cy + 64);
 
-      // AI FARM ROBOTICS sub-brand
+      // Official Combat Arena Subtitle
       ctx.fillStyle = '#38bdf8';
-      ctx.font = '800 16px Orbitron, sans-serif';
-      ctx.fillText('AI FARM ROBOTICS', cx, cy + 104);
+      ctx.font = '800 15px Orbitron, sans-serif';
+      ctx.fillText('OFFICIAL COMBAT ARENA', cx, cy + 104);
 
-      // Championship Arena subtitle
-      ctx.fillStyle = 'rgba(203, 213, 225, 0.65)';
-      ctx.font = '700 11px Orbitron, sans-serif';
-      ctx.fillText('OFFICIAL COMBAT ARENA', cx, cy + 128);
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.70)';
+      ctx.font = '700 12px Orbitron, sans-serif';
+      ctx.fillText('4x4m TOURNAMENT ARENA', cx, cy + 128);
       ctx.restore();
-
-      // ========================================================
-      // 7. ARENA FLOOR FLANK DECALS (AI FARM ROBOTICS)
-      // ========================================================
-      if (afImg.complete && afImg.naturalWidth > 0) {
-        const afW = 95;
-        const afH = Math.round(afW * (afImg.naturalHeight / afImg.naturalWidth));
-        ctx.drawImage(afImg, 195 - afW / 2, cy - afH / 2, afW, afH);
-        ctx.drawImage(afImg, 829 - afW / 2, cy - afH / 2, afW, afH);
-      }
     };
 
     bbxImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
-    afImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
     renderFloor();
 
     return tex;
@@ -3606,8 +3615,6 @@
 
     const bbxImg = new Image();
     bbxImg.src = 'logo_battlebotx.png';
-    const afImg = new Image();
-    afImg.src = 'logo_aifarm_dark.png';
 
     const renderBillboard = () => {
       // Stage LED Big Screen Background
@@ -3619,11 +3626,11 @@
       ctx.lineWidth = 8;
       ctx.strokeRect(16, 16, 992, 480);
 
-      // Header: AI Farm Robotics
+      // Header: Tournament Title
       ctx.textAlign = 'center';
       ctx.fillStyle = '#f8fafc';
       ctx.font = '700 36px Orbitron, sans-serif';
-      ctx.fillText('AI FARM ROBOTICS', 512, 90);
+      ctx.fillText('BATTLEBOTx CHAMPIONSHIP', 512, 90);
 
       // Main Logo Title: Exact Casing BATTLEBOTx
       ctx.fillStyle = '#ef4444';
@@ -3639,28 +3646,40 @@
       ctx.font = '600 26px Orbitron, sans-serif';
       ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 512, 350);
 
-      // Exact Casing: AI FARM  ·  BATTLEBOTx
+      // Footer: Tournament Series
       ctx.fillStyle = '#f8fafc';
       ctx.font = '700 32px Orbitron, sans-serif';
-      ctx.fillText('AI FARM  ·  BATTLEBOTx', 512, 420);
+      ctx.fillText('OFFICIAL TOURNAMENT ARENA', 512, 420);
 
-      // Left Flank Logo: AI FARM ROBOTICS
-      if (afImg.complete && afImg.naturalWidth > 0) {
-        const afW = 120;
-        const afH = Math.round(afW * (afImg.naturalHeight / afImg.naturalWidth));
-        ctx.drawImage(afImg, 105 - afW / 2, 256 - afH / 2, afW, afH);
-      }
-
-      // Right Flank Logo: BATTLEBOTx
+      // Symmetrical Flank Logos: BATTLEBOTx on White Badge
       if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const bbxW = 125;
+        const bbxW = 120;
         const bbxH = Math.round(bbxW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
-        ctx.drawImage(bbxImg, 919 - bbxW / 2, 256 - bbxH / 2, bbxW, bbxH);
+        const pad = 6;
+        const bW = bbxW + pad * 2;
+        const bH = bbxH + pad * 2;
+
+        [105, 919].forEach(posX => {
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#fdc911';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(posX - bW / 2, 256 - bH / 2, bW, bH, 12);
+          } else {
+            ctx.rect(posX - bW / 2, 256 - bH / 2, bW, bH);
+          }
+          ctx.fill();
+          ctx.stroke();
+          ctx.clip();
+          ctx.drawImage(bbxImg, posX - bbxW / 2, 256 - bbxH / 2, bbxW, bbxH);
+          ctx.restore();
+        });
       }
     };
 
     bbxImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
-    afImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
     renderBillboard();
 
     return tex;
