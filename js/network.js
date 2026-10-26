@@ -137,7 +137,7 @@
             } else if (data.type === 'state') {
               this.applyRemoteState(data);
             } else if (data.type === 'end_match') {
-              endMatch(data.playerWon, data.isDraw, data.isKO);
+              endMatch(data.playerWon, data.isDraw, data.isKO, data.isTotalDestruction);
             }
           });
 

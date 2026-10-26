@@ -132,10 +132,21 @@
     });
   }
 
+  let totalDestructionCelebrationTimer = 0.0;
+  let pendingGameOverData = null;
+
   function cleanupBots() {
     countoutHornPlayed = false;
+    totalDestructionCelebrationTimer = 0.0;
+    pendingGameOverData = null;
     AudioSys.stopCombatAudio();
     clearBotBadges();
+    const warnContainer = document.getElementById('flip-warning-container');
+    if (warnContainer) {
+      warnContainer.classList.add('hidden');
+      const flipPill = warnContainer.querySelector('.flip-pill span');
+      if (flipPill) flipPill.textContent = '⚠️ COUNTDOWN K.O. IN';
+    }
     if (playerBot) { scene.remove(playerBot.root); playerBot = null; }
     if (enemyBot) { scene.remove(enemyBot.root); enemyBot = null; }
     clearArenaDebris();
@@ -729,6 +740,8 @@
     if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
 
     matchTimeRemaining = 180;
+    totalDestructionCelebrationTimer = 0.0;
+    pendingGameOverData = null;
     updateTimerDisplay();
     document.getElementById('flip-warning-container').classList.add('hidden');
     hud.classList.remove('hidden');
@@ -762,20 +775,81 @@
     }, 850);
   }
 
-  function endMatch(playerWon, isDraw = false, isKO = true) {
-    if (matchState === 'gameover') return;
-    matchState = 'gameover';
-    BgmSys.setMode('menu');
-    AudioSys.arenaBuzzer();
-    AudioSys.stopCombatAudio();
+  function endMatch(playerWon, isDraw = false, isKO = true, isTotalDestruction = false) {
+    if (matchState === 'gameover' || matchState === 'celebrating') return;
 
+    if (isTotalDestruction) {
+      matchState = 'celebrating';
+      totalDestructionCelebrationTimer = 5.0;
+      pendingGameOverData = { playerWon, isDraw, isKO, isTotalDestruction: true };
+
+      AudioSys.arenaBuzzer();
+      const isGuest = (NetworkSys.isOnline && !NetworkSys.isHost);
+      const didIWin = isGuest ? !playerWon : playerWon;
+      if (didIWin) {
+        AudioSys.winFanfare();
+        AudioSys.crowdCheer(1.0, 5.0);
+      } else {
+        AudioSys.crowdGasp(0.9);
+        AudioSys.loseSound();
+      }
+
+      const warnContainer = document.getElementById('flip-warning-container');
+      const warnWho = document.getElementById('flip-who-text');
+      const warnNum = document.getElementById('flip-timer-num');
+      const flipPill = warnContainer ? warnContainer.querySelector('.flip-pill span') : null;
+      if (warnContainer && warnWho && warnNum) {
+        warnContainer.classList.remove('hidden');
+        if (didIWin) {
+          warnWho.textContent = '💥 ENEMY TOTAL DESTRUCTION! VICTORY!';
+          if (flipPill) flipPill.textContent = '🏆 VICTORY CELEBRATION';
+        } else {
+          warnWho.textContent = '💥 ROBOT COMPLETELY DEMOLISHED! DEFEAT!';
+          if (flipPill) flipPill.textContent = '💀 TOTAL KNOCKOUT';
+        }
+        warnNum.textContent = 'KO (5s)';
+      }
+
+      if (NetworkSys.isOnline && NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+        NetworkSys.conn.send({
+          type: 'end_match',
+          playerWon,
+          isDraw,
+          isKO,
+          isTotalDestruction: true
+        });
+      }
+      return;
+    }
+
+    // Normal referee countout KO or judges' decision
     if (NetworkSys.isOnline && NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
       NetworkSys.conn.send({
         type: 'end_match',
         playerWon,
         isDraw,
-        isKO
+        isKO,
+        isTotalDestruction: false
       });
+    }
+
+    finalizeGameOver(playerWon, isDraw, isKO, false);
+  }
+
+  function finalizeGameOver(playerWon, isDraw = false, isKO = true, isTotalDestruction = false) {
+    if (matchState === 'gameover') return;
+    matchState = 'gameover';
+    BgmSys.setMode('menu');
+    if (!isTotalDestruction) {
+      AudioSys.arenaBuzzer();
+    }
+    AudioSys.stopCombatAudio();
+
+    const warnContainer = document.getElementById('flip-warning-container');
+    const flipPill = warnContainer ? warnContainer.querySelector('.flip-pill span') : null;
+    if (warnContainer) {
+      warnContainer.classList.add('hidden');
+      if (flipPill) flipPill.textContent = '⚠️ COUNTDOWN K.O. IN';
     }
 
     const isGuest = (NetworkSys.isOnline && !NetworkSys.isHost);
@@ -795,16 +869,28 @@
       if (detail) detail.textContent = 'Time Expired — Both robots active!';
       AudioSys.beep(300, 0.3);
     } else if (didIWin) {
-      heading.textContent = isKO ? 'TOTAL DESTRUCTION!' : 'VICTORY';
+      heading.textContent = isTotalDestruction ? 'TOTAL DESTRUCTION!' : (isKO ? 'KNOCKOUT!' : 'VICTORY');
       heading.className = 'result-title win';
-      if (detail) detail.textContent = isKO ? 'Opponent robot obliterated! All parts destroyed!' : 'Won by Judges\' Decision!';
-      AudioSys.winFanfare();
-      AudioSys.crowdCheer(1.0, 2.5);
+      if (detail) {
+        detail.textContent = isTotalDestruction
+          ? 'Opponent robot obliterated! All parts destroyed!'
+          : (isKO ? 'Opponent counted out by referee! KO Victory!' : 'Won by Judges\' Decision!');
+      }
+      if (!isTotalDestruction) {
+        AudioSys.winFanfare();
+        AudioSys.crowdCheer(1.0, 2.5);
+      }
     } else {
-      heading.textContent = isKO ? 'DEFEAT — DEMOLISHED!' : 'DEFEAT';
+      heading.textContent = isTotalDestruction ? 'DEFEAT — DEMOLISHED!' : (isKO ? 'DEFEAT — COUNTED OUT!' : 'DEFEAT');
       heading.className = 'result-title lose';
-      if (detail) detail.textContent = isKO ? 'Your robot was torn apart! All parts destroyed!' : 'Lost by Judges\' Decision!';
-      AudioSys.loseSound();
+      if (detail) {
+        detail.textContent = isTotalDestruction
+          ? 'Your robot was torn apart! All parts destroyed!'
+          : (isKO ? 'Your robot was immobilized and counted out!' : 'Lost by Judges\' Decision!');
+      }
+      if (!isTotalDestruction) {
+        AudioSys.loseSound();
+      }
     }
 
     document.getElementById('result-score').textContent = `YOU ${playerScore} - ${enemyScore} OPPONENT`;
@@ -1461,7 +1547,7 @@
         handleBotCollision();
         checkMenuBotKnockout(dt);
       }
-    } else if (matchState === 'playing' && playerBot && enemyBot) {
+    } else if ((matchState === 'playing' || matchState === 'celebrating') && playerBot && enemyBot) {
       let t = sliderThrottleVal;
       let s = sliderSteerVal;
 
@@ -1512,8 +1598,10 @@
         }
         updateBotPhysics(playerBot, simDt);
         updateBotPhysics(enemyBot, simDt);
-        handleBotCollision();
-        updateImmobilizationAndCountout(dt);
+        if (matchState === 'playing') {
+          handleBotCollision();
+          updateImmobilizationAndCountout(dt);
+        }
 
         if (NetworkSys.isOnline && NetworkSys.isHost) {
           NetworkSys.broadcastState();
@@ -1552,18 +1640,37 @@
         }
       }
 
-      matchTimeRemaining -= dt;
-      if (matchTimeRemaining <= 0) {
-        matchTimeRemaining = 0;
-        // Judges' Decision based on remaining drive power & attached armor pieces
-        const pAttached = playerBot.armorPanels.filter(p => p.attached).length;
-        const eAttached = enemyBot.armorPanels.filter(p => p.attached).length;
-        const pScore = playerBot.driveHealth * 0.6 + pAttached * 10;
-        const eScore = enemyBot.driveHealth * 0.6 + eAttached * 10;
-        const isDraw = Math.abs(pScore - eScore) < 4;
-        endMatch(pScore > eScore, isDraw, false);
+      if (matchState === 'playing') {
+        matchTimeRemaining -= dt;
+        if (matchTimeRemaining <= 0) {
+          matchTimeRemaining = 0;
+          // Judges' Decision based on remaining drive power & attached armor pieces
+          const pAttached = playerBot.armorPanels.filter(p => p.attached).length;
+          const eAttached = enemyBot.armorPanels.filter(p => p.attached).length;
+          const pScore = playerBot.driveHealth * 0.6 + pAttached * 10;
+          const eScore = enemyBot.driveHealth * 0.6 + eAttached * 10;
+          const isDraw = Math.abs(pScore - eScore) < 4;
+          endMatch(pScore > eScore, isDraw, false, false);
+        }
+        updateTimerDisplay();
+      } else if (matchState === 'celebrating') {
+        totalDestructionCelebrationTimer -= dt;
+        const warnNum = document.getElementById('flip-timer-num');
+        if (warnNum) {
+          const secLeft = Math.max(1, Math.ceil(totalDestructionCelebrationTimer));
+          warnNum.textContent = `KO (${secLeft}s)`;
+        }
+        if (totalDestructionCelebrationTimer <= 0) {
+          if (pendingGameOverData) {
+            finalizeGameOver(
+              pendingGameOverData.playerWon,
+              pendingGameOverData.isDraw,
+              pendingGameOverData.isKO,
+              true
+            );
+          }
+        }
       }
-      updateTimerDisplay();
     }
 
     for (let i = sparks.length - 1; i >= 0; i--) {
