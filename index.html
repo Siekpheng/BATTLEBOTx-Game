@@ -1790,7 +1790,7 @@
           <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF
         </div>
         <div style="margin-top:6px; font-size:0.71rem; color:#64748b; line-height:1.4;">
-          <kbd>C</kbd> Camera Angle · 🎮 Controller: LS Drive & Steer (or RS) · LB Weapon · RB Camera
+          <kbd>C</kbd> Camera · 🎮 Controller: <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera
         </div>
       </div>
 
@@ -5171,9 +5171,35 @@
       return sign * Math.min(1.0, (Math.abs(val) - threshold) / (1.0 - threshold));
     };
 
-    // 1. Left joystick for forward and backward (axes[1], inverted: up = forward)
+    // 1. Trigger acceleration/reverse controls:
+    // Right Trigger (RT / R2 / buttons[7]): Forward (0 to +1.0)
+    // Left Trigger (LT / L2 / buttons[6]): Backward / Reverse (0 to -1.0)
+    let rtVal = 0;
+    let ltVal = 0;
+    if (pad.buttons) {
+      if (pad.buttons[7]) {
+        rtVal = typeof pad.buttons[7].value === 'number' ? pad.buttons[7].value : (pad.buttons[7].pressed ? 1.0 : 0);
+      }
+      if (pad.buttons[6]) {
+        ltVal = typeof pad.buttons[6].value === 'number' ? pad.buttons[6].value : (pad.buttons[6].pressed ? 1.0 : 0);
+      }
+    }
+    const rtFiltered = applyDeadzone(rtVal, 0.08);
+    const ltFiltered = applyDeadzone(ltVal, 0.08);
+    const triggerThrottle = rtFiltered - ltFiltered; // RT drives forward (+), LT drives backward (-)
+
+    // 2. Left joystick for forward and backward (axes[1], inverted: up = forward)
     let leftY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
-    let throttle = -applyDeadzone(leftY, 0.16);
+    let stickThrottle = -applyDeadzone(leftY, 0.16);
+
+    // Combine Trigger Throttle and Stick Throttle:
+    // If triggers are actively pulled, use trigger throttle; otherwise fall back to joystick or D-pad
+    let throttle = 0;
+    if (Math.abs(triggerThrottle) > 0.02) {
+      throttle = triggerThrottle;
+    } else {
+      throttle = stickThrottle;
+    }
 
     // Optional D-Pad fallback for throttle
     if (Math.abs(throttle) < 0.1 && pad.buttons) {
@@ -5248,7 +5274,7 @@
     console.log(`🎮 Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
     const hint = document.getElementById('hint-controls-text');
     if (hint) {
-      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER DETECTED:</span> Left Stick: Drive · Right Stick: Steer · <kbd>LB</kbd> Weapon ON/OFF · <kbd>RB</kbd> Camera`;
+      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER CONNECTED:</span> <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera`;
     }
   });
 
