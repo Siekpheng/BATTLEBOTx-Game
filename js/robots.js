@@ -64,9 +64,43 @@
     }
   }
 
+  function isWheelMesh(mesh) {
+    if (!mesh) return false;
+    let curr = mesh;
+    while (curr) {
+      const n = (curr.name || '').toLowerCase();
+      if (n.includes('wheel') || n.includes('tire') || n.includes('rim') || n.startsWith('wheel')) {
+        return true;
+      }
+      curr = curr.parent;
+    }
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      if (m && m.name) {
+        const mn = m.name.toLowerCase();
+        if (mn.includes('rubber') || mn.includes('tire') || mn.includes('rim')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function addRobotMeshOutline(mesh, outlineColor = 0x050a12) {
     if (!mesh || !mesh.geometry) return;
     if (mesh.name === 'CAD_Outline') return;
+
+    // Per user specification: only outline the robot model, no outline on any wheel or tire
+    if (isWheelMesh(mesh)) {
+      const existing = mesh.children ? mesh.children.find(c => c.name === 'CAD_Outline') : null;
+      if (existing) {
+        mesh.remove(existing);
+        if (existing.geometry) existing.geometry.dispose();
+        if (existing.material) existing.material.dispose();
+      }
+      mesh._hasOutline = false;
+      return;
+    }
 
     let existingLine = null;
     if (mesh.children && mesh.children.length > 0) {
@@ -154,11 +188,19 @@
       }
     });
 
-    // 3. Crisp Industrial CAD Outline Definition (sharp panel seams, chamfers, wheels, weapons):
-    // Adaptive contrast: on dark chassis/carbon (lum < 0.22), use crisp technical slate outline (0x475569)
-    // On light/vibrant armor & wedges (lum >= 0.22), use dark industrial ink (0x050a12)
-    const outlineCol = (maxLum < 0.22) ? 0x475569 : 0x050a12;
-    addRobotMeshOutline(mesh, outlineCol);
+    // 3. Crisp Industrial CAD Outline Definition (sharp panel seams, chamfers, armor, weapons):
+    // Outline ONLY the robot body model (chassis, armor, weapons, wedges); omit all wheels and tires
+    if (!isWheelMesh(mesh)) {
+      // Adaptive contrast: on dark chassis/carbon (lum < 0.22), use crisp technical slate outline (0x475569)
+      // On light/vibrant armor & wedges (lum >= 0.22), use dark industrial ink (0x050a12)
+      const outlineCol = (maxLum < 0.22) ? 0x475569 : 0x050a12;
+      addRobotMeshOutline(mesh, outlineCol);
+    } else {
+      const existing = mesh.children ? mesh.children.find(c => c.name === 'CAD_Outline') : null;
+      if (existing) {
+        mesh.remove(existing);
+      }
+    }
   }
 
   function attachCadToRobot1(bot) {
