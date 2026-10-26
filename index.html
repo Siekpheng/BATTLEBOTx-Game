@@ -1643,13 +1643,7 @@
       </div>
     </div>
 
-    <!-- 80% Damage Fire Outbreak Warning Banner -->
-    <div id="fire-warning-container" class="hidden">
-      <div class="fire-pill">
-        <span>🔥</span>
-        <strong id="fire-who-text">BATTERY FIRE! (80%+ DAMAGE)</strong>
-      </div>
-    </div>
+
 
     <!-- Desktop & Touch Controls HUD (Docked to Side so Center Arena & Robot View Stay Clear) -->
     <div class="controls-bottom" id="controls-bottom-bar">
@@ -2331,12 +2325,113 @@
       }
     },
 
-    // 4. Official BattleBots Arena Match Buzzer (Dual-Sawtooth Klaxon Horn)
+    // 3.5 Exciting Esports Tournament Countdown Beats (3... 2... 1...)
+    countdownBeat(step) {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const dest = this.masterGain || this.ctx.destination;
+
+      // Pitch progression building intense tension:
+      // Step 3: Low-mid power pulse (E4 = 330 Hz, Sub: 160Hz -> 42Hz)
+      // Step 2: Rising alert pulse (G#4 = 415 Hz, Sub: 185Hz -> 45Hz)
+      // Step 1: High peak anticipation pulse (B4 = 494 Hz, Sub: 215Hz -> 48Hz)
+      let baseFreq = 330;
+      let overtoneFreq = 660;
+      let subStart = 160;
+      let pulseGain = 0.30;
+
+      if (step === 2) {
+        baseFreq = 415;
+        overtoneFreq = 830;
+        subStart = 185;
+        pulseGain = 0.34;
+      } else if (step === 1) {
+        baseFreq = 494;
+        overtoneFreq = 988;
+        subStart = 215;
+        pulseGain = 0.38;
+      }
+
+      // 1. Heavy Sub-Bass Heartbeat Impact Punch (Tactile chest thud)
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(subStart, now);
+      subOsc.frequency.exponentialRampToValueAtTime(42, now + 0.18);
+      subGain.gain.setValueAtTime(0.35, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.20);
+      subOsc.connect(subGain);
+      subGain.connect(dest);
+      subOsc.start(now);
+      subOsc.stop(now + 0.22);
+
+      // 2. Harmonic Sci-Fi Tension Synthesizer Chord (Crisp attack, resonant body)
+      const osc1 = this.ctx.createOscillator();
+      const filter1 = this.ctx.createBiquadFilter();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(baseFreq, now);
+      filter1.type = 'bandpass';
+      filter1.frequency.setValueAtTime(baseFreq * 1.8, now);
+      filter1.Q.setValueAtTime(4.2, now);
+      gain1.gain.setValueAtTime(pulseGain, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+      osc1.connect(filter1);
+      filter1.connect(gain1);
+      gain1.connect(dest);
+      osc1.start(now);
+      osc1.stop(now + 0.28);
+
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(overtoneFreq, now);
+      gain2.gain.setValueAtTime(pulseGain * 0.75, now);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc2.connect(gain2);
+      gain2.connect(dest);
+      osc2.start(now);
+      osc2.stop(now + 0.24);
+
+      // 3. Tension Shimmer / Acoustic Air Whoosh
+      if (this.noiseBuffer) {
+        const nNode = this.ctx.createBufferSource();
+        const nFilter = this.ctx.createBiquadFilter();
+        const nGain = this.ctx.createGain();
+        nNode.buffer = this.noiseBuffer;
+        nFilter.type = 'bandpass';
+        nFilter.frequency.setValueAtTime(baseFreq * 2.5, now);
+        nFilter.Q.setValueAtTime(3.0, now);
+        nGain.gain.setValueAtTime(0.08, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        nNode.connect(nFilter);
+        nFilter.connect(nGain);
+        nGain.connect(dest);
+        nNode.start(now);
+        nNode.stop(now + 0.18);
+      }
+    },
+
+    // 4. Official BattleBots Arena Match Buzzer & Pyrotechnic Fight Start Shockwave
     arenaBuzzer() {
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
+      // Layer A: Massive Stadium Sub-Boom Impact Shockwave (40Hz chest thud)
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(120, now);
+      subOsc.frequency.exponentialRampToValueAtTime(32, now + 0.65);
+      subGain.gain.setValueAtTime(0.48, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+      subOsc.connect(subGain);
+      subGain.connect(dest);
+      subOsc.start(now);
+      subOsc.stop(now + 0.80);
+
+      // Layer B: Dual-Sawtooth Arena Klaxon Horn
       const osc1 = this.ctx.createOscillator();
       const osc2 = this.ctx.createOscillator();
       const filter = this.ctx.createBiquadFilter();
@@ -2348,13 +2443,13 @@
       osc2.frequency.setValueAtTime(204, now); // D3 (Musical fifth)
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(750, now);
+      filter.frequency.setValueAtTime(820, now);
       filter.Q.setValueAtTime(2.2, now);
 
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(0.38, now + 0.02);
-      gain.gain.setValueAtTime(0.38, now + 0.85);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.20);
+      gain.gain.linearRampToValueAtTime(0.42, now + 0.02);
+      gain.gain.setValueAtTime(0.42, now + 0.85);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.25);
 
       osc1.connect(filter);
       osc2.connect(filter);
@@ -2363,8 +2458,27 @@
 
       osc1.start(now);
       osc2.start(now);
-      osc1.stop(now + 1.25);
-      osc2.stop(now + 1.25);
+      osc1.stop(now + 1.30);
+      osc2.stop(now + 1.30);
+
+      // Layer C: Pyrotechnic Flame Cannon Blast / Stadium Spark Burst
+      if (this.noiseBuffer) {
+        const pyroNode = this.ctx.createBufferSource();
+        const pyroFilter = this.ctx.createBiquadFilter();
+        const pyroGain = this.ctx.createGain();
+        pyroNode.buffer = this.noiseBuffer;
+        pyroFilter.type = 'bandpass';
+        pyroFilter.frequency.setValueAtTime(1600, now);
+        pyroFilter.frequency.exponentialRampToValueAtTime(450, now + 0.40);
+        pyroFilter.Q.setValueAtTime(2.2, now);
+        pyroGain.gain.setValueAtTime(0.24, now);
+        pyroGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        pyroNode.connect(pyroFilter);
+        pyroFilter.connect(pyroGain);
+        pyroGain.connect(dest);
+        pyroNode.start(now);
+        pyroNode.stop(now + 0.50);
+      }
     },
 
     // 5. Tire Skid / Floor Drift Screech
@@ -3779,8 +3893,7 @@
       scene.remove(d.mesh);
     }
     clearBotFlames();
-    const fireWarn = document.getElementById('fire-warning-container');
-    if (fireWarn) fireWarn.classList.add('hidden');
+
   }
 
   // ========================================================
@@ -4282,14 +4395,12 @@
   function togglePlayerWeapon(bot = playerBot) {
     if (!bot) return;
     bot.weaponActive = (bot.weaponActive === false) ? true : false;
-    if (!bot.weaponActive) {
-      bot.weaponSpinSpeed = 0; // Strictly cut kinetic spin speed when weapon is disabled
-    }
+    // When turning off, do not stop abruptly: let mechanical inertia smoothly coast down in updateRobotPhysics
     if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
       if (bot.weaponActive) {
         AudioSys.beep(840, 0.08); // High chirp for Weapon ON
       } else {
-        AudioSys.beep(300, 0.10); // Low hum for Weapon OFF
+        AudioSys.beep(320, 0.12); // Low spindown hum for Weapon OFF
       }
     }
     console.log(`⚡ Weapon toggled: ${bot.weaponActive ? 'ON' : 'OFF'}`);
@@ -5472,7 +5583,7 @@
     const steps = ['3', '2', '1', 'FIGHT!'];
     let idx = 0;
     countdownText.textContent = steps[0];
-    AudioSys.beep(480, 0.12);
+    AudioSys.countdownBeat(3);
 
     const interval = setInterval(() => {
       idx++;
@@ -5485,7 +5596,7 @@
         if (idx === 3) {
           AudioSys.arenaBuzzer();
         } else {
-          AudioSys.beep(480, 0.12);
+          AudioSys.countdownBeat(3 - idx);
         }
       } else {
         clearInterval(interval);
@@ -5796,8 +5907,9 @@
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 1);
         }
       } else if (bot.weaponActive === false) {
-        // Weapon motor turned OFF by player: strictly 0 RPM & 0 kinetic power
-        bot.weaponSpinSpeed = 0;
+        // Weapon motor turned OFF by player: smooth mechanical inertia spindown until stopped
+        const spinDownDecel = 24.0; // Smooth realistic deceleration (~4.0s from full 95 rad/s)
+        bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - spinDownDecel * dt);
       } else {
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s)
         const targetSpin = 95.0;
@@ -6732,11 +6844,11 @@
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
         if (playerBot.weaponActive === false) {
-          rpmText.textContent = `${rpmPct}% (WEAPON OFF)`;
-          rpmText.style.color = '#f87171';
+          rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
+          rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
           rpmFill.style.width = `${rpmPct}%`;
           rpmFill.classList.remove('ready');
-          rpmFill.style.background = '#64748b';
+          rpmFill.style.background = rpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
         } else if (rpmPct >= 92) {
           rpmText.textContent = '100% (SMASH READY!)';
           rpmText.style.color = '#34d399';
@@ -6851,26 +6963,7 @@
     AudioSys.setFireActive((isPBurning || isEBurning) && (matchState === 'playing' || matchState === 'countdown'));
     updateFlames(dt);
 
-    const fireWarnContainer = document.getElementById('fire-warning-container');
-    const fireWhoText = document.getElementById('fire-who-text');
-    if (fireWarnContainer && fireWhoText) {
-      if (matchState === 'playing' || matchState === 'countdown') {
-        if (isPBurning && isEBurning) {
-          fireWarnContainer.classList.remove('hidden');
-          fireWhoText.textContent = '🔥 CATASTROPHIC DAMAGE: BOTH ROBOTS ON FIRE!';
-        } else if (isPBurning) {
-          fireWarnContainer.classList.remove('hidden');
-          fireWhoText.textContent = '🔥 BATTERY FIRE! YOUR ROBOT OVER 80% DAMAGED!';
-        } else if (isEBurning) {
-          fireWarnContainer.classList.remove('hidden');
-          fireWhoText.textContent = '🔥 ENEMY BATTERY BREACHED: ENEMY BOT ON FIRE!';
-        } else {
-          fireWarnContainer.classList.add('hidden');
-        }
-      } else {
-        fireWarnContainer.classList.add('hidden');
-      }
-    }
+// Fire banner message removed per user request (flame particles & combustion audio remain active)
 
     // UI is now docked to the side, so it never blocks the robot view and never dims down
     const controlsBottomBar = document.getElementById('controls-bottom-bar');
