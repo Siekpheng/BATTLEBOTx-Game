@@ -491,7 +491,7 @@
   function updateFullscreenButtonText() {
     const active = isFullscreenActive();
     const btnMenu = document.getElementById('btn-menu-fullscreen');
-    if (btnMenu) btnMenu.textContent = active ? '✕ Exit Fullscreen' : '⛶ Fullscreen (Landscape)';
+    if (btnMenu) btnMenu.textContent = active ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
     const btnHud = document.getElementById('btn-fullscreen');
     if (btnHud) btnHud.textContent = active ? '✕ Exit' : '⛶';
   }
@@ -509,51 +509,8 @@
   const btnMobileFs = document.getElementById('btn-mobile-fs');
   if (btnMobileFs) btnMobileFs.addEventListener('click', toggleAppFullscreen);
 
-  const rotateBanner = document.getElementById('mobile-rotate-banner');
-  if (rotateBanner) rotateBanner.addEventListener('click', requestAppFullscreen);
-
-  const portraitModal = document.getElementById('portrait-rotate-modal');
-  const btnDismissPortrait = document.getElementById('btn-dismiss-portrait');
-  const btnForceRotateFs = document.getElementById('btn-force-fullscreen-rotate');
-  let portraitDismissed = false;
-
-  if (btnDismissPortrait) {
-    btnDismissPortrait.addEventListener('click', () => {
-      portraitDismissed = true;
-      if (portraitModal) portraitModal.classList.add('hidden');
-    });
-  }
-
-  if (btnForceRotateFs) {
-    btnForceRotateFs.addEventListener('click', () => {
-      requestAppFullscreen();
-      setTimeout(() => {
-        if (portraitModal) portraitModal.classList.add('hidden');
-      }, 500);
-    });
-  }
-
-  // Check orientation on mobile and show landscape suggestion banner/modal in portrait
+  // Dynamic camera FOV adjustment for mobile devices on orientation/resize
   function checkMobileOrientation() {
-    const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
-    const isPortrait = window.innerHeight > window.innerWidth;
-
-    if (rotateBanner) {
-      if (isMobileDevice && isPortrait && !isFullscreenActive()) {
-        rotateBanner.classList.remove('hidden');
-      } else {
-        rotateBanner.classList.add('hidden');
-      }
-    }
-
-    if (portraitModal) {
-      if (isMobileDevice && isPortrait && !portraitDismissed && !isFullscreenActive()) {
-        portraitModal.classList.remove('hidden');
-      } else {
-        portraitModal.classList.add('hidden');
-      }
-    }
-
     // Dynamic FOV compensation for portrait mode so arena is never zoomed in or cropped!
     if (typeof camera !== 'undefined' && camera) {
       const aspect = window.innerWidth / window.innerHeight;
@@ -683,7 +640,6 @@
       if (el) el.classList.add('hidden');
     });
     document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
-    if (portraitModal && (window.innerWidth > window.innerHeight || portraitDismissed)) portraitModal.classList.add('hidden');
 
     let botTypeChoice = selectedBotType || 'robot1';
     const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];

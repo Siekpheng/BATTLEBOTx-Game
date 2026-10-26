@@ -56,30 +56,10 @@
   <!-- Custom Game Styles & Keyframe Animations -->
   <link rel="stylesheet" href="css/style.css" />
 </head>
-</head>
 <body>
 <div id="app">
   <div id="canvas-container"></div>
   <div id="damage-vignette"></div>
-  <div id="mobile-rotate-banner" class="mobile-rotate-banner hidden">
-    <span>📱 Turn phone to Landscape for Full Screen Battle ⛶</span>
-  </div>
-
-  <!-- PORTRAIT ROTATION & IPHONE FULLSCREEN MODAL -->
-  <div id="portrait-rotate-modal" class="overlay-screen hidden" style="z-index: 99999; text-align: center;">
-    <div class="modal-box" style="max-width: 360px; padding: 22px 18px; border-color: rgba(56, 189, 248, 0.45); backdrop-filter: blur(14px);">
-      <div style="font-size: 3rem; margin-bottom: 8px; animation: rotatePhoneAnim 2s infinite ease-in-out;">📲</div>
-      <h2 style="font-size: 1.25rem; color: #38bdf8; margin-bottom: 8px;">ROTATE TO LANDSCAPE</h2>
-      <p style="font-size: 0.86rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
-        For the full-screen arena view & comfortable dual thumb controls, please rotate your phone horizontally.
-      </p>
-      <div style="background: rgba(2, 132, 199, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 10px; font-size: 0.78rem; color: #93c5fd; line-height: 1.4; margin-bottom: 14px; text-align: left;">
-        💡 <strong>iPhone Safari Tip:</strong> Rotating to landscape collapses the URL bar into full screen! Or tap Share (⎋) ➔ <strong>"Add to Home Screen"</strong> to play with zero browser bars like a native app.
-      </div>
-      <button class="action-btn" id="btn-force-fullscreen-rotate" type="button" style="margin-bottom: 8px;">⛶ Go Fullscreen Now</button>
-      <button class="action-btn secondary" id="btn-dismiss-portrait" type="button" style="font-size: 0.86rem; padding: 9px;">Play in Portrait Anyway</button>
-    </div>
-  </div>
 
   <!-- MAIN MENU OVERLAY -->
   <div id="menu-screen" class="overlay-screen">

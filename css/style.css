@@ -915,35 +915,7 @@
       }
     }
 
-    .mobile-rotate-banner {
-      position: fixed;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, rgba(2, 132, 199, 0.95), rgba(30, 58, 138, 0.95));
-      border: 1px solid rgba(125, 211, 252, 0.6);
-      color: #ffffff;
-      padding: 9px 18px;
-      border-radius: 9999px;
-      font-size: 0.80rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      z-index: 99999;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
-      cursor: pointer;
-      animation: pulseAlert 1.2s infinite alternate ease-in-out;
-      max-width: 92vw;
-      text-align: center;
-      pointer-events: auto;
-    }
 
-    @media (orientation: landscape) {
-      .mobile-rotate-banner {
-        display: none !important;
-      }
-    }
 
     .mobile-round-btn:active {
       transform: scale(0.92);
@@ -1056,18 +1028,7 @@
       }
     }
 
-    @keyframes rotatePhoneAnim {
-      0% { transform: rotate(0deg); }
-      30% { transform: rotate(-90deg); }
-      70% { transform: rotate(-90deg); }
-      100% { transform: rotate(0deg); }
-    }
 
-    @media (orientation: landscape) {
-      #portrait-rotate-modal {
-        display: none !important;
-      }
-    }
 
     .dock-toggle-btn {
       background: rgba(255, 255, 255, 0.08);
