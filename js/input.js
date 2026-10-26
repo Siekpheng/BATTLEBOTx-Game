@@ -258,6 +258,31 @@
   const btnMenuCamera = document.getElementById('btn-menu-camera');
   const menuCardEl = document.querySelector('#menu-screen .menu-card');
 
+  // ========================================================
+  // AUTO SPECTATE IDLE ENGINE (10s Inactivity in Main Menu)
+  // ========================================================
+  let lastMenuActivityTime = performance.now();
+  const MENU_IDLE_TIMEOUT_SEC = 10.0;
+
+  function resetMenuIdleTimer() {
+    lastMenuActivityTime = performance.now();
+  }
+
+  function isAnyModalOpen() {
+    const modalIds = ['modal-select', 'modal-1v1', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover'];
+    for (const id of modalIds) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains('hidden')) return true;
+    }
+    const menuEl = document.getElementById('menu-screen');
+    if (!menuEl || menuEl.classList.contains('hidden')) return true;
+    return false;
+  }
+
+  function isMenuSpectating() {
+    return (typeof matchState !== 'undefined' && matchState === 'menu' && menuCardEl && menuCardEl.classList.contains('minimized'));
+  }
+
   function toggleMenuSpectate(minimized) {
     if (!menuCardEl) return;
     const isMin = (typeof minimized === 'boolean') ? minimized : !menuCardEl.classList.contains('minimized');
@@ -270,7 +295,88 @@
       if (btnMenuRestore) btnMenuRestore.classList.add('hidden');
       if (btnMenuSpectate) btnMenuSpectate.innerHTML = '👁 Spectate Arena';
     }
+    resetMenuIdleTimer();
   }
+
+  function updateMenuIdleSpectate() {
+    if (typeof matchState === 'undefined' || matchState !== 'menu') {
+      lastMenuActivityTime = performance.now();
+      return;
+    }
+    if (isAnyModalOpen()) {
+      lastMenuActivityTime = performance.now();
+      return;
+    }
+    if (isMenuSpectating()) {
+      lastMenuActivityTime = performance.now();
+      return;
+    }
+
+    const idleSeconds = (performance.now() - lastMenuActivityTime) / 1000;
+    if (idleSeconds >= MENU_IDLE_TIMEOUT_SEC) {
+      lastMenuActivityTime = performance.now();
+      toggleMenuSpectate(true);
+    }
+  }
+
+  // Periodic heartbeat timer guaranteeing 10s idle trigger even if rAF is backgrounded
+  setInterval(updateMenuIdleSpectate, 250);
+
+  // 1. Press ANY key: exit spectate mode & reset idle countdown
+  window.addEventListener('keydown', (e) => {
+    if (isMenuSpectating()) {
+      toggleMenuSpectate(false);
+      resetMenuIdleTimer();
+      return;
+    }
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      resetMenuIdleTimer();
+    }
+  }, { passive: true });
+
+  // 2. Click or tap anywhere: exit spectate mode & reset idle countdown
+  window.addEventListener('pointerdown', (e) => {
+    if (isMenuSpectating()) {
+      const isTopControl = e.target && e.target.closest && e.target.closest('#btn-menu-camera, #btn-menu-music, #btn-menu-fullscreen');
+      if (!isTopControl) {
+        toggleMenuSpectate(false);
+        resetMenuIdleTimer();
+        return;
+      }
+    }
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      resetMenuIdleTimer();
+    }
+  }, { passive: true });
+
+  // 3. Pointer move & wheel: reset idle countdown while in menu
+  window.addEventListener('pointermove', () => {
+    if (typeof matchState !== 'undefined' && matchState === 'menu' && !isMenuSpectating()) {
+      resetMenuIdleTimer();
+    }
+  }, { passive: true });
+
+  window.addEventListener('wheel', () => {
+    if (isMenuSpectating()) {
+      toggleMenuSpectate(false);
+    }
+    resetMenuIdleTimer();
+  }, { passive: true });
+
+  // 4. Touchstart support
+  window.addEventListener('touchstart', (e) => {
+    if (isMenuSpectating()) {
+      const isTopControl = e.target && e.target.closest && e.target.closest('#btn-menu-camera, #btn-menu-music, #btn-menu-fullscreen');
+      if (!isTopControl) {
+        toggleMenuSpectate(false);
+        resetMenuIdleTimer();
+        return;
+      }
+    }
+    if (typeof matchState !== 'undefined' && matchState === 'menu') {
+      resetMenuIdleTimer();
+    }
+  }, { passive: true });
 
   if (btnMenuSpectate) {
     btnMenuSpectate.addEventListener('click', (e) => {
@@ -288,8 +394,11 @@
   const menuScreenEl = document.getElementById('menu-screen');
   if (menuScreenEl) {
     menuScreenEl.addEventListener('click', (e) => {
-      if (e.target === menuScreenEl && menuCardEl && menuCardEl.classList.contains('minimized')) {
-        toggleMenuSpectate(false);
+      if (menuCardEl && menuCardEl.classList.contains('minimized')) {
+        const isTopControl = e.target && e.target.closest && e.target.closest('#btn-menu-camera, #btn-menu-music, #btn-menu-fullscreen');
+        if (!isTopControl) {
+          toggleMenuSpectate(false);
+        }
       }
     });
   }
@@ -300,6 +409,13 @@
       cycleMenuCameraMode();
     });
   }
+
+  window.toggleMenuSpectate = toggleMenuSpectate;
+  window.updateMenuIdleSpectate = updateMenuIdleSpectate;
+  window.resetMenuIdleTimer = resetMenuIdleTimer;
+  window.isMenuSpectating = isMenuSpectating;
+  window.fastForwardMenuIdle = (sec) => { lastMenuActivityTime -= sec * 1000; updateMenuIdleSpectate(); };
+  window.getMenuIdleSeconds = () => (performance.now() - lastMenuActivityTime) / 1000;
 
   // HUD Side Dock Toggle (Left / Right)
   const btnDockToggle = document.getElementById('btn-dock-toggle');

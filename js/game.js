@@ -1409,6 +1409,17 @@
     const gp1 = pollGamepadControls(0);
 
     if (matchState === 'menu') {
+      if (typeof updateMenuIdleSpectate === 'function') {
+        updateMenuIdleSpectate(dt);
+      }
+      if (gp1 && gp1.hasInput) {
+        if (typeof isMenuSpectating === 'function' && isMenuSpectating()) {
+          toggleMenuSpectate(false);
+        }
+        if (typeof resetMenuIdleTimer === 'function') {
+          resetMenuIdleTimer();
+        }
+      }
       if (!playerBot || !enemyBot) {
         startMenuDemoFight();
       } else {
