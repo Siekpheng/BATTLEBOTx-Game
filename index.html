@@ -1669,10 +1669,10 @@
           </div>
         </div>
         <div id="hint-controls-text">
-          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive Controls · Auto Weapon Wind-Up
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF
         </div>
         <div style="margin-top:6px; font-size:0.71rem; color:#64748b; line-height:1.4;">
-          Mouse Scroll adjusts camera height · Press <kbd>C</kbd> to change camera angle
+          <kbd>C</kbd> Camera Angle · 🎮 Controller: LS Drive · RS Steer · LB Weapon · RB Camera
         </div>
       </div>
 
@@ -4054,6 +4054,7 @@
       roll: 0,
       rollVel: 0,
       weaponSpinSpeed: 0.0,
+      weaponActive: true,
       halfWidth: 1.02,
       halfLength: 1.25,
       height: 0.78,
@@ -4120,49 +4121,11 @@
 
   function setupBotBadges() {
     clearBotBadges();
-    if (!playerBot || !enemyBot) return;
-
-    const isMirror = (playerBot.type === enemyBot.type);
-    let p1Title = 'P1 · BLUE';
-    let p2Title = 'P2 · RED';
-    if (NetworkSys.isOnline) {
-      p1Title = NetworkSys.isHost ? 'P1 · HOST' : 'P2 · GUEST';
-      p2Title = NetworkSys.isHost ? 'P2 · GUEST' : 'P1 · HOST';
-    } else if (gameMode === 'vs_bot') {
-      p1Title = 'P1 · YOU';
-      p2Title = 'AI ENEMY';
-    } else if (gameMode === 'practice') {
-      p1Title = 'P1 · YOU';
-      p2Title = 'DUMMY';
-    }
-
-    const p1Tex = createBadgeTexture(p1Title, '#38bdf8', isMirror ? 'CHAMPION' : '');
-    const p2Tex = createBadgeTexture(p2Title, '#ef4444', isMirror ? 'RIVAL' : '');
-
-    const isMobile = (window.innerWidth < 768);
-    const badgeScaleX = isMobile ? 2.0 : 3.2;
-    const badgeScaleY = isMobile ? 0.58 : 0.90;
-
-    const p1Mat = new THREE.SpriteMaterial({ map: p1Tex, depthTest: false, transparent: true });
-    p1BadgeSprite = new THREE.Sprite(p1Mat);
-    p1BadgeSprite.scale.set(badgeScaleX, badgeScaleY, 1);
-    scene.add(p1BadgeSprite);
-
-    const p2Mat = new THREE.SpriteMaterial({ map: p2Tex, depthTest: false, transparent: true });
-    p2BadgeSprite = new THREE.Sprite(p2Mat);
-    p2BadgeSprite.scale.set(badgeScaleX, badgeScaleY, 1);
-    scene.add(p2BadgeSprite);
+    // Overhead 3D player tags removed per user request
   }
 
   function updateBotBadges() {
-    const isMobile = (window.innerWidth < 768);
-    const badgeYOffset = isMobile ? 1.30 : 1.85;
-    if (p1BadgeSprite && playerBot && playerBot.root) {
-      p1BadgeSprite.position.set(playerBot.x, (playerBot.root.position.y || 0) + badgeYOffset, playerBot.z);
-    }
-    if (p2BadgeSprite && enemyBot && enemyBot.root) {
-      p2BadgeSprite.position.set(enemyBot.x, (enemyBot.root.position.y || 0) + badgeYOffset, enemyBot.z);
-    }
+    // Overhead 3D player tags removed per user request
   }
 
   function applyMirrorMatchRivalStyle(bot) {
@@ -4197,6 +4160,19 @@
   // ========================================================
   // 7. INPUT HANDLING
   // ========================================================
+  function togglePlayerWeapon(bot = playerBot) {
+    if (!bot) return;
+    bot.weaponActive = (bot.weaponActive === false) ? true : false;
+    if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
+      if (bot.weaponActive) {
+        AudioSys.beep(840, 0.08); // High chirp for Weapon ON
+      } else {
+        AudioSys.beep(300, 0.10); // Low hum for Weapon OFF
+      }
+    }
+    console.log(`⚡ Weapon toggled: ${bot.weaponActive ? 'ON' : 'OFF'}`);
+  }
+
   const keys = {};
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -4204,7 +4180,15 @@
       cycleCameraMode();
     }
     if (e.code === 'Space') {
-      e.preventDefault(); // Space key completely removed
+      e.preventDefault();
+      if (!e.repeat && (matchState === 'playing' || matchState === 'countdown') && playerBot) {
+        togglePlayerWeapon(playerBot);
+      }
+    }
+    if (e.code === 'Numpad0' || e.code === 'ShiftRight') {
+      if (!e.repeat && gameMode === '1v1' && (matchState === 'playing' || matchState === 'countdown') && enemyBot) {
+        togglePlayerWeapon(enemyBot);
+      }
     }
   });
 
@@ -4222,6 +4206,131 @@
   let dragSteer = false;
   let sliderThrottleVal = 0;
   let sliderSteerVal = 0;
+
+  // Weapon RPM click toggle (Desktop & Mobile)
+  const weaponRpmWrap = document.getElementById('weapon-rpm-wrap');
+  if (weaponRpmWrap) {
+    weaponRpmWrap.style.cursor = 'pointer';
+    weaponRpmWrap.title = 'Click or press [SPACE] / Controller [LB] to toggle weapon ON/OFF';
+    weaponRpmWrap.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-dock-toggle')) return;
+      togglePlayerWeapon(playerBot);
+    });
+  }
+
+  // ========================================================
+  // 7.5 GAMEPAD / CONTROLLER ENGINE
+  // Left Stick Y: Forward & Backward (Throttle)
+  // Right Stick X: Turn Left & Right (Steer)
+  // Left Bumper (LB / Button 4): Weapon ON / OFF
+  // Right Bumper (RB / Button 5): Change Camera Angle
+  // ========================================================
+  const prevGamepadButtons = [
+    { lb: false, rb: false, start: false },
+    { lb: false, rb: false, start: false }
+  ];
+
+  function pollGamepadControls(playerIndex = 0) {
+    if (typeof navigator.getGamepads !== 'function') return null;
+    const rawGamepads = navigator.getGamepads();
+    if (!rawGamepads) return null;
+
+    const connectedPads = [];
+    for (let i = 0; i < rawGamepads.length; i++) {
+      if (rawGamepads[i] && rawGamepads[i].connected) connectedPads.push(rawGamepads[i]);
+    }
+    if (playerIndex >= connectedPads.length) return null;
+    const pad = connectedPads[playerIndex];
+
+    const applyDeadzone = (val, threshold = 0.16) => {
+      if (Math.abs(val) < threshold) return 0;
+      const sign = Math.sign(val);
+      return sign * Math.min(1.0, (Math.abs(val) - threshold) / (1.0 - threshold));
+    };
+
+    // 1. Left joystick for forward and backward (axes[1], inverted: up = forward)
+    let leftY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
+    let throttle = -applyDeadzone(leftY, 0.16);
+
+    // Optional D-Pad fallback for throttle
+    if (Math.abs(throttle) < 0.1 && pad.buttons) {
+      if (pad.buttons[12] && (pad.buttons[12].pressed || pad.buttons[12].value > 0.5)) throttle = 1.0;
+      else if (pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) throttle = -1.0;
+    }
+
+    // 2. Right joystick for turn left and right (axes[2])
+    let rightX = (pad.axes && pad.axes.length > 2) ? pad.axes[2] : 0;
+    if (Math.abs(rightX) < 0.1 && pad.axes && pad.axes.length > 5 && Math.abs(pad.axes[5]) > 0.1) {
+      rightX = pad.axes[5];
+    }
+    let steer = applyDeadzone(rightX, 0.16);
+
+    // Optional D-Pad fallback for steer
+    if (Math.abs(steer) < 0.1 && pad.buttons) {
+      if (pad.buttons[14] && (pad.buttons[14].pressed || pad.buttons[14].value > 0.5)) steer = -1.0;
+      else if (pad.buttons[15] && (pad.buttons[15].pressed || pad.buttons[15].value > 0.5)) steer = 1.0;
+    }
+
+    if (!prevGamepadButtons[playerIndex]) {
+      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false };
+    }
+    const prev = prevGamepadButtons[playerIndex];
+
+    // 3. Left button (LB / buttons[4]) for turning weapon on/off
+    const lbPressed = !!(pad.buttons && pad.buttons[4] && (pad.buttons[4].pressed || pad.buttons[4].value > 0.5));
+    if (lbPressed && !prev.lb) {
+      if (playerIndex === 0 && playerBot) {
+        togglePlayerWeapon(playerBot);
+      } else if (playerIndex === 1 && enemyBot && gameMode === '1v1') {
+        togglePlayerWeapon(enemyBot);
+      }
+    }
+    prev.lb = lbPressed;
+
+    // 4. Right button (RB / buttons[5]) for changing camera angle
+    const rbPressed = !!(pad.buttons && pad.buttons[5] && (pad.buttons[5].pressed || pad.buttons[5].value > 0.5));
+    if (rbPressed && !prev.rb) {
+      if (playerIndex === 0 && (matchState === 'playing' || matchState === 'countdown')) {
+        cycleCameraMode();
+      }
+    }
+    prev.rb = rbPressed;
+
+    // 5. Start / Menu button (buttons[9]) for pause toggle
+    const startPressed = !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
+    if (startPressed && !prev.start) {
+      const btnPause = document.getElementById('btn-pause');
+      const btnResume = document.getElementById('btn-resume-game');
+      if (matchState === 'playing' && btnPause) btnPause.click();
+      else if (matchState === 'paused' && btnResume) btnResume.click();
+    }
+    prev.start = startPressed;
+
+    return {
+      throttle,
+      steer,
+      hasInput: Math.abs(throttle) > 0.05 || Math.abs(steer) > 0.05
+    };
+  }
+
+  window.addEventListener('gamepadconnected', (e) => {
+    console.log(`🎮 Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
+    const hint = document.getElementById('hint-controls-text');
+    if (hint) {
+      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER DETECTED:</span> Left Stick: Drive · Right Stick: Steer · <kbd>LB</kbd> Weapon ON/OFF · <kbd>RB</kbd> Camera`;
+    }
+  });
+
+  window.addEventListener('gamepaddisconnected', (e) => {
+    console.log(`🎮 Gamepad disconnected from index ${e.gamepad.index}`);
+    const hint = document.getElementById('hint-controls-text');
+    if (hint) {
+      hint.innerHTML = `<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF`;
+    }
+  });
+
+  window.pollGamepadControls = pollGamepadControls;
+  window.togglePlayerWeapon = togglePlayerWeapon;
 
   // HUD Side Dock Toggle (Left / Right)
   const btnDockToggle = document.getElementById('btn-dock-toggle');
@@ -5553,6 +5662,9 @@
         if (Math.random() < 0.05) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 1);
         }
+      } else if (bot.weaponActive === false) {
+        // Weapon motor turned OFF by player: decelerate to zero
+        bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - 32.0 * dt);
       } else {
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s)
         const targetSpin = 95.0;
@@ -5641,6 +5753,14 @@
       if (keys['ArrowDown']) t -= 1;
       if (keys['ArrowLeft']) s -= 1;
       if (keys['ArrowRight']) s += 1;
+
+      // Controller 2 input (if connected)
+      const gp2 = pollGamepadControls(1);
+      if (gp2 && gp2.hasInput) {
+        t = gp2.throttle;
+        s = gp2.steer;
+      }
+
       enemyBot.throttleInput = t;
       enemyBot.steerInput = s;
       return;
@@ -6409,9 +6529,17 @@
       }
     }
 
+    // Always poll Controller 1 every frame (LB weapon toggle and RB camera cycle respond during countdown & playing)
+    const gp1 = pollGamepadControls(0);
+
     if (matchState === 'playing' && playerBot && enemyBot) {
       let t = sliderThrottleVal;
       let s = sliderSteerVal;
+
+      if (gp1 && gp1.hasInput) {
+        t = gp1.throttle;
+        s = gp1.steer;
+      }
 
       if (NetworkSys.isOnline && !NetworkSys.isHost) {
         // GUEST MODE: Send local controls to Host, receive remote physics
@@ -6419,6 +6547,11 @@
         if (keys['KeyS'] || keys['ArrowDown']) t = -1;
         if (keys['KeyA'] || keys['ArrowLeft']) s = -1;
         if (keys['KeyD'] || keys['ArrowRight']) s = 1;
+
+        if (gp1 && gp1.hasInput) {
+          t = gp1.throttle;
+          s = gp1.steer;
+        }
 
         throttleKnob.style.transform = `translateY(${-t * 42}px)`;
         steerKnob.style.transform = `translateX(${s * 46}px)`;
@@ -6433,6 +6566,11 @@
         if (keys['KeyS'] || (keys['ArrowDown'] && gameMode !== '1v1')) t = -1;
         if (keys['KeyA'] || (keys['ArrowLeft'] && gameMode !== '1v1')) s = -1;
         if (keys['KeyD'] || (keys['ArrowRight'] && gameMode !== '1v1')) s = 1;
+
+        if (gp1 && gp1.hasInput) {
+          t = gp1.throttle;
+          s = gp1.steer;
+        }
 
         playerBot.throttleInput = t;
         playerBot.steerInput = s;
@@ -6458,21 +6596,30 @@
       const rpmText = document.getElementById('weapon-rpm-text');
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
-        if (rpmPct >= 92) {
+        if (playerBot.weaponActive === false) {
+          rpmText.textContent = `${rpmPct}% (WEAPON OFF)`;
+          rpmText.style.color = '#f87171';
+          rpmFill.style.width = `${rpmPct}%`;
+          rpmFill.classList.remove('ready');
+          rpmFill.style.background = '#64748b';
+        } else if (rpmPct >= 92) {
           rpmText.textContent = '100% (SMASH READY!)';
           rpmText.style.color = '#34d399';
           rpmFill.style.width = '100%';
           rpmFill.classList.add('ready');
+          rpmFill.style.background = '';
         } else if (rpmPct <= 5) {
           rpmText.textContent = '0% (STALLED — WINDING UP...)';
           rpmText.style.color = '#ef4444';
           rpmFill.style.width = `${rpmPct}%`;
           rpmFill.classList.remove('ready');
+          rpmFill.style.background = '';
         } else {
           rpmText.textContent = `${rpmPct}% (WINDING UP...)`;
           rpmText.style.color = '#38bdf8';
           rpmFill.style.width = `${rpmPct}%`;
           rpmFill.classList.remove('ready');
+          rpmFill.style.background = '';
         }
       }
 
