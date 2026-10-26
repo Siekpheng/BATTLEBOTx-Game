@@ -36,8 +36,16 @@
       throttleInput: 0,
       steerInput: 0
     };
-    if (!bot.cadAttached && getBotScene(type)) {
-      attachCadToBot(bot, type);
+    if (!bot.cadAttached) {
+      if (typeof getBotScene === 'function' && getBotScene(type)) {
+        attachCadToBot(bot, type);
+      } else if (typeof ensureBotModelLoaded === 'function') {
+        ensureBotModelLoaded(type).then(sc => {
+          if (sc && bot && !bot.cadAttached && typeof attachCadToBot === 'function') {
+            attachCadToBot(bot, type);
+          }
+        });
+      }
     }
     return bot;
   }
@@ -395,14 +403,14 @@
     });
   });
 
-  // Idle preloader: preload all 6 robots in background so menu swaps are instant
+  // Background preloader: preload all 6 robots so all menu combatants have instant high-res CAD models
   setTimeout(() => {
     if (typeof ensureBotModelLoaded === 'function') {
-      ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'].forEach((t, i) => {
-        setTimeout(() => ensureBotModelLoaded(t), i * 650);
+      MENU_ROBOT_ROSTER.forEach((t, i) => {
+        setTimeout(() => ensureBotModelLoaded(t), i * 180);
       });
     }
-  }, 1000);
+  }, 200);
 
   // HUD Touch Controls Toggle
   const btnToggleTouch = document.getElementById('btn-toggle-touch');
@@ -1050,7 +1058,7 @@
   // ========================================================
   // 10.5 MENU AI EXHIBITION BATTLE SYSTEM (ANTI-CIRCLING LEAD PURSUIT)
   // ========================================================
-  const MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
+  // MENU_ROBOT_ROSTER is globally defined in js/state.js
   let menuP1Type = 'robot1';
   let menuP2Type = 'robot2';
   let menuRespawnCooldown = 0.0;
@@ -1133,6 +1141,19 @@
       }
     }
 
+    // 3.5 Unstick Maneuver if Pinned or Motionless
+    const currentSpeed = Math.hypot(bot.vx || 0, bot.vz || 0);
+    if (currentSpeed < 0.35 && dist > 1.5) {
+      bot.menuUnstickTimer = (bot.menuUnstickTimer || 0) + dt;
+      if (bot.menuUnstickTimer > 0.8) {
+        bot.throttleInput = -0.85;
+        bot.steerInput = (bot.x > 0 ? -1.0 : 1.0);
+        return;
+      }
+    } else {
+      bot.menuUnstickTimer = 0.0;
+    }
+
     // 4. Arena Boundary Bounce-Back
     // Prevent bots from grinding along walls: turn forcefully back toward center arena
     const wallBound = ARENA_HALF - 1.5;
@@ -1148,22 +1169,43 @@
 
   function isMenuBotImmobilized(bot, dt) {
     if (!bot) return true;
-    if (bot.driveHealth <= 0) return true;
-    if (bot.flipped) return true;
-    const noWheels = bot.wheels && bot.wheels.length > 0 && bot.wheels.filter(w => w.attached).length === 0;
-    if (noWheels) return true;
 
-    const speed = Math.hypot(bot.vx, bot.vz);
-    if (speed < 0.35) {
-      bot.stoppedTimer = (bot.stoppedTimer || 0) + dt;
-      if (bot.stoppedTimer > 1.0) return true;
+    // Auto self-right if flipped during menu fight: pop back upright after 0.8s!
+    if (bot.flipped) {
+      bot.menuFlipTimer = (bot.menuFlipTimer || 0) + dt;
+      if (bot.menuFlipTimer > 0.8) {
+        bot.flipped = false;
+        bot.pitch = 0;
+        bot.roll = 0;
+        bot.pitchVel = 0;
+        bot.rollVel = 0;
+        bot.vy = 2.2;
+        bot.menuFlipTimer = 0.0;
+      }
     } else {
-      bot.stoppedTimer = 0.0;
+      bot.menuFlipTimer = 0.0;
     }
+
+    // A robot in the menu is ONLY replaced once it has caught on fire (80%+ damage)!
+    const isBurning = (typeof isBotFlaming === 'function' && isBotFlaming(bot)) || (bot.driveHealth <= 0);
+    if (isBurning) {
+      bot.menuBurningTimer = (bot.menuBurningTimer || 0) + dt;
+      // Allow the defeated robot to blaze dramatically for 1.8s before bringing in the next challenger
+      if (bot.menuBurningTimer >= 1.8) {
+        return true;
+      }
+    } else {
+      bot.menuBurningTimer = 0.0;
+    }
+
     return false;
   }
 
   function pickNextMenuRobot(exclude1, exclude2) {
+    // Prioritize robots whose CAD models are already fully loaded
+    const readyPool = MENU_ROBOT_ROSTER.filter(t => t !== exclude1 && t !== exclude2 && (typeof getBotScene === 'function' && !!getBotScene(t)));
+    if (readyPool.length > 0) return readyPool[Math.floor(Math.random() * readyPool.length)];
+
     const pool = MENU_ROBOT_ROSTER.filter(t => t !== exclude1 && t !== exclude2);
     if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
     return MENU_ROBOT_ROSTER.filter(t => t !== exclude1)[0] || 'robot1';

@@ -508,7 +508,8 @@
           const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
 
-          const clashDmg = impactSpeed * 1.6 + 6.0;
+          const clashMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
+          const clashDmg = (impactSpeed * 1.6 + 6.0) * clashMult;
           if (!isPractice) {
             playerBot.driveHealth = Math.max(0, playerBot.driveHealth - clashDmg * pVuln);
           }
@@ -611,7 +612,8 @@
           const eRemainingArmor = enemyBot.armorPanels.filter(p => p.attached).length;
           const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
-          const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
+          const menuDmgMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
+          const baseDmg = (impactSpeed * 2.3 + (canSendFlying ? 14 : 6)) * menuDmgMult;
           const driveDmg = baseDmg * eVuln;
           enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
 
@@ -720,7 +722,8 @@
           const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
           const pMaxArmor = Math.max(1, playerBot.armorPanels.length);
           const pVuln = 1.0 + (1.0 - (pRemainingArmor / pMaxArmor)) * 1.25;
-          const baseDmg = impactSpeed * 2.3 + (canSendFlying ? 14 : 6);
+          const menuDmgMultE = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.5 : 1.0;
+          const baseDmg = (impactSpeed * 2.3 + (canSendFlying ? 14 : 6)) * menuDmgMultE;
           const driveDmg = baseDmg * pVuln;
           playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
 

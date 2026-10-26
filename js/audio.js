@@ -586,11 +586,19 @@
       }
     },
 
+    isCombatAudioAllowed() {
+      return (typeof matchState !== 'undefined' && matchState !== 'menu');
+    },
+
     updateCombatAudio(pBot, eBot, matchState, dt) {
       if (!this.ctx || this.ctx.state !== 'running' || !this.loopsInitialized) return;
+      if (!this.isCombatAudioAllowed()) {
+        this.stopCombatAudio();
+        return;
+      }
       const now = this.ctx.currentTime;
-      const isCombatActive = (matchState === 'playing' || matchState === 'countdown' || (matchState === 'menu' && pBot && eBot));
-      const menuVol = (matchState === 'menu') ? 0.35 : 1.0;
+      const isCombatActive = (matchState === 'playing' || matchState === 'countdown');
+      const menuVol = 1.0;
 
       // --- PLAYER WEAPON WINDING & SPIN SOUND ---
       const pSpeed = (pBot && isCombatActive) ? (pBot.weaponSpinSpeed || 0) : 0;
@@ -672,6 +680,12 @@
 
     setFireActive(active) {
       if (!this.ctx || !this.loopsInitialized) return;
+      if (!this.isCombatAudioAllowed()) {
+        const now = this.ctx.currentTime;
+        if (this.fireRumbleGain) this.fireRumbleGain.gain.setTargetAtTime(0.0001, now, 0.05);
+        if (this.fireAirGain) this.fireAirGain.gain.setTargetAtTime(0.0001, now, 0.05);
+        return;
+      }
       const now = this.ctx.currentTime;
       if (active && this.fireSoundEnabled !== false) {
         // Natural turbulent breathing of active combustion blaze
@@ -710,7 +724,7 @@
 
     // 1.5 Authentic Heavy Metal-on-Steel Clashing (Robot-on-Robot Clangs, Gouges & Slams)
     metalClashSound(intensity = 1, isHardClash = false) {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
       const scale = Math.min(2.8, Math.max(0.35, intensity));
@@ -805,7 +819,7 @@
 
     // 1. Heavy Multi-Layered Kinetic Hit
     hitSound(intensity = 1, isWeapon = false) {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
       const scale = Math.min(2.5, Math.max(0.4, intensity));
@@ -861,7 +875,7 @@
 
     // 2. High-Speed Tooth Gouge & Sparks Grinding
     weaponSliceSound() {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
@@ -903,7 +917,7 @@
 
     // 3. Kinetic Weapon Stall Shudder & Groan
     weaponStallSound() {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
@@ -1121,7 +1135,7 @@
 
     // 5. Tire Skid / Floor Drift Screech
     tireSkid(speed = 1) {
-      if (!this.ctx || !this.noiseBuffer) return;
+      if (!this.ctx || !this.noiseBuffer || !this.isCombatAudioAllowed()) return;
       const now = performance.now();
       if (now - this.lastSkidTime < 240) return;
       this.lastSkidTime = now;
@@ -1146,7 +1160,7 @@
 
     // 6. Realistic Thermal Ember Snap & LiPo Cell Rupture Pop
     playFireCrackle() {
-      if (!this.ctx || this.fireSoundEnabled === false) return;
+      if (!this.ctx || this.fireSoundEnabled === false || !this.isCombatAudioAllowed()) return;
       const now = performance.now();
       // Natural, organic cadence (~3-5 pops per second instead of 15/sec machine-gun)
       if (now - this.lastCrackleTime < 180 + Math.random() * 140) return;
@@ -1191,7 +1205,7 @@
 
     // 6.5 Official BattleBots Referee Immobilization / Count-Out Warning Horn
     refereeWarningHorn() {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
@@ -1252,7 +1266,7 @@
 
     // 7. Referee Countdown Pip (Ticks every second during 10s count-out with escalating pitch)
     alarmBeep(sec = 10) {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
@@ -1293,7 +1307,7 @@
     },
 
     lungeSound() {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -1309,7 +1323,7 @@
     },
 
     selfRightSound() {
-      if (!this.ctx) return;
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
       this.beep(280, 0.08, 'square', 0.18);
       this.beep(440, 0.14, 'sawtooth', 0.20);
     },
@@ -1330,7 +1344,7 @@
 
     // 9. Synthesized Stadium Crowd Roar / Arena Cheering
     crowdCheer(intensity = 1.0, duration = 1.8) {
-      if (!this.ctx || !this.noiseBuffer) return;
+      if (!this.ctx || !this.noiseBuffer || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 
@@ -1373,7 +1387,7 @@
 
     // 10. Synthesized Arena Crowd Gasp / Collective Shock ("OHHH!")
     crowdGasp(intensity = 0.8) {
-      if (!this.ctx || !this.noiseBuffer) return;
+      if (!this.ctx || !this.noiseBuffer || !this.isCombatAudioAllowed()) return;
       const now = this.ctx.currentTime;
       const dest = this.masterGain || this.ctx.destination;
 

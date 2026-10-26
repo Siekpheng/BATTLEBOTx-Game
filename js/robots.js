@@ -66,11 +66,30 @@
 
   function addRobotMeshOutline(mesh, outlineColor = 0x050a12) {
     if (!mesh || !mesh.geometry) return;
-    if (mesh.name === 'CAD_Outline' || mesh._hasOutline) return;
-    if (mesh.getObjectByName && mesh.getObjectByName('CAD_Outline')) {
+    if (mesh.name === 'CAD_Outline') return;
+
+    let existingLine = null;
+    if (mesh.children && mesh.children.length > 0) {
+      existingLine = mesh.children.find(c => c.name === 'CAD_Outline');
+    }
+
+    if (existingLine) {
+      if (existingLine.material) {
+        existingLine.material = existingLine.material.clone();
+        existingLine.material.color.setHex(outlineColor);
+        existingLine.material.transparent = true;
+        existingLine.material.opacity = 0.95;
+        existingLine.material.depthTest = true;
+        existingLine.material.depthWrite = false;
+        existingLine.material.polygonOffset = true;
+        existingLine.material.polygonOffsetFactor = -1.0;
+        existingLine.material.polygonOffsetUnits = -2.0;
+        existingLine.material.needsUpdate = true;
+      }
       mesh._hasOutline = true;
       return;
     }
+
     try {
       const edges = new THREE.EdgesGeometry(mesh.geometry, 26);
       const lineMat = new THREE.LineBasicMaterial({
@@ -105,6 +124,7 @@
       mesh.material = mesh.material.clone();
     }
 
+    let maxLum = 0;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     mats.forEach(mat => {
       // 1. Guarantee 100% solid, fully opaque rendering with DoubleSide (completely eliminates see-through on all CAD plates & cavity)
@@ -118,6 +138,7 @@
       // 2. Refined Robot Luminance & Specular Shading (Preserves rich 3D curvature, specular depth & bevel highlights):
       if (mat.color && !mat._emissiveApplied) {
         const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
+        if (lum > maxLum) maxLum = lum;
         if (lum < 0.15) {
           // Dark parts (chassis frame, tires, carbon): clean subtle lift so interior CAD cavity is clearly visible
           mat.emissive = new THREE.Color(0x12161f);
@@ -134,7 +155,10 @@
     });
 
     // 3. Crisp Industrial CAD Outline Definition (sharp panel seams, chamfers, wheels, weapons):
-    addRobotMeshOutline(mesh);
+    // Adaptive contrast: on dark chassis/carbon (lum < 0.22), use crisp technical slate outline (0x475569)
+    // On light/vibrant armor & wedges (lum >= 0.22), use dark industrial ink (0x050a12)
+    const outlineCol = (maxLum < 0.22) ? 0x475569 : 0x050a12;
+    addRobotMeshOutline(mesh, outlineCol);
   }
 
   function attachCadToRobot1(bot) {
