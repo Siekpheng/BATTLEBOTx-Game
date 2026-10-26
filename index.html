@@ -2916,6 +2916,35 @@
     }
   }
 
+  function addRobotMeshOutline(mesh, outlineColor = 0x050a12) {
+    if (!mesh || !mesh.geometry) return;
+    if (mesh.name === 'CAD_Outline' || mesh._hasOutline) return;
+    if (mesh.getObjectByName && mesh.getObjectByName('CAD_Outline')) {
+      mesh._hasOutline = true;
+      return;
+    }
+    try {
+      const edges = new THREE.EdgesGeometry(mesh.geometry, 26);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: outlineColor,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1.0,
+        polygonOffsetUnits: -2.0
+      });
+      const lines = new THREE.LineSegments(edges, lineMat);
+      lines.name = 'CAD_Outline';
+      lines.renderOrder = 1;
+      mesh.add(lines);
+      mesh._hasOutline = true;
+    } catch (e) {
+      console.warn('Could not generate outline for mesh:', e);
+    }
+  }
+
   function optimizeRobotMaterial(mesh) {
     if (!mesh || !mesh.material) return;
     mesh.castShadow = true;
@@ -2938,15 +2967,15 @@
       mat.side = THREE.DoubleSide; // Render both sides so CAD sheet metal panels & interior cavity are 100% solid
       mat.needsUpdate = true;
 
-      // 2. Dedicated Robot Luminance Boost (Light ONLY on the robot, zero brightening of the arena):
+      // 2. Refined Robot Luminance & Specular Shading (Preserves rich 3D curvature, specular depth & bevel highlights):
       if (mat.color && !mat._emissiveApplied) {
         const lum = mat.color.r * 0.299 + mat.color.g * 0.587 + mat.color.b * 0.114;
         if (lum < 0.15) {
-          // Dark parts (chassis frame, tires, carbon): clean lift so interior CAD cavity is clearly visible
-          mat.emissive = new THREE.Color(0x222a38);
+          // Dark parts (chassis frame, tires, carbon): clean subtle lift so interior CAD cavity is clearly visible
+          mat.emissive = new THREE.Color(0x12161f);
         } else {
-          // Vibrant painted body, armor, wedges, weapons: bright, self-radiant CAD coloration
-          mat.emissive = mat.color.clone().multiplyScalar(0.35);
+          // Vibrant painted body, armor, wedges, weapons: subtle ambient lift (0.06) restoring genuine 3D specular depth & shading gradients
+          mat.emissive = mat.color.clone().multiplyScalar(0.06);
         }
         mat._emissiveApplied = true;
       }
@@ -2955,6 +2984,9 @@
         mat.metalness = Math.min(0.55, mat.metalness * 1.25);
       }
     });
+
+    // 3. Crisp Industrial CAD Outline Definition (sharp panel seams, chamfers, wheels, weapons):
+    addRobotMeshOutline(mesh);
   }
 
   function attachCadToRobot1(bot) {
@@ -4146,7 +4178,7 @@
           if (!n.includes('tire') && !n.includes('rubber') && !n.includes('nut') && !n.includes('rim') && !n.includes('steel') && !n.includes('blade')) {
             if (mat.color) {
               mat.color.setHex(0xdc2626);
-              if (mat.emissive) mat.emissive.setHex(0x5a1010);
+              if (mat.emissive) mat.emissive.setHex(0x180404);
               mat.needsUpdate = true;
             }
           }
@@ -4347,6 +4379,7 @@
     }
   });
 
+  window.addRobotMeshOutline = addRobotMeshOutline;
   window.pollGamepadControls = pollGamepadControls;
   window.togglePlayerWeapon = togglePlayerWeapon;
   window.handleBotCollision = handleBotCollision;
