@@ -3607,7 +3607,7 @@
 
   function createNorthBillboardTexture() {
     const c = document.createElement('canvas');
-    c.width = 1024;
+    c.width = 2048;
     c.height = 512;
     const ctx = c.getContext('2d');
     const tex = new THREE.CanvasTexture(c);
@@ -3619,61 +3619,67 @@
     const renderBillboard = () => {
       // Stage LED Big Screen Background
       ctx.fillStyle = '#060a12';
-      ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillRect(0, 0, 2048, 512);
 
       // Glowing border frame
       ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 8;
-      ctx.strokeRect(16, 16, 992, 480);
+      ctx.lineWidth = 10;
+      ctx.strokeRect(24, 16, 2000, 480);
 
       // Header: Tournament Title
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
       ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 36px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx CHAMPIONSHIP', 512, 90);
+      ctx.font = '700 42px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx CHAMPIONSHIP', 1024, 95);
 
       // Main Logo Title: Exact Casing BATTLEBOTx
       ctx.fillStyle = '#ef4444';
-      ctx.font = '900 84px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx', 512, 195);
+      ctx.font = '900 96px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx', 1024, 205);
 
       ctx.fillStyle = '#38bdf8';
-      ctx.font = '700 32px Orbitron, sans-serif';
-      ctx.fillText('4x4m TOURNAMENT ARENA', 512, 265);
+      ctx.font = '700 36px Orbitron, sans-serif';
+      ctx.fillText('4x4m TOURNAMENT ARENA', 1024, 280);
 
       // High-Performance Combat Championship
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '600 26px Orbitron, sans-serif';
-      ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 512, 350);
+      ctx.font = '600 28px Orbitron, sans-serif';
+      ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 1024, 355);
 
       // Footer: Tournament Series
       ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 32px Orbitron, sans-serif';
-      ctx.fillText('OFFICIAL TOURNAMENT ARENA', 512, 420);
+      ctx.font = '700 34px Orbitron, sans-serif';
+      ctx.fillText('OFFICIAL TOURNAMENT ARENA', 1024, 430);
 
-      // Symmetrical Flank Logos: BATTLEBOTx on White Badge
+      // Symmetrical Flank Logos: Calibrated for True Square in 3D Space
+      // Plane 3D Aspect Ratio is 22.9957 / 5.8500 = 3.9309.
+      // Canvas is 2048 x 512 (4.0).
+      // Badge of 218px wide x 214px tall on canvas projects to a 100% exact 2.45m x 2.45m square in 3D!
       if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const bbxW = 120;
-        const bbxH = Math.round(bbxW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
-        const pad = 6;
-        const bW = bbxW + pad * 2;
-        const bH = bbxH + pad * 2;
+        const badgeW = 228;
+        const badgeH = 214;
+        const pad = 10;
+        const imgW = badgeW - pad * 2;
+        const imgH = badgeH - pad * 2;
 
-        [105, 919].forEach(posX => {
+        [240, 1808].forEach(posX => {
           ctx.save();
           ctx.fillStyle = '#ffffff';
           ctx.strokeStyle = '#fdc911';
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 3.5;
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+          ctx.shadowBlur = 12;
           ctx.beginPath();
           if (ctx.roundRect) {
-            ctx.roundRect(posX - bW / 2, 256 - bH / 2, bW, bH, 12);
+            ctx.roundRect(posX - badgeW / 2, 256 - badgeH / 2, badgeW, badgeH, 16);
           } else {
-            ctx.rect(posX - bW / 2, 256 - bH / 2, bW, bH);
+            ctx.rect(posX - badgeW / 2, 256 - badgeH / 2, badgeW, badgeH);
           }
           ctx.fill();
           ctx.stroke();
           ctx.clip();
-          ctx.drawImage(bbxImg, posX - bbxW / 2, 256 - bbxH / 2, bbxW, bbxH);
+          ctx.drawImage(bbxImg, posX - imgW / 2, 256 - imgH / 2, imgW, imgH);
           ctx.restore();
         });
       }
