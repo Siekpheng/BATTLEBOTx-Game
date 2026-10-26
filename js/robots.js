@@ -729,6 +729,9 @@
     if (typeof matchState !== 'undefined' && matchState === 'menu') {
       bot.weaponSpinSpeed = 95.0;
     }
+    if (typeof initBotDetachableParts === 'function') {
+      initBotDetachableParts(bot);
+    }
   }
 
   function attachCadToRobot1(bot) { attachCadToBot(bot, 'robot1'); }

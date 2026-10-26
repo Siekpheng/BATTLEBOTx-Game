@@ -49,6 +49,9 @@
         });
       }
     }
+    if (typeof initBotDetachableParts === 'function') {
+      initBotDetachableParts(bot);
+    }
     return bot;
   }
 
@@ -1196,55 +1199,17 @@
       return bot.menuDestroyedTimer > 1.2;
     }
 
-    if (bot.driveHealth <= 0) {
-      if (typeof destroyRobotEntirely === 'function' && !bot.isEntirelyDestroyed) {
-        destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
-      }
-      bot.menuDestroyedTimer = 0.0;
-      return false;
-    }
-
-    // If all wheels are lost, bot is immobilized — explode into debris and replace!
-    const activeWheels = (bot.wheels && bot.wheels.length > 0) ? bot.wheels.filter(w => w.attached).length : 2;
-    if (activeWheels === 0 && !bot.isEntirelyDestroyed) {
-      bot.menuNoWheelTimer = (bot.menuNoWheelTimer || 0) + dt;
-      if (bot.menuNoWheelTimer > 0.8) {
-        if (typeof destroyRobotEntirely === 'function') {
-          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
-        }
-        bot.menuDestroyedTimer = 0.0;
-        return false;
-      }
-    } else {
-      bot.menuNoWheelTimer = 0.0;
-    }
-
-    // If bot has been motionless/stuck against wall/opponent for > 3.5s, replace it!
+    // If bot has been motionless/stuck against wall/opponent for > 4.5s, mark destroyed so clean replacement occurs
     const botSpeed = Math.hypot(bot.vx || 0, bot.vz || 0);
     if (botSpeed < 0.25 && !bot.isEntirelyDestroyed) {
       bot.menuStuckTimer = (bot.menuStuckTimer || 0) + dt;
-      if (bot.menuStuckTimer > 3.5) {
-        if (typeof destroyRobotEntirely === 'function') {
-          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
-        }
+      if (bot.menuStuckTimer > 4.5) {
+        bot.isEntirelyDestroyed = true;
         bot.menuDestroyedTimer = 0.0;
         return false;
       }
     } else {
       bot.menuStuckTimer = 0.0;
-    }
-
-    const isBurning = (typeof isBotFlaming === 'function' && isBotFlaming(bot));
-    if (isBurning) {
-      bot.menuBurningTimer = (bot.menuBurningTimer || 0) + dt;
-      if (bot.menuBurningTimer >= 2.0) {
-        if (typeof destroyRobotEntirely === 'function') {
-          destroyRobotEntirely(bot, { x: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 });
-        }
-        return false;
-      }
-    } else {
-      bot.menuBurningTimer = 0.0;
     }
 
     return false;

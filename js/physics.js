@@ -523,28 +523,18 @@
           const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
           const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
 
-          const clashMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
-          const clashDmg = (impactSpeed * 1.1 + 3.8) * clashMult;
+          // Head-on clash detaches parts 1 by 1 from both robots
           if (!isPractice) {
-            playerBot.driveHealth = Math.max(0, playerBot.driveHealth - clashDmg * pVuln);
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            if (impactSpeed > 6.5) detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
           }
-          enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - clashDmg * eVuln);
+          detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          if (impactSpeed > 6.5) detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
 
-          if (!isPractice && Math.random() < 0.45) detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
-          if (Math.random() < 0.45) detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
-
-          if (impactSpeed > 4.5) {
-            const clashWheelProb = (impactSpeed > 6.5) ? 0.45 : 0.25;
-            if (!isPractice && playerBot.wheels && Math.random() < clashWheelProb) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
-            if (enemyBot.wheels && Math.random() < clashWheelProb) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
-          }
-
-          if (!isPractice && playerBot.driveHealth <= 0) {
-            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+          if (!isPractice && playerBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
           }
-          if (enemyBot.driveHealth <= 0) {
-            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+          if (enemyBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
           }
         } else if (isPWeaponHit) {
@@ -637,29 +627,14 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          const eRemainingArmor = enemyBot.armorPanels.filter(p => p.attached).length;
-          const eMaxArmor = Math.max(1, enemyBot.armorPanels.length);
-          const eVuln = 1.0 + (1.0 - (eRemainingArmor / eMaxArmor)) * 1.25;
-          const menuDmgMult = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
-          const baseDmg = (impactSpeed * 1.5 + (canSendFlying ? 10 : 4.5)) * menuDmgMult;
-          const driveDmg = baseDmg * eVuln;
-          enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          if (canFlipEnemy || impactSpeed > 6.0) {
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          }
 
-          if (enemyBot.driveHealth <= 0) {
-            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+          if (enemyBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
-          }
-
-          if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
-            detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
-          }
-          if (enemyBot.wheels) {
-            const eAttachedWheels = enemyBot.wheels.filter(w => w.attached).length;
-            const isDirectSideHit = Math.abs(eHitRight) > 0.28;
-            const eWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
-            if (eAttachedWheels > 0 && Math.random() < eWheelProb) {
-              detachWheel(enemyBot, { x: nx, z: nz }, midPos);
-            }
           }
           if (!wasEnemyFlipped && enemyBot.flipped) {
             AudioSys.crowdGasp(0.8);
@@ -756,29 +731,14 @@
 
           triggerDamageVignette();
 
-          const pRemainingArmor = playerBot.armorPanels.filter(p => p.attached).length;
-          const pMaxArmor = Math.max(1, playerBot.armorPanels.length);
-          const pVuln = 1.0 + (1.0 - (pRemainingArmor / pMaxArmor)) * 1.25;
-          const menuDmgMultE = (typeof matchState !== 'undefined' && matchState === 'menu') ? 1.4 : 1.0;
-          const baseDmg = (impactSpeed * 1.5 + (canSendFlying ? 10 : 4.5)) * menuDmgMultE;
-          const driveDmg = baseDmg * pVuln;
-          playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
+          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+          if (canFlipPlayer || impactSpeed > 6.0) {
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+          }
 
-          if (playerBot.driveHealth <= 0) {
-            if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+          if (playerBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
-          }
-
-          if (Math.random() < (canSendFlying ? 0.85 : 0.40)) {
-            detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
-          }
-          if (playerBot.wheels) {
-            const pAttachedWheels = playerBot.wheels.filter(w => w.attached).length;
-            const isDirectSideHit = Math.abs(pHitRight) > 0.28;
-            const pWheelProb = isDirectSideHit ? 0.65 : (canSendFlying ? 0.55 : (impactSpeed > 4.2 ? 0.35 : 0.15));
-            if (pAttachedWheels > 0 && Math.random() < pWheelProb) {
-              detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
-            }
           }
           if (!wasPlayerFlipped && playerBot.flipped) {
             AudioSys.crowdGasp(0.8);
@@ -812,57 +772,38 @@
             const eIsAttacker = (eApproach > 1.2 && eApproach > pApproach * 1.15);
 
             if (pIsAttacker && playerBot.weaponActive !== false) {
-              // Player rammed Enemy with active weapon!
-              const driveDmg = Math.max(0, impactSpeed * 0.85);
-              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
+              // Player rammed Enemy with active weapon: detach part 1 by 1!
               if (impactSpeed > 4.2) {
                 enemyBot.vy = 0.8;
                 enemyBot.airY = 0.08;
                 enemyBot.rollVel = (eHitRight > 0 ? -4.5 : 4.5);
+                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
               }
-              if (impactSpeed > 5.5 && Math.random() < 0.45) {
-                detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
-              }
-              if (impactSpeed > 4.5 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
-                if (Math.random() < 0.40) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
-              }
-              if (enemyBot.driveHealth <= 0) {
-                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+              if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
               }
             } else if (eIsAttacker && enemyBot.weaponActive !== false) {
-              // Enemy rammed Player with active weapon!
-              const driveDmg = Math.max(0, impactSpeed * 0.85);
-              playerBot.driveHealth = Math.max(0, playerBot.driveHealth - driveDmg);
+              // Enemy rammed Player with active weapon: detach part 1 by 1!
               triggerDamageVignette();
               if (impactSpeed > 4.2) {
                 playerBot.vy = 0.8;
                 playerBot.airY = 0.08;
                 playerBot.rollVel = (pHitRight > 0 ? -4.5 : 4.5);
+                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
               }
-              if (impactSpeed > 5.5 && Math.random() < 0.45) {
-                detachArmorPiece(playerBot, { x: -nx, z: -nz }, midPos);
-              }
-              if (impactSpeed > 4.5 && Math.abs(pHitRight) > 0.35 && playerBot.wheels) {
-                if (Math.random() < 0.40) detachWheel(playerBot, { x: -nx, z: -nz }, midPos);
-              }
-              if (playerBot.driveHealth <= 0) {
-                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+              if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
               }
             } else if (playerBot.weaponActive !== false && enemyBot.weaponActive !== false) {
-              // Mutual bumper crunch: only damages if both robots have active weapons
-              const pRam = Math.max(0, eApproach * 0.55);
-              const eRam = Math.max(0, pApproach * 0.55);
-              playerBot.driveHealth = Math.max(0, playerBot.driveHealth - pRam);
-              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - eRam);
-              if (pRam > 2.5) triggerDamageVignette();
-              if (playerBot.driveHealth <= 0) {
-                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(playerBot, { x: -nx, z: -nz }, midPos);
+              // Mutual bumper crunch: detach 1 part on hard collision
+              if (impactSpeed > 4.5) {
+                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+              }
+              if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true);
               }
-              if (enemyBot.driveHealth <= 0) {
-                if (typeof destroyRobotEntirely === 'function') destroyRobotEntirely(enemyBot, { x: nx, z: nz }, midPos);
+              if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true);
               }
             }
@@ -880,19 +821,13 @@
     if (warnContainer) warnContainer.classList.add('hidden');
     countoutHornPlayed = false;
 
-    // Instant Win on Total Destruction or 0 HP — NO 10-Second Countdown!
+    // Instant Win on Total Destruction (when all parts have flown off!) — NO 10-Second Countdown!
     if (typeof matchState !== 'undefined' && matchState === 'playing') {
-      if (playerBot && (playerBot.isEntirelyDestroyed || playerBot.driveHealth <= 0)) {
-        if (!playerBot.isEntirelyDestroyed && typeof destroyRobotEntirely === 'function') {
-          destroyRobotEntirely(playerBot, { x: 0, z: -1 });
-        }
+      if (playerBot && playerBot.isEntirelyDestroyed) {
         endMatch(false, false, true);
         return;
       }
-      if (enemyBot && (enemyBot.isEntirelyDestroyed || enemyBot.driveHealth <= 0)) {
-        if (!enemyBot.isEntirelyDestroyed && typeof destroyRobotEntirely === 'function') {
-          destroyRobotEntirely(enemyBot, { x: 0, z: 1 });
-        }
+      if (enemyBot && enemyBot.isEntirelyDestroyed) {
         endMatch(true, false, true);
         return;
       }
