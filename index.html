@@ -1672,7 +1672,7 @@
           <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF
         </div>
         <div style="margin-top:6px; font-size:0.71rem; color:#64748b; line-height:1.4;">
-          <kbd>C</kbd> Camera Angle · 🎮 Controller: LS Drive · RS Steer · LB Weapon · RB Camera
+          <kbd>C</kbd> Camera Angle · 🎮 Controller: LS Drive & Steer (or RS) · LB Weapon · RB Camera
         </div>
       </div>
 
@@ -2447,16 +2447,16 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.78; // Comfortable, atmospheric tournament cinema exposure
+  renderer.toneMappingExposure = 1.05; // Bright, vivid professional arena tournament lighting
   container.appendChild(renderer.domElement);
 
-  // Professional Tournament Cinema Lighting (Balanced, Vivid Robot CAD Colors & Non-Blinding):
-  // 1. Dual-tone hemisphere light: soft sky tint (0xdbeafe, 0.24), deep floor contrast (0x0f172a, 0.16)
-  const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x0f172a, 0.24);
+  // Professional Tournament Cinema Lighting (Bright, Vivid Robot CAD Colors & Clear Details):
+  // 1. Dual-tone hemisphere light: bright sky fill (0xe0f2fe, 0.58), deep ground fill (0x1e293b, 0.36)
+  const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.58);
   scene.add(hemiLight);
 
   // 2. Main overhead tournament keylight (crisp neutral white shining straight down over arena center)
-  const topCenterLight = new THREE.DirectionalLight(0xffffff, 0.52);
+  const topCenterLight = new THREE.DirectionalLight(0xffffff, 0.90);
   topCenterLight.position.set(0, 32, 1);
   topCenterLight.target.position.set(0, 0, 0);
   topCenterLight.castShadow = true;
@@ -2475,14 +2475,14 @@
   scene.add(topCenterLight.target);
 
   // 3. Dual overhead arena combat spotlights focused on the fighting arena
-  const spot1 = new THREE.SpotLight(0xf8fafc, 0.45, 42, Math.PI / 3.4, 0.35, 1.1);
+  const spot1 = new THREE.SpotLight(0xf8fafc, 0.75, 48, Math.PI / 3.2, 0.35, 1.0);
   spot1.position.set(-4.0, 20.0, -1.0);
   spot1.target.position.set(-1.0, 0, 0);
   spot1.castShadow = false; // Prevents multi-shadow acne on robot assemblies
   scene.add(spot1);
   scene.add(spot1.target);
 
-  const spot2 = new THREE.SpotLight(0xf8fafc, 0.45, 42, Math.PI / 3.4, 0.35, 1.1);
+  const spot2 = new THREE.SpotLight(0xf8fafc, 0.75, 48, Math.PI / 3.2, 0.35, 1.0);
   spot2.position.set(4.0, 20.0, -1.0);
   spot2.target.position.set(1.0, 0, 0);
   spot2.castShadow = false;
@@ -2490,11 +2490,18 @@
   scene.add(spot2.target);
 
   // 4. Subtle metallic edge rim light from the North/rear: catches metallic bevels & armor silhouettes
-  const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.18);
+  const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.40);
   rimLight.position.set(0, 16, -16);
   rimLight.target.position.set(0, 0, 0);
   scene.add(rimLight);
   scene.add(rimLight.target);
+
+  // 5. Front combat fill light from South: clearly illuminates robot face, wedges, and weapons facing camera
+  const frontFillLight = new THREE.DirectionalLight(0xfff7ed, 0.35);
+  frontFillLight.position.set(0, 12, 16);
+  frontFillLight.target.position.set(0, 0, 0);
+  scene.add(frontFillLight);
+  scene.add(frontFillLight.target);
 
   // ========================================================
   // 4x4m SQUARE BATTLEBOX ENCLOSURE (CALIBRATED TO CAD SPECS)
@@ -2938,14 +2945,10 @@
       mat.side = THREE.DoubleSide; // Render both sides so CAD sheet metal panels & interior cavity are 100% solid
       mat.needsUpdate = true;
 
-      // 2. Soften robot model reflectance so it's not too bright while keeping arena floor perfect:
-      if (mat.color && !mat._colorScaled) {
-        mat.color.multiplyScalar(0.80);
-        mat._colorScaled = true;
-      }
-      mat.roughness = 0.52; // Soft satin/powder finish (prevents glaring white hot-spots)
-      if (mat.metalness !== undefined && mat.metalness > 0.25) {
-        mat.metalness = 0.15;
+      // 2. Crisp, vibrant industrial CAD material finish with specular highlights:
+      mat.roughness = 0.36; // Fine satin sheen (clear highlights and reflections)
+      if (mat.metalness !== undefined && mat.metalness > 0.05) {
+        mat.metalness = Math.min(0.50, mat.metalness * 1.20);
       }
     });
   }
@@ -4258,12 +4261,20 @@
       else if (pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) throttle = -1.0;
     }
 
-    // 2. Right joystick for turn left and right (axes[2])
+    // 2. Turn Left and Right: Supports BOTH Left Joystick (axes[0]) AND Right Joystick (axes[2])
+    // Left Stick X (axes[0]): Allows full single-stick driving on left joystick
+    let leftX = (pad.axes && pad.axes.length > 0) ? pad.axes[0] : 0;
+    let leftStickSteer = applyDeadzone(leftX, 0.16);
+
+    // Right Stick X (axes[2] or fallback axes[5]): Also allows dual-stick steering
     let rightX = (pad.axes && pad.axes.length > 2) ? pad.axes[2] : 0;
     if (Math.abs(rightX) < 0.1 && pad.axes && pad.axes.length > 5 && Math.abs(pad.axes[5]) > 0.1) {
       rightX = pad.axes[5];
     }
-    let steer = applyDeadzone(rightX, 0.16);
+    let rightStickSteer = applyDeadzone(rightX, 0.16);
+
+    // Steer with EITHER left joystick or right joystick (dominant stick deflection)
+    let steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
 
     // Optional D-Pad fallback for steer
     if (Math.abs(steer) < 0.1 && pad.buttons) {
