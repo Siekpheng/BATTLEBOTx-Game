@@ -157,29 +157,56 @@
       width: 100%;
       height: 195px;
       border-radius: 16px;
-      background: radial-gradient(circle at 50% 55%, rgba(255, 125, 40, 0.26), rgba(10, 14, 22, 0.96) 74%);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: #080c14;
+      border: 1px solid rgba(56, 189, 248, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.6);
+      box-shadow: inset 0 0 25px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    .hero-cover-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), filter 0.45s ease;
+      filter: contrast(1.06) brightness(1.04);
+    }
+
+    .hero-illustration:hover .hero-cover-img {
+      transform: scale(1.04);
+      filter: contrast(1.12) brightness(1.1);
+    }
+
+    .hero-cover-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 140, 0, 0.06) 0%, rgba(8, 12, 20, 0.35) 75%, rgba(4, 6, 10, 0.75) 100%),
+                  linear-gradient(to top, rgba(12, 17, 26, 0.75) 0%, transparent 35%);
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.55);
     }
 
     .hero-badge {
       position: absolute;
-      top: 10px;
-      right: 12px;
+      top: 12px;
+      right: 14px;
+      z-index: 3;
       font-family: 'Orbitron', sans-serif;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 800;
-      letter-spacing: 1px;
-      padding: 4px 9px;
+      letter-spacing: 1.2px;
+      padding: 4px 10px;
       border-radius: 6px;
-      background: rgba(224, 83, 83, 0.25);
-      border: 1px solid rgba(224, 83, 83, 0.6);
-      color: #ffa4a4;
-      text-shadow: 0 0 10px rgba(224,83,83,0.6);
+      background: rgba(12, 18, 30, 0.78);
+      border: 1px solid rgba(239, 68, 68, 0.65);
+      color: #fca5a5;
+      text-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(8px);
     }
 
     .menu-actions {
@@ -1323,30 +1350,9 @@
       <h1 class="menu-title">BATTLEBOTx</h1>
 
       <div class="hero-illustration">
-        <span class="hero-badge">BATTLEBOTx</span>
-        <svg width="380" height="150" viewBox="0 0 380 150" fill="none">
-          <defs>
-            <radialGradient id="clashGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#ffbe55" stop-opacity="0.95"/>
-              <stop offset="45%" stop-color="#ef4444" stop-opacity="0.45"/>
-              <stop offset="100%" stop-color="#080c12" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-          <circle cx="190" cy="80" r="70" fill="url(#clashGlow)"/>
-          <path d="M190 38 L195 12 M190 62 L220 28 M182 58 L152 24 M198 76 L242 60 M176 76 L138 58 M190 88 L194 116 M184 84 L160 108 M196 84 L224 104" stroke="#fde047" stroke-width="2.5" stroke-linecap="round"/>
-          <g transform="translate(60, 60) rotate(9)">
-            <rect x="0" y="12" width="90" height="38" rx="6" fill="#1e2430" stroke="#94a3b8" stroke-width="2"/>
-            <polygon points="90,16 118,28 90,44" fill="#cbd5e1"/>
-            <circle cx="22" cy="48" r="14" fill="#dc2626" stroke="#7f1d1d" stroke-width="3"/>
-            <circle cx="70" cy="48" r="14" fill="#dc2626" stroke="#7f1d1d" stroke-width="3"/>
-          </g>
-          <g transform="translate(200, 56) rotate(-9)">
-            <polygon points="0,38 30,14 30,44" fill="#e2e8f0" stroke="#64748b" stroke-width="2"/>
-            <rect x="28" y="10" width="88" height="40" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
-            <circle cx="48" cy="48" r="14" fill="#1e293b" stroke="#cbd5e1" stroke-width="3"/>
-            <circle cx="94" cy="48" r="14" fill="#1e293b" stroke="#cbd5e1" stroke-width="3"/>
-          </g>
-        </svg>
+        <img class="hero-cover-img" src="cover_robot1_robot2.png" alt="BATTLEBOTx Championship Clash" />
+        <div class="hero-cover-overlay"></div>
+        <span class="hero-badge">PRO ARENA</span>
       </div>
 
       <nav class="menu-actions" aria-label="Game modes">
@@ -5135,6 +5141,15 @@
   window.camera = camera;
   window.getMenuCameraMode = () => menuCameraMode;
   window.getMatchState = () => matchState;
+  window.setMatchState = (s) => { matchState = s; };
+  window.ensureBotModelLoaded = ensureBotModelLoaded;
+  window.getBotScene = getBotScene;
+  window.scene = scene;
+  window.renderer = renderer;
+  window.createBotInstance = createBotInstance;
+  window.attachCadToRobot1 = attachCadToRobot1;
+  window.attachCadToRobot2 = attachCadToRobot2;
+  window.attachCadToRobot6 = attachCadToRobot6;
 
   // BGM Soundtrack Toggle Buttons (Menu & In-Game HUD)
   const btnMenuMusic = document.getElementById('btn-menu-music');
