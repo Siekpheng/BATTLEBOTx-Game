@@ -735,7 +735,33 @@
       transition: transform 0.1s, background 0.15s;
     }
 
-        .menu-fullscreen-btn {
+        .menu-music-btn {
+      position: absolute;
+      top: 18px;
+      right: 160px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #38bdf8;
+      border-radius: 9999px;
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      z-index: 60;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+    .menu-music-btn:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+    .menu-fullscreen-btn {
       position: absolute;
       top: 18px;
       right: 18px;
@@ -1207,6 +1233,7 @@
 
   <!-- MAIN MENU OVERLAY -->
   <div id="menu-screen" class="overlay-screen">
+    <button id="btn-menu-music" class="menu-music-btn" type="button" title="Toggle Background Music">🎵 Music: ON</button>
     <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
     <div class="menu-card">
       <h1 class="menu-title">BATTLEBOTx</h1>
@@ -1620,6 +1647,7 @@
   <div id="hud" class="hidden">
     <div class="hud-top-bar">
       <div class="timer-pill" id="hud-timer">03:00</div>
+      <button class="hud-icon-btn" id="btn-hud-music" type="button" title="Toggle Background Music">🎵</button>
       <button class="hud-icon-btn" id="btn-pause" type="button" title="Pause Game">II</button>
       <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam [C]</button>
       <button class="hud-icon-btn" id="btn-cam-down" type="button" title="Lower Camera">Cam -</button>
@@ -1713,6 +1741,287 @@
 <script>
 (() => {
   // ========================================================
+  // 1.0 NON-COPYRIGHT PROCEDURAL COMBAT SOUNDTRACK (BgmSys)
+  // 100% Original Code-Synthesized Cyberpunk Industrial Soundtrack
+  // 0 KB Download Footprint, Adaptive To Match Combat State
+  // ========================================================
+  const BgmSys = {
+    ctx: null,
+    masterOut: null,
+    bgmGain: null,
+    noiseBuffer: null,
+
+    enabled: true,
+    isPlaying: false,
+    tempo: 126, // High-energy industrial combat tempo
+    step: 0,
+    nextNoteTime: 0,
+    timerId: null,
+    mode: 'menu', // 'menu' | 'combat' | 'climax'
+
+    init(ctx, masterOut, noiseBuffer) {
+      this.ctx = ctx;
+      this.masterOut = masterOut;
+      this.noiseBuffer = noiseBuffer;
+
+      if (!this.bgmGain && this.ctx) {
+        this.bgmGain = this.ctx.createGain();
+        let saved = null;
+        try { saved = localStorage.getItem('battlebotx_bgm_enabled'); } catch(e){}
+        this.enabled = (saved !== null) ? (saved === 'true') : true;
+        this.bgmGain.gain.setValueAtTime(this.enabled ? 0.22 : 0.0001, this.ctx.currentTime);
+        this.bgmGain.connect(this.masterOut);
+      }
+      this.updateUI();
+    },
+
+    start() {
+      if (!this.ctx || this.isPlaying) return;
+      this.isPlaying = true;
+      this.nextNoteTime = this.ctx.currentTime + 0.1;
+      this.step = 0;
+      this.scheduleLoop();
+    },
+
+    stop() {
+      this.isPlaying = false;
+      if (this.timerId) {
+        clearTimeout(this.timerId);
+        this.timerId = null;
+      }
+    },
+
+    setMode(mode) {
+      this.mode = mode; // 'menu' | 'combat' | 'climax'
+    },
+
+    toggle() {
+      this.enabled = !this.enabled;
+      try { localStorage.setItem('battlebotx_bgm_enabled', String(this.enabled)); } catch(e){}
+      if (this.bgmGain && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.bgmGain.gain.setTargetAtTime(this.enabled ? 0.22 : 0.0001, now, 0.08);
+      }
+      this.updateUI();
+      return this.enabled;
+    },
+
+    updateUI() {
+      const menuBtn = document.getElementById('btn-menu-music');
+      const hudBtn = document.getElementById('btn-hud-music');
+      if (menuBtn) {
+        menuBtn.textContent = this.enabled ? '🎵 Music: ON' : '🔇 Music: OFF';
+        menuBtn.style.color = this.enabled ? '#38bdf8' : '#94a3b8';
+      }
+      if (hudBtn) {
+        hudBtn.textContent = this.enabled ? '🎵' : '🔇';
+        hudBtn.title = this.enabled ? 'Mute Music' : 'Unmute Music';
+        hudBtn.style.opacity = this.enabled ? '1.0' : '0.55';
+      }
+    },
+
+    scheduleLoop() {
+      if (!this.isPlaying || !this.ctx) return;
+      const secondsPer16th = (60.0 / this.tempo) / 4.0;
+      const lookahead = 0.12;
+
+      while (this.nextNoteTime < this.ctx.currentTime + lookahead) {
+        this.scheduleStep(this.step, this.nextNoteTime);
+        this.step = (this.step + 1) % 64; // 4-bar progression (16 steps * 4 = 64)
+        this.nextNoteTime += secondsPer16th;
+      }
+
+      this.timerId = setTimeout(() => this.scheduleLoop(), 40);
+    },
+
+    scheduleStep(step, time) {
+      if (!this.enabled && this.bgmGain && this.bgmGain.gain.value < 0.001) return;
+      const bar = Math.floor(step / 16);
+      const stepInBar = step % 16;
+      const isMenu = (this.mode === 'menu');
+      const isClimax = (this.mode === 'climax');
+
+      // 1. DRUMS (Kick, Snare, Hi-Hats)
+      const isKickStep = isMenu
+        ? (stepInBar === 0 || stepInBar === 8)
+        : (stepInBar === 0 || stepInBar === 4 || stepInBar === 8 || stepInBar === 12 || (isClimax && stepInBar === 14));
+
+      if (isKickStep) {
+        this.playKick(time, isMenu ? 0.18 : 0.38, isMenu ? 100 : 145);
+      }
+
+      if (!isMenu && (stepInBar === 4 || stepInBar === 12)) {
+        this.playSnare(time, isClimax ? 0.30 : 0.24);
+      }
+
+      if (!isMenu) {
+        const isOpen = (stepInBar === 2 || stepInBar === 6 || stepInBar === 10 || stepInBar === 14);
+        const isEvery = isClimax || (stepInBar % 2 === 0);
+        if (isEvery) {
+          this.playHat(time, isOpen ? 0.12 : 0.07, isOpen);
+        }
+      }
+
+      // 2. HEAVY INDUSTRIAL CYBERPUNK BASSLINE
+      // Bar 0: D (Root D1 = 36.71 Hz / D2 = 73.42 Hz)
+      // Bar 1: F (Root F1 = 43.65 Hz / F2 = 87.31 Hz)
+      // Bar 2: G (Root G1 = 49.00 Hz / G2 = 98.00 Hz)
+      // Bar 3: C -> A (C1 = 32.70 Hz, step >= 8: A0 = 27.50 Hz)
+      let rootHz = 36.71;
+      if (bar === 1) rootHz = 43.65;
+      else if (bar === 2) rootHz = 49.00;
+      else if (bar === 3) rootHz = (stepInBar < 8) ? 32.70 : 27.50;
+
+      const isOctave = (stepInBar % 2 === 1);
+      const bassFreq = isOctave ? rootHz * 2.0 : rootHz;
+
+      const cutoff = isMenu ? 260 : (isClimax ? 820 : 520);
+      const bassVol = isMenu ? 0.15 : (isKickStep ? 0.18 : 0.25); // Natural sidechain ducking on kick beats!
+      this.playBass(time, bassFreq, cutoff, bassVol);
+
+      // 3. MELODIC SYNTH ARPEGGIO & BATTLE HOOK
+      const arpNotes = [
+        146.83, 220.00, 293.66, 349.23,  220.00, 293.66, 349.23, 440.00,
+        146.83, 220.00, 293.66, 349.23,  293.66, 349.23, 440.00, 523.25,
+        174.61, 220.00, 261.63, 349.23,  220.00, 261.63, 349.23, 440.00,
+        174.61, 220.00, 261.63, 349.23,  261.63, 349.23, 440.00, 523.25,
+        196.00, 233.08, 293.66, 392.00,  233.08, 293.66, 392.00, 466.16,
+        196.00, 233.08, 293.66, 392.00,  293.66, 392.00, 466.16, 587.33,
+        164.81, 220.00, 261.63, 329.63,  220.00, 261.63, 329.63, 440.00,
+        220.00, 261.63, 329.63, 440.00,  261.63, 329.63, 440.00, 587.33
+      ];
+
+      if (stepInBar % 2 === 0 || (isClimax && stepInBar % 2 === 1)) {
+        const leadFreq = arpNotes[step % arpNotes.length];
+        this.playLead(time, leadFreq, isMenu ? 0.08 : (isClimax ? 0.17 : 0.12), isMenu);
+      }
+    },
+
+    playKick(time, vol = 0.35, startFreq = 145) {
+      if (!this.ctx || !this.bgmGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.frequency.setValueAtTime(startFreq, time);
+      osc.frequency.exponentialRampToValueAtTime(36, time + 0.08);
+
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+      osc.connect(gain);
+      gain.connect(this.bgmGain);
+
+      osc.start(time);
+      osc.stop(time + 0.10);
+    },
+
+    playSnare(time, vol = 0.25) {
+      if (!this.ctx || !this.bgmGain || !this.noiseBuffer) return;
+
+      const nNode = this.ctx.createBufferSource();
+      const nFilter = this.ctx.createBiquadFilter();
+      const nGain = this.ctx.createGain();
+      nNode.buffer = this.noiseBuffer;
+      nFilter.type = 'bandpass';
+      nFilter.frequency.setValueAtTime(1800, time);
+      nFilter.Q.setValueAtTime(2.0, time);
+      nGain.gain.setValueAtTime(vol, time);
+      nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+      nNode.connect(nFilter);
+      nFilter.connect(nGain);
+      nGain.connect(this.bgmGain);
+      nNode.start(time);
+      nNode.stop(time + 0.15);
+
+      const osc = this.ctx.createOscillator();
+      const oGain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(210, time);
+      osc.frequency.exponentialRampToValueAtTime(80, time + 0.06);
+      oGain.gain.setValueAtTime(vol * 0.7, time);
+      oGain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+      osc.connect(oGain);
+      oGain.connect(this.bgmGain);
+      osc.start(time);
+      osc.stop(time + 0.08);
+    },
+
+    playHat(time, vol = 0.09, isOpen = false) {
+      if (!this.ctx || !this.bgmGain || !this.noiseBuffer) return;
+      const node = this.ctx.createBufferSource();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+      node.buffer = this.noiseBuffer;
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(6800, time);
+      const dur = isOpen ? 0.09 : 0.035;
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      node.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.bgmGain);
+      node.start(time);
+      node.stop(time + dur + 0.01);
+    },
+
+    playBass(time, freq, cutoff = 520, vol = 0.24) {
+      if (!this.ctx || !this.bgmGain) return;
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, time);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(cutoff, time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.45), time + 0.10);
+      filter.Q.setValueAtTime(3.2, time);
+
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.11);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.bgmGain);
+
+      osc.start(time);
+      osc.stop(time + 0.12);
+    },
+
+    playLead(time, freq, vol = 0.12, isMenu = false) {
+      if (!this.ctx || !this.bgmGain) return;
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+
+      osc1.type = isMenu ? 'sine' : 'sawtooth';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(freq, time);
+      osc2.frequency.setValueAtTime(freq * 1.004, time);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(isMenu ? 900 : 1600, time);
+      filter.Q.setValueAtTime(2.2, time);
+
+      const dur = isMenu ? 0.22 : 0.14;
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.bgmGain);
+
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + dur + 0.02);
+      osc2.stop(time + dur + 0.02);
+    }
+  };
+
+  // ========================================================
   // 1. PROFESSIONAL REAL-TIME WEB AUDIO COMBAT ENGINE
   // ========================================================
   const AudioSys = {
@@ -1764,10 +2073,14 @@
           this.setupMasterChain();
           this.generateNoiseBuffer();
           this.initContinuousNodes();
+          BgmSys.init(this.ctx, this.masterGain, this.noiseBuffer);
+          BgmSys.start();
         }
       }
       if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume();
+        this.ctx.resume().then(() => {
+          if (!BgmSys.isPlaying) BgmSys.start();
+        });
       }
     },
 
@@ -4669,10 +4982,28 @@
   });
 
   window.AudioSys = AudioSys;
+  window.BgmSys = BgmSys;
   window.addRobotMeshOutline = addRobotMeshOutline;
   window.pollGamepadControls = pollGamepadControls;
   window.togglePlayerWeapon = togglePlayerWeapon;
   window.handleBotCollision = handleBotCollision;
+
+  // BGM Soundtrack Toggle Buttons (Menu & In-Game HUD)
+  const btnMenuMusic = document.getElementById('btn-menu-music');
+  if (btnMenuMusic) {
+    btnMenuMusic.addEventListener('click', () => {
+      AudioSys.init();
+      BgmSys.toggle();
+    });
+  }
+
+  const btnHudMusic = document.getElementById('btn-hud-music');
+  if (btnHudMusic) {
+    btnHudMusic.addEventListener('click', () => {
+      AudioSys.init();
+      BgmSys.toggle();
+    });
+  }
 
   // HUD Side Dock Toggle (Left / Right)
   const btnDockToggle = document.getElementById('btn-dock-toggle');
@@ -5707,6 +6038,7 @@
   function endMatch(playerWon, isDraw = false, isKO = true) {
     if (matchState === 'gameover') return;
     matchState = 'gameover';
+    BgmSys.setMode('menu');
     AudioSys.arenaBuzzer();
     AudioSys.stopCombatAudio();
 
@@ -6870,6 +7202,15 @@
       } else {
         enemyWeaponGlow.intensity = 0;
       }
+    }
+
+    // Adaptive BGM Intensity (Climax mode when either bot < 30% HP or flaming)
+    if (matchState === 'playing' || matchState === 'countdown') {
+      const pLow = playerBot && (playerBot.driveHealth < 30 || (typeof isBotFlaming === 'function' && isBotFlaming(playerBot)));
+      const eLow = enemyBot && (enemyBot.driveHealth < 30 || (typeof isBotFlaming === 'function' && isBotFlaming(enemyBot)));
+      BgmSys.setMode((pLow || eLow) ? 'climax' : 'combat');
+    } else {
+      BgmSys.setMode('menu');
     }
 
     // Dynamic Real-Time Combat Audio (Weapon wind-up scream, drive motors hum, floor drift)
