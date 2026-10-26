@@ -209,24 +209,6 @@
     }
   });
 
-  window.AudioSys = AudioSys;
-  window.BgmSys = BgmSys;
-  window.addRobotMeshOutline = addRobotMeshOutline;
-  window.pollGamepadControls = pollGamepadControls;
-  window.togglePlayerWeapon = togglePlayerWeapon;
-  window.handleBotCollision = (...args) => (typeof handleBotCollision === 'function' ? handleBotCollision(...args) : null);
-  window.camera = camera;
-  window.getMenuCameraMode = () => menuCameraMode;
-  window.getMatchState = () => matchState;
-  window.setMatchState = (s) => { matchState = s; };
-  window.ensureBotModelLoaded = ensureBotModelLoaded;
-  window.getBotScene = getBotScene;
-  window.scene = scene;
-  window.renderer = renderer;
-  window.createBotInstance = (...args) => (typeof createBotInstance === 'function' ? createBotInstance(...args) : null);
-  window.attachCadToRobot1 = attachCadToRobot1;
-  window.attachCadToRobot2 = attachCadToRobot2;
-  window.attachCadToRobot6 = attachCadToRobot6;
 
   // BGM Soundtrack Toggle Buttons (Menu & In-Game HUD)
   const btnMenuMusic = document.getElementById('btn-menu-music');
