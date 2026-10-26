@@ -1048,14 +1048,16 @@
   }
 
   // ========================================================
-  // 10.5 MENU AI EXHIBITION BATTLE SYSTEM
+  // 10.5 MENU AI EXHIBITION BATTLE SYSTEM (ANTI-CIRCLING LEAD PURSUIT)
   // ========================================================
   const MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
   let menuP1Type = 'robot1';
   let menuP2Type = 'robot2';
   let menuRespawnCooldown = 0.0;
+  let menuCirclingTimer = 0.0;
+  let menuCircleBreakPhase = 0.0;
 
-  function driveMenuBotAI(bot, target, dt) {
+  function driveMenuBotAI(bot, target, dt, isP1) {
     if (!bot || !target) return;
     if (bot.driveHealth <= 0 || bot.flipped) {
       bot.throttleInput = 0;
@@ -1063,44 +1065,84 @@
       return;
     }
 
-    const dx = target.x - bot.x;
-    const dz = target.z - bot.z;
+    // 1. Predictive Interception (Lead Pursuit)
+    // Cuts across the opponent's circle instead of tail-chasing behind them
+    const rawDx = target.x - bot.x;
+    const rawDz = target.z - bot.z;
+    const dist = Math.hypot(rawDx, rawDz);
+
+    // Dynamic lead factor: higher at range to intercept, tighter when closing in to punch through
+    const targetSpeed = Math.hypot(target.vx || 0, target.vz || 0);
+    const leadFactor = (dist < 2.5) ? 0.08 : Math.min(0.52, dist / 11.0);
+
+    // Subtle asymmetric path bias: P1 cuts inside-left, P2 cuts inside-right to guarantee collision
+    const perpX = -(target.vz || 0) * (isP1 ? 0.16 : -0.16);
+    const perpZ = (target.vx || 0) * (isP1 ? 0.16 : -0.16);
+
+    const aimX = target.x + (target.vx || 0) * leadFactor + perpX;
+    const aimZ = target.z + (target.vz || 0) * leadFactor + perpZ;
+
+    const dx = aimX - bot.x;
+    const dz = aimZ - bot.z;
     const targetYaw = Math.atan2(dx, dz);
+
     let diff = targetYaw - bot.yaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
 
-    const dist = Math.hypot(dx, dz);
-    const weaponReady = ((bot.weaponSpinSpeed || 0) >= 35.0);
-
-    // If weapon stalled on impact and close, reverse briefly to build kinetic RPM
-    if (!weaponReady && dist < 2.4) {
-      bot.throttleInput = -0.60;
-      bot.steerInput = Math.sin(performance.now() * 0.003) > 0 ? 0.70 : -0.70;
+    // 2. Anti-Circling Detector & Circle Breaker
+    // If bots circle between 1.2m and 4.8m for > 0.85s without an impact, break the orbit immediately
+    if (dist < 4.8 && dist > 1.2) {
+      menuCirclingTimer += dt;
+      if (menuCirclingTimer > 0.85) {
+        menuCircleBreakPhase = 0.65; // Trigger 0.65s forced collision break
+        menuCirclingTimer = 0;
+      }
     } else {
-      // Steer smoothly towards target
-      const steerTarget = Math.max(-1, Math.min(1, -diff * 2.2));
-      bot.steerInput += (steerTarget - bot.steerInput) * Math.min(1, dt * 6.0);
+      menuCirclingTimer = Math.max(0, menuCirclingTimer - dt * 2.0);
+    }
 
-      // Aggressive charge scaling
-      if (Math.abs(diff) < 0.45) {
-        bot.throttleInput = 1.0; // Full kinetic charge
-      } else if (Math.abs(diff) < 1.0) {
-        bot.throttleInput = 0.70;
+    if (menuCircleBreakPhase > 0) {
+      // Circle Break: One bot commits to a direct center line charge, the other cuts hard inward
+      if (isP1) {
+        bot.steerInput = 0;
+        bot.throttleInput = 1.0;
       } else {
-        bot.throttleInput = 0.38;
+        bot.steerInput = Math.max(-1, Math.min(1, -diff * 3.4));
+        bot.throttleInput = 1.0;
+      }
+      return;
+    }
+
+    // 3. Close-Quarters Ramming Commitment (Distance < 3.2m)
+    // NEVER reverse away! Commit 100% full forward throttle directly into opponent!
+    if (dist < 3.2) {
+      bot.steerInput = Math.max(-1, Math.min(1, -diff * 2.8));
+      bot.throttleInput = 1.0; // Floor throttle into opponent chassis!
+    } else {
+      // Mid / Long-Range High-Aggression Pursuit
+      const steerTarget = Math.max(-1, Math.min(1, -diff * 2.5));
+      bot.steerInput += (steerTarget - bot.steerInput) * Math.min(1, dt * 7.5);
+
+      if (Math.abs(diff) < 0.65) {
+        bot.throttleInput = 1.0; // Kinetic charge
+      } else if (Math.abs(diff) < 1.25) {
+        bot.throttleInput = 0.85; // High-speed intercept
+      } else {
+        bot.throttleInput = 0.55; // Quick turn to face
       }
     }
 
-    // Keep within arena bounds (turn back toward center if approaching kickplates)
-    const wallBound = ARENA_HALF - 1.6;
+    // 4. Arena Boundary Bounce-Back
+    // Prevent bots from grinding along walls: turn forcefully back toward center arena
+    const wallBound = ARENA_HALF - 1.5;
     if (Math.abs(bot.x) > wallBound || Math.abs(bot.z) > wallBound) {
       const centerYaw = Math.atan2(-bot.x, -bot.z);
       let cDiff = centerYaw - bot.yaw;
       while (cDiff > Math.PI) cDiff -= Math.PI * 2;
       while (cDiff < -Math.PI) cDiff += Math.PI * 2;
-      bot.steerInput = Math.max(-1, Math.min(1, -cDiff * 2.5));
-      bot.throttleInput = Math.max(0.5, bot.throttleInput);
+      bot.steerInput = Math.max(-1, Math.min(1, -cDiff * 3.0));
+      bot.throttleInput = Math.max(0.75, bot.throttleInput);
     }
   }
 
@@ -1328,8 +1370,9 @@
       if (!playerBot || !enemyBot) {
         startMenuDemoFight();
       } else {
-        driveMenuBotAI(playerBot, enemyBot, simDt);
-        driveMenuBotAI(enemyBot, playerBot, simDt);
+        if (menuCircleBreakPhase > 0) menuCircleBreakPhase -= dt;
+        driveMenuBotAI(playerBot, enemyBot, simDt, true);
+        driveMenuBotAI(enemyBot, playerBot, simDt, false);
         updateBotPhysics(playerBot, simDt);
         updateBotPhysics(enemyBot, simDt);
         handleBotCollision();
