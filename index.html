@@ -103,6 +103,14 @@
       transition: opacity 0.2s ease, visibility 0.2s;
     }
 
+    /* Main Menu Screen: Transparent background allowing the 3D flying arena to shine through */
+    #menu-screen {
+      background: radial-gradient(circle at center, rgba(11, 17, 27, 0.12) 0%, rgba(6, 9, 15, 0.45) 100%);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      pointer-events: auto;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -110,15 +118,24 @@
     .menu-card {
       width: 100%;
       max-width: 480px;
-      background: rgba(12, 17, 26, 0.96);
-      border: 1px solid var(--panel-border);
+      background: rgba(12, 17, 26, 0.84);
+      border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 22px;
-      padding: 30px 26px 22px;
+      padding: 26px 26px 20px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 40px rgba(224, 83, 83, 0.1);
+      gap: 16px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 35px rgba(56, 189, 248, 0.14);
       animation: cardFadeIn 0.35s ease-out;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #menu-screen .menu-card.minimized {
+      opacity: 0;
+      transform: scale(0.92) translateY(24px);
+      pointer-events: none;
     }
 
     @keyframes cardFadeIn {
@@ -735,10 +752,27 @@
       transition: transform 0.1s, background 0.15s;
     }
 
-        .menu-music-btn {
+    .menu-top-left-bar {
       position: absolute;
       top: 18px;
-      right: 160px;
+      left: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 60;
+    }
+
+    .menu-top-right-bar {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 60;
+    }
+
+    .menu-nav-btn {
       background: rgba(15, 23, 42, 0.88);
       border: 1px solid rgba(56, 189, 248, 0.45);
       color: #38bdf8;
@@ -752,19 +786,20 @@
       gap: 6px;
       cursor: pointer;
       z-index: 60;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
       transition: all 0.2s ease;
       touch-action: manipulation;
     }
-    .menu-music-btn:hover {
+    .menu-nav-btn:hover {
       background: rgba(30, 41, 59, 0.95);
       border-color: #38bdf8;
+      color: #ffffff;
       transform: translateY(-1px);
     }
-    .menu-fullscreen-btn {
-      position: absolute;
-      top: 18px;
-      right: 18px;
+
+    .menu-music-btn, .menu-fullscreen-btn {
       background: rgba(15, 23, 42, 0.88);
       border: 1px solid rgba(56, 189, 248, 0.45);
       color: #38bdf8;
@@ -777,18 +812,60 @@
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      z-index: 35;
+      z-index: 60;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      transition: all 0.15s ease;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      transition: all 0.2s ease;
+      touch-action: manipulation;
     }
-
-    .menu-fullscreen-btn:hover {
-      background: rgba(56, 189, 248, 0.22);
+    .menu-music-btn:hover, .menu-fullscreen-btn:hover {
+      background: rgba(30, 41, 59, 0.95);
       border-color: #38bdf8;
       color: #ffffff;
       transform: translateY(-1px);
+    }
+
+    .menu-restore-pill {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92);
+      border: 1.5px solid #38bdf8;
+      color: #38bdf8;
+      border-radius: 9999px;
+      padding: 10px 24px;
+      font-family: inherit;
+      font-size: 0.90rem;
+      font-weight: 800;
+      cursor: pointer;
+      z-index: 70;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.35);
+      animation: pulseGlow 2s infinite ease-in-out;
+      transition: transform 0.2s ease;
+    }
+    .menu-restore-pill:hover {
+      transform: translateX(-50%) scale(1.05);
+      background: rgba(30, 41, 59, 0.98);
+      color: #ffffff;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.25); }
+      50% { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 28px rgba(56, 189, 248, 0.55); }
+    }
+
+    @media (max-width: 680px) {
+      .menu-top-left-bar, .menu-top-right-bar {
+        top: 10px;
+        gap: 6px;
+      }
+      .menu-top-left-bar { left: 10px; }
+      .menu-top-right-bar { right: 10px; }
+      .menu-nav-btn, .menu-music-btn, .menu-fullscreen-btn {
+        padding: 6px 10px;
+        font-size: 0.72rem;
+      }
     }
 
     .mobile-rotate-banner {
@@ -1233,8 +1310,15 @@
 
   <!-- MAIN MENU OVERLAY -->
   <div id="menu-screen" class="overlay-screen">
-    <button id="btn-menu-music" class="menu-music-btn" type="button" title="Toggle Background Music">🎵 Music: ON</button>
-    <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
+    <div class="menu-top-left-bar">
+      <button id="btn-menu-spectate" class="menu-nav-btn" type="button" title="Hide/Show Menu UI to view Arena">👁 Spectate Arena</button>
+      <button id="btn-menu-camera" class="menu-nav-btn" type="button" title="Cycle Camera Angle">🎥 Angle: <strong>Dynamic Tour</strong></button>
+    </div>
+    <div class="menu-top-right-bar">
+      <button id="btn-menu-music" class="menu-music-btn" type="button" title="Toggle Background Music">🎵 Music: ON</button>
+      <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
+    </div>
+    <button id="btn-menu-restore" class="menu-restore-pill hidden" type="button">✕ Return to Menu</button>
     <div class="menu-card">
       <h1 class="menu-title">BATTLEBOTx</h1>
 
@@ -3409,43 +3493,57 @@
   // 6. Overhead combat lighting is provided by roofSpot1 and roofSpot2 directly above.
 
   function updateArenaWallTransparency(dt) {
-    if (!playerBot) return;
-
-    const px = playerBot.x;
-    const pz = playerBot.z;
     const cx = camera.position.x;
     const cz = camera.position.z;
 
     for (let i = 0; i < arenaWallMeshes.length; i++) {
       const w = arenaWallMeshes[i];
-      // Normal points outward
-      const pDot = px * w.nx + pz * w.nz;
-      const pDist = ARENA_HALF - pDot;
-
-      let eDist = 999;
-      if (enemyBot) {
-        const eDot = enemyBot.x * w.nx + enemyBot.z * w.nz;
-        eDist = ARENA_HALF - eDot;
-      }
-
-      const cDot = cx * w.nx + cz * w.nz;
-      const cDist = ARENA_HALF - cDot;
-
-      // Distance from closest bot to this wall
-      const minBotDist = Math.min(pDist, eDist);
-
       let targetOpacity = 0.28;
 
-      // When robot is close to wall (< 3.2 units), fade even more transparent (0.08)
-      if (minBotDist < 3.2) {
-        const proximity = Math.max(0, Math.min(1, minBotDist / 3.2));
-        targetOpacity = Math.min(targetOpacity, 0.08 + 0.20 * proximity);
-      }
+      if (playerBot) {
+        const px = playerBot.x;
+        const pz = playerBot.z;
+        // Normal points outward
+        const pDot = px * w.nx + pz * w.nz;
+        const pDist = ARENA_HALF - pDot;
 
-      // When camera is on the other side looking through or close to this wall
-      if (cDist < 3.0 || (cDot > pDot && cDot > ARENA_HALF - 2.5)) {
-        const camProximity = Math.max(0, Math.min(1, Math.max(0, cDist) / 3.0));
-        targetOpacity = Math.min(targetOpacity, 0.02 + 0.18 * camProximity);
+        let eDist = 999;
+        if (enemyBot) {
+          const eDot = enemyBot.x * w.nx + enemyBot.z * w.nz;
+          eDist = ARENA_HALF - eDot;
+        }
+
+        const cDot = cx * w.nx + cz * w.nz;
+        const cDist = ARENA_HALF - cDot;
+
+        // Distance from closest bot to this wall
+        const minBotDist = Math.min(pDist, eDist);
+
+        // When robot is close to wall (< 3.2 units), fade even more transparent (0.08)
+        if (minBotDist < 3.2) {
+          const proximity = Math.max(0, Math.min(1, minBotDist / 3.2));
+          targetOpacity = Math.min(targetOpacity, 0.08 + 0.20 * proximity);
+        }
+
+        // When camera is on the other side looking through or close to this wall
+        if (cDist < 3.0 || (cDot > pDot && cDot > ARENA_HALF - 2.5)) {
+          const camProximity = Math.max(0, Math.min(1, Math.max(0, cDist) / 3.0));
+          targetOpacity = Math.min(targetOpacity, 0.02 + 0.18 * camProximity);
+        }
+      } else {
+        // Menu cinematic flyover mode:
+        // When camera is outside looking inward, fade whichever wall is between the camera and center
+        const cDot = cx * w.nx + cz * w.nz;
+        if (cDot > 0) { // Camera is on the outer side of this wall
+          const distToWall = cDot - ARENA_HALF;
+          if (distToWall > -2.0 && distToWall < 9.0) {
+            targetOpacity = 0.04; // Transparent so interior arena, lighting & floor are crystal clear!
+          } else {
+            targetOpacity = 0.15;
+          }
+        } else {
+          targetOpacity = 0.22;
+        }
       }
 
       w.currentOpacity += (targetOpacity - w.currentOpacity) * Math.min(1, dt * 8.0);
@@ -3453,7 +3551,11 @@
 
       // When North wall is transparent to camera, fade the banner on the North wall too
       if (w.nz < -0.9 && billboardMat) {
-        billboardMat.opacity = Math.max(0.08, w.currentOpacity);
+        if (!playerBot) {
+          billboardMat.opacity = (cz < -ARENA_HALF) ? Math.max(0.08, w.currentOpacity) : 0.95;
+        } else {
+          billboardMat.opacity = Math.max(0.08, w.currentOpacity);
+        }
       }
     }
   }
@@ -4987,6 +5089,9 @@
   window.pollGamepadControls = pollGamepadControls;
   window.togglePlayerWeapon = togglePlayerWeapon;
   window.handleBotCollision = handleBotCollision;
+  window.camera = camera;
+  window.getMenuCameraMode = () => menuCameraMode;
+  window.getMatchState = () => matchState;
 
   // BGM Soundtrack Toggle Buttons (Menu & In-Game HUD)
   const btnMenuMusic = document.getElementById('btn-menu-music');
@@ -5002,6 +5107,55 @@
     btnHudMusic.addEventListener('click', () => {
       AudioSys.init();
       BgmSys.toggle();
+    });
+  }
+
+  // Menu Spectate & Camera Controls
+  const btnMenuSpectate = document.getElementById('btn-menu-spectate');
+  const btnMenuRestore = document.getElementById('btn-menu-restore');
+  const btnMenuCamera = document.getElementById('btn-menu-camera');
+  const menuCardEl = document.querySelector('#menu-screen .menu-card');
+
+  function toggleMenuSpectate(minimized) {
+    if (!menuCardEl) return;
+    const isMin = (typeof minimized === 'boolean') ? minimized : !menuCardEl.classList.contains('minimized');
+    if (isMin) {
+      menuCardEl.classList.add('minimized');
+      if (btnMenuRestore) btnMenuRestore.classList.remove('hidden');
+      if (btnMenuSpectate) btnMenuSpectate.innerHTML = '👁 Show Menu';
+    } else {
+      menuCardEl.classList.remove('minimized');
+      if (btnMenuRestore) btnMenuRestore.classList.add('hidden');
+      if (btnMenuSpectate) btnMenuSpectate.innerHTML = '👁 Spectate Arena';
+    }
+  }
+
+  if (btnMenuSpectate) {
+    btnMenuSpectate.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenuSpectate();
+    });
+  }
+  if (btnMenuRestore) {
+    btnMenuRestore.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenuSpectate(false);
+    });
+  }
+
+  const menuScreenEl = document.getElementById('menu-screen');
+  if (menuScreenEl) {
+    menuScreenEl.addEventListener('click', (e) => {
+      if (e.target === menuScreenEl && menuCardEl && menuCardEl.classList.contains('minimized')) {
+        toggleMenuSpectate(false);
+      }
+    });
+  }
+
+  if (btnMenuCamera) {
+    btnMenuCamera.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cycleMenuCameraMode();
     });
   }
 
@@ -5918,6 +6072,9 @@
   async function startMatchSequence() {
     AudioSys.init();
     cleanupBots();
+    smoothCameraInitialized = false;
+    menuCamInitialized = false;
+    if (typeof toggleMenuSpectate === 'function') toggleMenuSpectate(false);
 
     // 1. Force hide the main menu screen and every overlay/modal
     const menuEl = document.getElementById('menu-screen');
@@ -7007,7 +7164,125 @@
     }
   }
 
+  // ========================================================
+  // CINEMATIC ARENA FLYOVER CAMERA SYSTEM (MAIN MENU)
+  // ========================================================
+  let menuCamTime = 0;
+  let menuCameraMode = 'tour'; // 'tour' (default), 'broadcast', 'lowglide', 'stage', 'topdown'
+  const menuCamTargetPos = new THREE.Vector3();
+  const menuCamTargetLook = new THREE.Vector3();
+  let menuCamInitialized = false;
+
+  const MENU_CAMERA_MODES = [
+    { id: 'tour', label: 'Dynamic Tour' },
+    { id: 'broadcast', label: 'High Stadium' },
+    { id: 'lowglide', label: 'Low Floor Glide' },
+    { id: 'stage', label: 'North Stage' },
+    { id: 'topdown', label: 'Aerial Crane' }
+  ];
+  let menuCameraModeIdx = 0;
+
+  function cycleMenuCameraMode() {
+    menuCameraModeIdx = (menuCameraModeIdx + 1) % MENU_CAMERA_MODES.length;
+    menuCameraMode = MENU_CAMERA_MODES[menuCameraModeIdx].id;
+    const btn = document.getElementById('btn-menu-camera');
+    if (btn) {
+      btn.innerHTML = `🎥 Angle: <strong>${MENU_CAMERA_MODES[menuCameraModeIdx].label}</strong>`;
+    }
+  }
+
+  function updateMenuCamera(dt) {
+    menuCamTime += dt;
+    const t = menuCamTime * 0.22;
+
+    if (menuCameraMode === 'tour') {
+      // Dynamic undulating 360-degree flyover:
+      // Smoothly swoops between low floor skimming (2.6m) and high stadium crane (18.5m),
+      // undulating radius (12.0m to 19.5m), dynamically tracking floor decals, stage screen, and corners.
+      const orbitAngle = t;
+      const radius = 15.6 + Math.sin(t * 1.5) * 2.8 + Math.cos(t * 0.5) * 1.2;
+      const rawH = 10.5 + Math.sin(t * 1.0 - 0.5) * 7.2 + Math.cos(t * 2.0) * 3.2;
+      const height = Math.max(2.6, rawH);
+
+      menuCamTargetPos.set(
+        Math.cos(orbitAngle) * radius,
+        height,
+        Math.sin(orbitAngle) * radius
+      );
+
+      // Look-at point drifts dynamically across arena highlights
+      menuCamTargetLook.set(
+        Math.sin(t * 1.2) * 3.2,
+        0.8 + Math.max(0, Math.sin(t * 0.8 + 1.0)) * 1.6,
+        Math.cos(t * 0.9) * 3.5 - 1.2
+      );
+    } else if (menuCameraMode === 'broadcast') {
+      // High-angle sweeping stadium broadcast orbit
+      const orbitAngle = t * 0.85;
+      const radius = 17.5;
+      const height = 13.5 + Math.sin(t * 0.6) * 2.0;
+      menuCamTargetPos.set(
+        Math.cos(orbitAngle) * radius,
+        height,
+        Math.sin(orbitAngle) * radius
+      );
+      menuCamTargetLook.set(0, 0.6, -1.0);
+    } else if (menuCameraMode === 'lowglide') {
+      // Dramatic low floor glide skimming just above kickplates
+      const orbitAngle = t * 1.1;
+      const radius = 13.5;
+      const height = 3.0 + Math.sin(t * 1.4) * 0.6;
+      menuCamTargetPos.set(
+        Math.cos(orbitAngle) * radius,
+        height,
+        Math.sin(orbitAngle) * radius
+      );
+      menuCamTargetLook.set(
+        Math.sin(orbitAngle + 0.6) * 2.5,
+        1.2,
+        Math.cos(orbitAngle + 0.6) * 2.5
+      );
+    } else if (menuCameraMode === 'stage') {
+      // Stage & Billboard spotlight framing from the South/Southeast
+      const swayAngle = Math.sin(t * 0.7) * 0.45;
+      const radius = 16.5;
+      menuCamTargetPos.set(
+        Math.sin(swayAngle) * radius,
+        6.5 + Math.sin(t * 0.5) * 1.5,
+        Math.cos(swayAngle) * radius
+      );
+      menuCamTargetLook.set(0, 3.5, -ARENA_HALF + 0.5); // Framing North stage billboard
+    } else if (menuCameraMode === 'topdown') {
+      // High aerial crane overview with slow majestic rotation
+      const driftAngle = t * 0.4;
+      const driftRad = 4.0;
+      menuCamTargetPos.set(
+        Math.cos(driftAngle) * driftRad,
+        22.5 + Math.sin(t * 0.3) * 1.5,
+        Math.sin(driftAngle) * driftRad
+      );
+      menuCamTargetLook.set(0, 0, 0);
+    }
+
+    if (!menuCamInitialized) {
+      camera.position.copy(menuCamTargetPos);
+      currentCamLookTarget.copy(menuCamTargetLook);
+      camera.lookAt(currentCamLookTarget);
+      menuCamInitialized = true;
+    } else {
+      // Butter-smooth interpolation for camera position and look target
+      camera.position.lerp(menuCamTargetPos, Math.min(1, dt * 3.5));
+      currentCamLookTarget.lerp(menuCamTargetLook, Math.min(1, dt * 3.5));
+      camera.lookAt(currentCamLookTarget);
+    }
+  }
+
   function updateCamera(dt) {
+    if (matchState === 'menu') {
+      updateMenuCamera(dt);
+      return;
+    }
+
     const activeTargetBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
     if (!activeTargetBot) {
       camera.position.set(0, 20, 18);
