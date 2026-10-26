@@ -149,13 +149,58 @@
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
+    .menu-brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+
+    .menu-brand-logo {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 4px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      border: 1.5px solid rgba(253, 201, 17, 0.7);
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .menu-brand-logo:hover {
+      transform: scale(1.08);
+    }
+
     .menu-title {
+      flex: 1;
       text-align: center;
-      font-size: 2.35rem;
+      font-size: 2.15rem;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: #ffffff;
       text-shadow: 0 4px 18px rgba(0,0,0,0.7);
+      margin: 0;
+    }
+
+    .menu-footer-logos {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-footer-logo {
+      height: 28px;
+      width: 28px;
+      object-fit: contain;
+      border-radius: 6px;
+      background: #ffffff;
+      padding: 2px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(253, 201, 17, 0.6);
+      flex-shrink: 0;
     }
 
     .hero-illustration {
@@ -1353,7 +1398,11 @@
     </div>
     <button id="btn-menu-restore" class="menu-restore-pill hidden" type="button">✕ Return to Menu</button>
     <div class="menu-card">
-      <h1 class="menu-title">BATTLEBOTx</h1>
+      <div class="menu-brand-header">
+        <img class="menu-brand-logo" src="logo_aifarm.png" alt="AI FARM ROBOTICS" title="AI FARM ROBOTICS" />
+        <h1 class="menu-title">BATTLEBOTx</h1>
+        <img class="menu-brand-logo" src="Picture1.png" alt="BATTLEBOTx" title="BATTLEBOTx" />
+      </div>
 
       <div class="hero-illustration">
         <img class="hero-cover-img" src="cover_robot1_robot2.png?v=headtohead" alt="BATTLEBOTx Championship Clash" />
@@ -1388,9 +1437,13 @@
       </nav>
 
       <footer class="menu-footer">
+        <div class="menu-footer-logos">
+          <img class="menu-footer-logo" src="logo_aifarm.png" alt="AI FARM ROBOTICS" title="AI FARM ROBOTICS" />
+          <img class="menu-footer-logo" src="Picture1.png" alt="BATTLEBOTx" title="BATTLEBOTx" />
+        </div>
         <div class="event-copy">
-          <strong style="color:#38bdf8; font-size:0.95rem; letter-spacing:0.06em;">AI FARM</strong>
-          <span style="color:var(--text-muted); font-size:0.75rem;">COMBAT ROBOTICS ARENA</span>
+          <strong style="color:#38bdf8; font-size:0.95rem; letter-spacing:0.06em;">AI FARM ROBOTICS</strong>
+          <span style="color:var(--text-muted); font-size:0.75rem;">COMBAT ARENA</span>
         </div>
         <div class="event-brand">BATTLEBOTx</div>
       </footer>
@@ -3532,13 +3585,13 @@
 
       // Draw BATTLEBOTx Logo emblem with white background
       if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const logoW = 150;
+        const logoW = 146;
         const logoH = Math.round(logoW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
         const badgePad = 8;
         const badgeW = logoW + badgePad * 2;
         const badgeH = logoH + badgePad * 2;
         const badgeX = cx - badgeW / 2;
-        const badgeY = cy - badgeH / 2 - 34;
+        const badgeY = cy - badgeH / 2 - 76;
 
         ctx.save();
         ctx.fillStyle = '#ffffff';
@@ -3556,7 +3609,7 @@
         ctx.stroke();
 
         ctx.clip();
-        ctx.drawImage(bbxImg, cx - logoW / 2, cy - logoH / 2 - 34, logoW, logoH);
+        ctx.drawImage(bbxImg, cx - logoW / 2, badgeY + badgePad, logoW, logoH);
         ctx.restore();
       } else {
         // Fallback procedural chevron
@@ -3564,11 +3617,11 @@
         ctx.strokeStyle = '#7d973c';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(cx - 50, cy - 70);
-        ctx.lineTo(cx + 40, cy - 35);
-        ctx.lineTo(cx - 10, cy - 35);
-        ctx.lineTo(cx + 40, cy);
-        ctx.lineTo(cx - 50, cy);
+        ctx.moveTo(cx - 50, cy - 100);
+        ctx.lineTo(cx + 40, cy - 65);
+        ctx.lineTo(cx - 10, cy - 65);
+        ctx.lineTo(cx + 40, cy - 30);
+        ctx.lineTo(cx - 50, cy - 30);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
       }
@@ -3585,17 +3638,8 @@
       ctx.shadowOffsetY = 3;
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 46px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx', cx, cy + 64);
-
-      // Official Combat Arena Subtitle
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '800 15px Orbitron, sans-serif';
-      ctx.fillText('OFFICIAL COMBAT ARENA', cx, cy + 104);
-
-      ctx.fillStyle = 'rgba(203, 213, 225, 0.70)';
-      ctx.font = '700 12px Orbitron, sans-serif';
-      ctx.fillText('4x4m TOURNAMENT ARENA', cx, cy + 128);
+      ctx.font = '900 44px Orbitron, sans-serif';
+      ctx.fillText('BATTLEBOTx', cx, cy + 58);
       ctx.restore();
     };
 
@@ -3616,76 +3660,90 @@
     const bbxImg = new Image();
     bbxImg.src = 'logo_battlebotx.png';
 
+    const aifarmImg = new Image();
+    aifarmImg.src = 'logo_aifarm.png';
+
     const renderBillboard = () => {
       // Stage LED Big Screen Background
       ctx.fillStyle = '#060a12';
       ctx.fillRect(0, 0, 2048, 512);
 
-      // Glowing border frame
+      // Glowing outer border frame
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 10;
       ctx.strokeRect(24, 16, 2000, 480);
 
-      // Header: Tournament Title
+      // Inner accent frame
+      ctx.strokeStyle = 'rgba(253, 201, 17, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(38, 30, 1972, 452);
+
+      // Center Branding Content (Clean Esports Broadcast, No 4x4m / Official Tournament text)
+      ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 42px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx CHAMPIONSHIP', 1024, 95);
+
+      // Header: AI FARM ROBOTICS
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '800 46px Orbitron, sans-serif';
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
+      ctx.shadowBlur = 14;
+      ctx.fillText('AI FARM ROBOTICS', 1024, 135);
 
       // Main Logo Title: Exact Casing BATTLEBOTx
       ctx.fillStyle = '#ef4444';
-      ctx.font = '900 96px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx', 1024, 205);
+      ctx.font = '900 110px Orbitron, sans-serif';
+      ctx.shadowColor = 'rgba(239, 68, 68, 0.7)';
+      ctx.shadowBlur = 22;
+      ctx.fillText('BATTLEBOTx', 1024, 275);
 
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '700 36px Orbitron, sans-serif';
-      ctx.fillText('4x4m TOURNAMENT ARENA', 1024, 280);
-
-      // High-Performance Combat Championship
+      // Spec subtitle
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '600 28px Orbitron, sans-serif';
-      ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 1024, 355);
-
-      // Footer: Tournament Series
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 34px Orbitron, sans-serif';
-      ctx.fillText('OFFICIAL TOURNAMENT ARENA', 1024, 430);
+      ctx.font = '700 32px Orbitron, sans-serif';
+      ctx.fillText('HIGH-PERFORMANCE COMBAT ROBOTICS', 1024, 390);
+      ctx.restore();
 
       // Symmetrical Flank Logos: Calibrated for True Square in 3D Space
-      // Plane 3D Aspect Ratio is 22.9957 / 5.8500 = 3.9309.
-      // Canvas is 2048 x 512 (4.0).
-      // Badge of 218px wide x 214px tall on canvas projects to a 100% exact 2.45m x 2.45m square in 3D!
-      if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const badgeW = 228;
-        const badgeH = 214;
-        const pad = 10;
-        const imgW = badgeW - pad * 2;
-        const imgH = badgeH - pad * 2;
+      // Plane 3D Aspect Ratio is 22.9957 / 5.8500 = 3.9309. Canvas is 2048 x 512 (4.0).
+      // Badge of 218px width x 214px height on canvas projects to a 100% exact square in 3D camera space!
+      const badgeW = 218;
+      const badgeH = 214;
+      const pad = 12;
+      const imgW = badgeW - pad * 2;
+      const imgH = badgeH - pad * 2;
 
-        [240, 1808].forEach(posX => {
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.strokeStyle = '#fdc911';
-          ctx.lineWidth = 3.5;
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-          ctx.shadowBlur = 12;
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(posX - badgeW / 2, 256 - badgeH / 2, badgeW, badgeH, 16);
-          } else {
-            ctx.rect(posX - badgeW / 2, 256 - badgeH / 2, badgeW, badgeH);
-          }
-          ctx.fill();
-          ctx.stroke();
-          ctx.clip();
-          ctx.drawImage(bbxImg, posX - imgW / 2, 256 - imgH / 2, imgW, imgH);
-          ctx.restore();
-        });
-      }
+      const drawBadge = (img, posX, posY) => {
+        if (!img.complete || img.naturalWidth === 0) return;
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#fdc911';
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(posX - badgeW / 2, posY - badgeH / 2, badgeW, badgeH, 16);
+        } else {
+          ctx.rect(posX - badgeW / 2, posY - badgeH / 2, badgeW, badgeH);
+        }
+        ctx.fill();
+        ctx.stroke();
+        ctx.clip();
+        ctx.drawImage(img, posX - imgW / 2, posY - imgH / 2, imgW, imgH);
+        ctx.restore();
+      };
+
+      // Left Flank: AI FARM ROBOTICS Logo
+      drawBadge(aifarmImg, 240, 256);
+
+      // Right Flank: BATTLEBOTx Logo
+      drawBadge(bbxImg, 1808, 256);
     };
 
     bbxImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
+    aifarmImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
     renderBillboard();
 
     return tex;
