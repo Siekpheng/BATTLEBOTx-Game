@@ -69,23 +69,11 @@
     let curr = mesh;
     while (curr) {
       const n = (curr.name || '').toLowerCase();
+      if (n.includes('weapon')) return false;
       if (n.includes('wheel') || n.includes('tire') || n.includes('rim') || n.startsWith('wheel') || n.startsWith('belt_wheel') || n.includes('pulley')) {
         return true;
       }
       curr = curr.parent;
-    }
-    const name = (mesh.name || '').toLowerCase();
-    if (name === 'chassis_mesh_1' || name === 'chassis_mesh_2' || name === 'chassis_mesh_4' || name === 'chassis_mesh_8' || name === 'chassis_mesh_9' || name === 'chassis_mesh_10') {
-      return true;
-    }
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const m of mats) {
-      if (m && m.name) {
-        const mn = m.name.toLowerCase();
-        if (mn.includes('rubber') || mn.includes('tire') || mn.includes('rim') || mn.includes('tread')) {
-          return true;
-        }
-      }
     }
     return false;
   }
@@ -209,18 +197,26 @@
       }
       mesh._hasOutline = false;
 
-      // Darken white ABS rim material on wheels to industrial dark titanium
-      // Completely removes any white circular outline or ring appearance on wheels
+      // Make ALL robot wheels sleek industrial tactical black:
+      // Tires (rubber/treads): Deep matte black #101216 (0x101216, roughness 0.82, metalness 0.04)
+      // Rims / Hubs / Spokes / Hardware: Sleek anodized black titanium #15181e (0x15181e, roughness 0.35, metalness 0.48)
       mats.forEach(mat => {
-        if (mat && (
-          (mat.name && mat.name.includes('ABS')) ||
-          (mat.color && (mat.color.r > 0.82 && mat.color.g > 0.82 && mat.color.b > 0.82))
-        )) {
-          mat.color.setHex(0x222834);
-          mat.roughness = 0.38;
-          mat.metalness = 0.45;
-          mat.needsUpdate = true;
+        if (!mat) return;
+        const matName = (mat.name || '').toLowerCase();
+        const isTire = matName.includes('rubber') || matName.includes('tire') || matName.includes('tread') || matName.includes('55,55,55');
+        if (isTire) {
+          mat.color.setHex(0x101216);
+          mat.roughness = 0.82;
+          mat.metalness = 0.04;
+        } else {
+          mat.color.setHex(0x15181e);
+          mat.roughness = 0.35;
+          mat.metalness = 0.48;
         }
+        if (mat.emissive) {
+          mat.emissive.setHex(0x020305);
+        }
+        mat.needsUpdate = true;
       });
       return;
     }
