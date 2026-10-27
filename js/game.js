@@ -213,9 +213,9 @@
 
     if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
     if (gameMode === '1v1') {
-      titleEl.textContent = '1V1 BATTLE · SELECT BOTH ROBOTS';
-      p1Label.textContent = 'PLAYER 1 ROBOT (WASD TO DRIVE)';
-      oppLabel.textContent = 'PLAYER 2 ROBOT (ARROW KEYS TO DRIVE · SAME ROBOT ALLOWED)';
+      titleEl.textContent = '1V1 LOCAL BATTLE · SELECT ROBOTS & READY UP';
+      p1Label.textContent = 'PLAYER 1 ROBOT';
+      oppLabel.textContent = 'PLAYER 2 ROBOT';
     } else if (gameMode === 'vs_bot') {
       titleEl.textContent = 'VS BOT · SELECT YOUR ROBOT';
       p1Label.textContent = 'YOUR ROBOT';
@@ -225,6 +225,9 @@
       p1Label.textContent = 'YOUR ROBOT';
       oppLabel.textContent = 'TARGET DUMMY ROBOT (SAME ROBOT ALLOWED)';
     }
+    if (typeof Local1v1State !== 'undefined') {
+      Local1v1State.reset();
+    }
   }
 
   document.getElementById('btn-1v1-local').addEventListener('click', () => {
@@ -233,6 +236,13 @@
     updateControlsHint();
     refreshSelectModalLabels();
     modalSelect.classList.remove('hidden');
+    if (typeof Local1v1State !== 'undefined') {
+      Local1v1State.reset();
+    }
+    if (typeof GamepadUINav !== 'undefined') {
+      GamepadUINav.activeContainerId = null;
+      GamepadUINav.ensureValidFocus();
+    }
   });
 
   document.getElementById('btn-1v1-close').addEventListener('click', () => {
@@ -385,7 +395,11 @@
 
 
   document.getElementById('btn-select-close').addEventListener('click', () => {
-    modalSelect.classList.add('hidden');
+    if (typeof exitSelectToMainMenu === 'function') {
+      exitSelectToMainMenu();
+    } else {
+      modalSelect.classList.add('hidden');
+    }
   });
 
   function updateControlsHint() {
@@ -413,6 +427,9 @@
       if (selectedBotType && typeof ensureBotModelLoaded === 'function') {
         ensureBotModelLoaded(selectedBotType);
       }
+      if (typeof Local1v1State !== 'undefined') {
+        Local1v1State.setP1Ready(false);
+      }
     });
   });
 
@@ -426,6 +443,9 @@
       selectedP2BotType = card.dataset.p2bot;
       if (selectedP2BotType && selectedP2BotType !== 'random' && typeof ensureBotModelLoaded === 'function') {
         ensureBotModelLoaded(selectedP2BotType);
+      }
+      if (typeof Local1v1State !== 'undefined') {
+        Local1v1State.setP2Ready(false);
       }
     });
   });
@@ -646,6 +666,13 @@
   });
 
   document.getElementById('btn-start-match').addEventListener('click', () => {
+    if (gameMode === '1v1' && typeof Local1v1State !== 'undefined') {
+      if (!Local1v1State.isBothReady()) {
+        Local1v1State.setP1Ready(true);
+        Local1v1State.setP2Ready(true);
+        return;
+      }
+    }
     autoFullscreenOnMobile();
     modalSelect.classList.add('hidden');
     menuScreen.classList.add('hidden');

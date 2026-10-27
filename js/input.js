@@ -636,23 +636,15 @@
     if (playerIndex === 0 && typeof GamepadMapper !== 'undefined') {
       GamepadMapper.pollActivityAndAutoMap(0.016);
     }
+
+    // In any game mode other than 1v1, only Controller 1 can drive.
+    // Controller 2 cannot drive or take over in vs_bot, practice, or online.
+    if (playerIndex !== 0 && (typeof gameMode === 'undefined' || gameMode !== '1v1')) {
+      return null;
+    }
+
     const pad = GamepadMapper.getPadForPlayer(playerIndex);
     const primaryRes = readSinglePadControls(pad, playerIndex);
-
-    // In Single-Player modes (vs_bot / practice), if the mapped slot has no input,
-    // also check all other connected gamepads so any active controller always works!
-    if (playerIndex === 0 && (typeof gameMode === 'undefined' || gameMode !== '1v1')) {
-      if (!primaryRes || !primaryRes.hasInput) {
-        const pads = getConnectedGamepadsList();
-        for (let i = 0; i < pads.length; i++) {
-          if (pads[i] === pad) continue;
-          const altRes = readSinglePadControls(pads[i], 0);
-          if (altRes && altRes.hasInput) {
-            return altRes;
-          }
-        }
-      }
-    }
     return primaryRes;
   }
 
@@ -1008,6 +1000,159 @@
 
 
   // ========================================================
+  // DUAL CONTROLLER 1V1 READY STATE MANAGER
+  // ========================================================
+  const Local1v1State = {
+    p1Ready: false,
+    p2Ready: false,
+    autoStartTimer: null,
+
+    isBothReady() {
+      return this.p1Ready && this.p2Ready;
+    },
+
+    setP1Ready(val) {
+      const boolVal = !!val;
+      if (this.p1Ready === boolVal) return;
+      this.p1Ready = boolVal;
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(this.p1Ready ? 740 : 360, 0.06);
+      }
+      this.updateUI();
+      this.checkBothReady();
+    },
+
+    setP2Ready(val) {
+      const boolVal = !!val;
+      if (this.p2Ready === boolVal) return;
+      this.p2Ready = boolVal;
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(this.p2Ready ? 740 : 360, 0.06);
+      }
+      this.updateUI();
+      this.checkBothReady();
+    },
+
+    toggleP1Ready() {
+      this.setP1Ready(!this.p1Ready);
+    },
+
+    toggleP2Ready() {
+      this.setP2Ready(!this.p2Ready);
+    },
+
+    reset() {
+      this.p1Ready = false;
+      this.p2Ready = false;
+      if (this.autoStartTimer) {
+        clearTimeout(this.autoStartTimer);
+        this.autoStartTimer = null;
+      }
+      this.updateUI();
+    },
+
+    checkBothReady() {
+      if (this.autoStartTimer) {
+        clearTimeout(this.autoStartTimer);
+        this.autoStartTimer = null;
+      }
+      if (this.isBothReady()) {
+        if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+          AudioSys.init();
+          AudioSys.beep(880, 0.12);
+        }
+        this.autoStartTimer = setTimeout(() => {
+          this.autoStartTimer = null;
+          if (this.isBothReady()) {
+            const btnStart = document.getElementById('btn-start-match');
+            if (btnStart) {
+              btnStart.click();
+            }
+          }
+        }, 400);
+      }
+    },
+
+    updateUI() {
+      const is1v1 = (typeof gameMode !== 'undefined' && gameMode === '1v1');
+      const badgeP1 = document.getElementById('p1-ready-badge');
+      const badgeP2 = document.getElementById('p2-ready-badge');
+      const btnStart = document.getElementById('btn-start-match');
+
+      if (!is1v1) {
+        if (badgeP1) badgeP1.style.display = 'none';
+        if (badgeP2) badgeP2.style.display = 'none';
+        if (btnStart) {
+          btnStart.classList.remove('both-ready', 'waiting-ready');
+          btnStart.innerHTML = 'START MATCH &nbsp;➔';
+        }
+        return;
+      }
+
+      if (badgeP1) {
+        badgeP1.style.display = 'inline-flex';
+        if (this.p1Ready) {
+          badgeP1.className = 'ready-badge ready';
+          badgeP1.innerHTML = '✓ P1 READY!';
+        } else {
+          badgeP1.className = 'ready-badge not-ready';
+          badgeP1.innerHTML = '🎮 P1: PRESS [A] TO READY';
+        }
+      }
+
+      if (badgeP2) {
+        badgeP2.style.display = 'inline-flex';
+        if (this.p2Ready) {
+          badgeP2.className = 'ready-badge ready';
+          badgeP2.innerHTML = '✓ P2 READY!';
+        } else {
+          badgeP2.className = 'ready-badge not-ready';
+          badgeP2.innerHTML = '🎮 P2: PRESS [A] TO READY';
+        }
+      }
+
+      if (btnStart) {
+        if (this.isBothReady()) {
+          btnStart.classList.add('both-ready');
+          btnStart.classList.remove('waiting-ready');
+          btnStart.innerHTML = '✓ BOTH READY · START MATCH ➔';
+        } else {
+          btnStart.classList.remove('both-ready');
+          btnStart.classList.add('waiting-ready');
+          const count = (this.p1Ready ? 1 : 0) + (this.p2Ready ? 1 : 0);
+          btnStart.innerHTML = `🎮 WAITING FOR BOTH PLAYERS (${count}/2 READY)`;
+        }
+      }
+    }
+  };
+  window.Local1v1State = Local1v1State;
+
+  function exitSelectToMainMenu() {
+    if (typeof Local1v1State !== 'undefined') {
+      Local1v1State.reset();
+    }
+    const modalSelect = document.getElementById('modal-select');
+    const modal1v1 = document.getElementById('modal-1v1');
+    const menuScreen = document.getElementById('menu-screen');
+    if (modalSelect) modalSelect.classList.add('hidden');
+    if (modal1v1) modal1v1.classList.add('hidden');
+    if (menuScreen) menuScreen.classList.remove('hidden');
+    if (typeof matchState !== 'undefined') matchState = 'menu';
+    if (typeof gameMode !== 'undefined') gameMode = 'bot';
+    if (typeof GamepadUINav !== 'undefined') {
+      GamepadUINav.clearFocus();
+      GamepadUINav.ensureValidFocus();
+    }
+    if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+      AudioSys.init();
+      AudioSys.beep(360, 0.08);
+    }
+  }
+  window.exitSelectToMainMenu = exitSelectToMainMenu;
+
+  // ========================================================
   // 7.6 CONTROLLER UI & MENU NAVIGATION ENGINE (1 & 2 CONTROLLERS)
   // Navigate all menus, modals, and robot cards with D-Pad / Left Stick,
   // [A / Cross] to Select, [B / Circle] to Go Back, [Start] to Launch Match!
@@ -1016,6 +1161,7 @@
     focusedEl: null,
     activeContainerId: null,
     navCooldown: 0,
+    p2NavCooldown: 0,
     prevPadStates: [
       { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
       { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
@@ -1256,6 +1402,22 @@
       return false;
     },
 
+    cycleP1BotDirect(step) {
+      const modalSelect = document.getElementById('modal-select');
+      if (!modalSelect || modalSelect.classList.contains('hidden')) return false;
+      const cards = Array.from(modalSelect.querySelectorAll('#p1-bot-selector .bot-card'));
+      if (cards.length === 0) return false;
+      let idx = cards.findIndex(c => c.classList.contains('selected'));
+      if (idx < 0) idx = 0;
+      idx = (idx + step + cards.length) % cards.length;
+      cards[idx].click();
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(580, 0.04);
+      }
+      return true;
+    },
+
     cycleP2BotDirect(step) {
       const modalSelect = document.getElementById('modal-select');
       if (!modalSelect || modalSelect.classList.contains('hidden')) return false;
@@ -1308,14 +1470,36 @@
       if (this.navCooldown > 0) {
         this.navCooldown = Math.max(0, this.navCooldown - dt);
       }
+      if (this.p2NavCooldown > 0) {
+        this.p2NavCooldown = Math.max(0, this.p2NavCooldown - dt);
+      }
 
       const isMappingModal = (container.id === 'modal-select' || container.id === 'modal-pause');
+      const is1v1Select = (container.id === 'modal-select' && typeof gameMode !== 'undefined' && gameMode === '1v1');
+
+      const p1PadIndex = (typeof window.gamepadPlayerMap !== 'undefined' && typeof window.gamepadPlayerMap.p1 === 'number' && window.gamepadPlayerMap.p1 >= 0)
+        ? window.gamepadPlayerMap.p1
+        : 0;
+      const p2PadIndex = (typeof window.gamepadPlayerMap !== 'undefined' && typeof window.gamepadPlayerMap.p2 === 'number' && window.gamepadPlayerMap.p2 >= 0)
+        ? window.gamepadPlayerMap.p2
+        : 1;
 
       for (let pIdx = 0; pIdx < Math.min(4, pads.length); pIdx++) {
         const pad = pads[pIdx];
         if (!pad) continue;
+
+        const isP1Pad = (pIdx === p1PadIndex);
+        const isP2Pad = (pIdx === p2PadIndex);
+
+        // REQUIREMENT:
+        // In the Main Menu (#menu-screen) and any non-1v1 mode (vs_bot, practice, online), ONLY Controller 1 can navigate.
+        // Controller 2 is strictly ignored.
+        if (!is1v1Select && !isP1Pad) {
+          continue;
+        }
+
         if (!this.prevPadStates[pIdx]) {
-          this.prevPadStates[pIdx] = { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null };
+          this.prevPadStates[pIdx] = { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, lt: false, rt: false, dir: null };
         }
         const prev = this.prevPadStates[pIdx];
         const b = pad.buttons || [];
@@ -1326,15 +1510,11 @@
         const lbPressed = !!(b[4] && (b[4].pressed || b[4].value > 0.5));
         const rbPressed = !!(b[5] && (b[5].pressed || b[5].value > 0.5));
         const startPressed = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
+        const ltPressed = !!(b[6] && (b[6].pressed || b[6].value > 0.6));
+        const rtPressed = !!(b[7] && (b[7].pressed || b[7].value > 0.6));
         const dir = this.readPadDir(pad);
 
         // Quick Controller Mapping Shortcuts on Robot Select & Pause Modals:
-        // - Press [LB] on any controller -> Assigns that controller to PLAYER 1 (P1)
-        // - Press [RB] on any controller -> Assigns that controller to PLAYER 2 (P2)
-        // - Press [Y] on any controller  -> Swaps P1 <-> P2 Controllers
-        const ltPressed = !!(b[6] && (b[6].pressed || b[6].value > 0.6));
-        const rtPressed = !!(b[7] && (b[7].pressed || b[7].value > 0.6));
-
         if (isMappingModal && typeof GamepadMapper !== 'undefined') {
           if ((lbPressed && !prev.lb) || (ltPressed && !prev.lt)) {
             GamepadMapper.setPlayerPad(0, pIdx);
@@ -1349,22 +1529,95 @@
         prev.lt = ltPressed;
         prev.rt = rtPressed;
 
-        const isMappedToP2 = (typeof gamepadPlayerMap !== 'undefined' && gamepadPlayerMap.p2 === pIdx && gamepadPlayerMap.p1 !== pIdx);
-
-        // When a controller is mapped to P2 on the Robot Select screen (#modal-select) and another controller or keyboard is P1,
-        // P2's controller Left/Right directly cycles Player 2's robot selection card!
-        if (isMappedToP2 && container.id === 'modal-select' && pads.length >= 2 && (dir === 'left' || dir === 'right')) {
-          if (dir !== prev.dir || this.navCooldown <= 0) {
-            this.cycleP2BotDirect(dir === 'right' ? 1 : -1);
-            this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
+        // ========================================================
+        // 1V1 LOCAL SELECT MODAL: DUAL CONTROLLER FLOW
+        // Controller 1 navigates & readies P1; Controller 2 navigates & readies P2.
+        // Both players must be ready to start. Back [B] from either returns to Main Menu.
+        // ========================================================
+        if (is1v1Select) {
+          if (isP1Pad) {
+            // Controller 1 navigates P1 Robot Selection cards
+            if (dir === 'left' || dir === 'right') {
+              if (dir !== prev.dir || this.navCooldown <= 0) {
+                this.cycleP1BotDirect(dir === 'right' ? 1 : -1);
+                if (typeof Local1v1State !== 'undefined') {
+                  Local1v1State.setP1Ready(false);
+                }
+                this.navCooldown = (dir !== prev.dir) ? 0.24 : 0.16;
+              }
+            }
+            // Controller 1 confirms: Toggle P1 Ready
+            if (aPressed && !prev.a) {
+              if (typeof Local1v1State !== 'undefined') {
+                Local1v1State.toggleP1Ready();
+              }
+            }
+            // Controller 1 Back [B]: Return to Main Menu
+            if (bPressed && !prev.b) {
+              exitSelectToMainMenu();
+            }
+            // Controller 1 Start: If both ready, start match; else toggle P1 ready
+            if (startPressed && !prev.start) {
+              if (typeof Local1v1State !== 'undefined' && Local1v1State.isBothReady()) {
+                const startBtn = document.getElementById('btn-start-match');
+                if (startBtn) startBtn.click();
+              } else if (typeof Local1v1State !== 'undefined') {
+                Local1v1State.toggleP1Ready();
+              }
+            }
           }
-        } else if (dir) {
+
+          if (isP2Pad && (!isP1Pad || pads.length >= 2)) {
+            // Controller 2 navigates P2 Robot Selection cards
+            if (dir === 'left' || dir === 'right') {
+              if (dir !== prev.dir || this.p2NavCooldown <= 0) {
+                this.cycleP2BotDirect(dir === 'right' ? 1 : -1);
+                if (typeof Local1v1State !== 'undefined') {
+                  Local1v1State.setP2Ready(false);
+                }
+                this.p2NavCooldown = (dir !== prev.dir) ? 0.24 : 0.16;
+              }
+            }
+            // Controller 2 confirms: Toggle P2 Ready
+            if (aPressed && !prev.a) {
+              if (typeof Local1v1State !== 'undefined') {
+                Local1v1State.toggleP2Ready();
+              }
+            }
+            // Controller 2 Back [B]: Return to Main Menu
+            if (bPressed && !prev.b) {
+              exitSelectToMainMenu();
+            }
+            // Controller 2 Start: If both ready, start match; else toggle P2 ready
+            if (startPressed && !prev.start) {
+              if (typeof Local1v1State !== 'undefined' && Local1v1State.isBothReady()) {
+                const startBtn = document.getElementById('btn-start-match');
+                if (startBtn) startBtn.click();
+              } else if (typeof Local1v1State !== 'undefined') {
+                Local1v1State.toggleP2Ready();
+              }
+            }
+          }
+
+          prev.a = aPressed;
+          prev.b = bPressed;
+          prev.y = yPressed;
+          prev.lb = lbPressed;
+          prev.rb = rbPressed;
+          prev.start = startPressed;
+          prev.dir = dir;
+          continue;
+        }
+
+        // ========================================================
+        // STANDARD SINGLE-CONTROLLER MODAL & MENU NAVIGATION
+        // ========================================================
+        if (dir) {
           if (dir !== prev.dir || this.navCooldown <= 0) {
             this.moveFocus(dir);
             this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
           }
         }
-
         if (aPressed && !prev.a) {
           this.confirmSelection();
         }
@@ -1392,3 +1645,68 @@
   }
   window.GamepadUINav = GamepadUINav;
   window.updateGamepadMenuNavigation = updateGamepadMenuNavigation;
+
+  // 1v1 Local Select Keyboard & Click Listeners
+  window.addEventListener('keydown', (e) => {
+    const modalSelect = document.getElementById('modal-select');
+    const is1v1Select = modalSelect && !modalSelect.classList.contains('hidden') && typeof gameMode !== 'undefined' && gameMode === '1v1';
+    if (!is1v1Select) return;
+
+    if (e.code === 'KeyA') {
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.cycleP1BotDirect(-1);
+        if (typeof Local1v1State !== 'undefined') Local1v1State.setP1Ready(false);
+      }
+    } else if (e.code === 'KeyD') {
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.cycleP1BotDirect(1);
+        if (typeof Local1v1State !== 'undefined') Local1v1State.setP1Ready(false);
+      }
+    } else if (e.code === 'Space' || e.code === 'KeyF') {
+      e.preventDefault();
+      if (!e.repeat && typeof Local1v1State !== 'undefined') Local1v1State.toggleP1Ready();
+    } else if (e.code === 'ArrowLeft') {
+      e.preventDefault();
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.cycleP2BotDirect(-1);
+        if (typeof Local1v1State !== 'undefined') Local1v1State.setP2Ready(false);
+      }
+    } else if (e.code === 'ArrowRight') {
+      e.preventDefault();
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.cycleP2BotDirect(1);
+        if (typeof Local1v1State !== 'undefined') Local1v1State.setP2Ready(false);
+      }
+    } else if (e.code === 'Enter' || e.code === 'Numpad0') {
+      e.preventDefault();
+      if (!e.repeat && typeof Local1v1State !== 'undefined') Local1v1State.toggleP2Ready();
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      if (typeof exitSelectToMainMenu === 'function') exitSelectToMainMenu();
+    }
+  });
+
+  function initReadyBadgeClicks() {
+    const p1Badge = document.getElementById('p1-ready-badge');
+    if (p1Badge && !p1Badge._hasClickListener) {
+      p1Badge._hasClickListener = true;
+      p1Badge.style.cursor = 'pointer';
+      p1Badge.addEventListener('click', () => {
+        if (typeof Local1v1State !== 'undefined') Local1v1State.toggleP1Ready();
+      });
+    }
+    const p2Badge = document.getElementById('p2-ready-badge');
+    if (p2Badge && !p2Badge._hasClickListener) {
+      p2Badge._hasClickListener = true;
+      p2Badge.style.cursor = 'pointer';
+      p2Badge.addEventListener('click', () => {
+        if (typeof Local1v1State !== 'undefined') Local1v1State.toggleP2Ready();
+      });
+    }
+  }
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initReadyBadgeClicks);
+  } else {
+    initReadyBadgeClicks();
+  }
+

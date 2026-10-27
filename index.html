@@ -54,7 +54,7 @@
   </script>
 
   <!-- Custom Game Styles & Keyframe Animations -->
-  <link rel="stylesheet" href="css/style.css?v=20261027j" />
+  <link rel="stylesheet" href="css/style.css?v=20261027k" />
 </head>
 <body class="hide-touch-controls">
 <div id="app">
@@ -299,8 +299,11 @@
         </div>
       </div>
 
-      <div id="p1-select-label" style="font-size: 0.82rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.08em; margin-bottom: 6px; text-transform: uppercase;">
-        PLAYER 1 ROBOT
+      <div class="bot-select-row-header">
+        <div id="p1-select-label" style="font-size: 0.82rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.08em; text-transform: uppercase;">
+          PLAYER 1 ROBOT
+        </div>
+        <div id="p1-ready-badge" class="ready-badge not-ready" style="display:none;" title="Press [A] on Controller #1 or [Space] on Keyboard to Ready Up">🎮 P1: PRESS [A] TO READY</div>
       </div>
 
       <!-- 5 Selectable Robot Cards -->
@@ -426,8 +429,11 @@
 
             <!-- OPPONENT / PLAYER 2 SELECTION (Supports picking the same robot for mirror match) -->
       <div id="opponent-select-section" style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 10px;">
-        <div id="opponent-select-label" style="font-size: 0.82rem; font-weight: 700; color: #f87171; letter-spacing: 0.08em; margin-bottom: 6px; text-transform: uppercase;">
-          OPPONENT ROBOT (SAME ROBOT ALLOWED)
+        <div class="bot-select-row-header">
+          <div id="opponent-select-label" style="font-size: 0.82rem; font-weight: 700; color: #f87171; letter-spacing: 0.08em; text-transform: uppercase;">
+            OPPONENT ROBOT (SAME ROBOT ALLOWED)
+          </div>
+          <div id="p2-ready-badge" class="ready-badge not-ready" style="display:none;" title="Press [A] on Controller #2 or [Enter] on Keyboard to Ready Up">🎮 P2: PRESS [A] TO READY</div>
         </div>
         <div class="bot-grid" id="p2-bot-selector">
           <!-- Mini bot choices for P2 / Opponent -->
@@ -641,14 +647,14 @@
 
 
   <!-- Modular Game Engine Scripts -->
-  <script src="js/state.js?v=20261027j"></script>
-  <script src="js/audio.js?v=20261027j"></script>
-  <script src="js/arena.js?v=20261027j"></script>
-  <script src="js/particles.js?v=20261027j"></script>
-  <script src="js/robots.js?v=20261027j"></script>
-  <script src="js/physics.js?v=20261027j"></script>
-  <script src="js/input.js?v=20261027j"></script>
-  <script src="js/network.js?v=20261027j"></script>
-  <script src="js/game.js?v=20261027j"></script>
+  <script src="js/state.js?v=20261027k"></script>
+  <script src="js/audio.js?v=20261027k"></script>
+  <script src="js/arena.js?v=20261027k"></script>
+  <script src="js/particles.js?v=20261027k"></script>
+  <script src="js/robots.js?v=20261027k"></script>
+  <script src="js/physics.js?v=20261027k"></script>
+  <script src="js/input.js?v=20261027k"></script>
+  <script src="js/network.js?v=20261027k"></script>
+  <script src="js/game.js?v=20261027k"></script>
 </body>
 </html>
