@@ -138,9 +138,9 @@
         ctx.lineTo(pts[1][0], pts[1][1]);
         ctx.lineTo(pts[2][0], pts[2][1]);
         ctx.closePath();
-        ctx.fillStyle = '#cfd3dc';
+        ctx.fillStyle = '#737884'; // Gray like the rest of the arena floor
         ctx.fill();
-        ctx.strokeStyle = '#252932';
+        ctx.strokeStyle = '#252932'; // Clean dark steel perimeter seam
         ctx.lineWidth = 4;
         ctx.stroke();
         ctx.restore();
@@ -209,10 +209,10 @@
         drawBolt(W - margin - 12, by);
       }
 
-      // 5. Team Starting Boxes
-      // Top Red Starting Box (North)
-      const redW = 320, redH = 320;
-      const redX = cx - redW / 2, redY = margin;
+      // 5. Team Starting Boxes (Generous 340x340 tournament boxes centered at Z = +/-9.626)
+      // Top Red Starting Box (North, Enemy / P2 Starting Position)
+      const redW = 340, redH = 340;
+      const redX = cx - redW / 2, redY = margin + 12;
       ctx.save();
       ctx.fillStyle = '#b23630';
       ctx.fillRect(redX, redY, redW, redH);
@@ -225,9 +225,9 @@
       ctx.strokeRect(redX + 4, redY + 4, redW - 8, redH - 8);
       ctx.restore();
 
-      // Bottom Green Starting Box (South)
-      const greenW = 320, greenH = 320;
-      const greenX = cx - greenW / 2, greenY = H - margin - greenH;
+      // Bottom Green Starting Box (South, Player 1 Starting Position)
+      const greenW = 340, greenH = 340;
+      const greenX = cx - greenW / 2, greenY = H - margin - 12 - greenH;
       ctx.save();
       ctx.fillStyle = '#2e7d32';
       ctx.fillRect(greenX, greenY, greenW, greenH);
@@ -370,7 +370,7 @@
         ctx.restore();
       }
 
-      // 10. Khmer Text Above Center: "សង្គ្រាម រ៉ូបូត"
+      // 10. Khmer Text Above Center: "សង្វៀន រ៉ូបូត" (Robot Arena)
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -379,7 +379,7 @@
       ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
       ctx.shadowBlur = 6;
       ctx.shadowOffsetY = 2;
-      ctx.fillText('សង្គ្រាម រ៉ូបូត', cx, 590);
+      ctx.fillText('សង្វៀន រ៉ូបូត', cx, 590);
       ctx.restore();
 
       // 11. English Text Below Center: "BATTLEBOTx"

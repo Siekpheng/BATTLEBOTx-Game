@@ -783,8 +783,8 @@
       if (loadingOverlay) loadingOverlay.classList.add('hidden');
     }
 
-    playerBot = createBotInstance(botTypeChoice, -7.5, 0, Math.PI / 2);
-    enemyBot = createBotInstance(enemyType, 7.5, 0, -Math.PI / 2);
+    playerBot = createBotInstance(botTypeChoice, 0, 9.626, Math.PI);
+    enemyBot = createBotInstance(enemyType, 0, -9.626, 0);
 
     // If mirror match (same robot), give the opponent a distinct rival red livery
     if (playerBot.type === enemyBot.type) {
@@ -1189,6 +1189,10 @@
         camY += wallNear * 1.5;
       }
 
+      const maxCamCoord = ARENA_HALF + 2.5;
+      camX = Math.max(-maxCamCoord, Math.min(maxCamCoord, camX));
+      camZ = Math.max(-maxCamCoord, Math.min(maxCamCoord, camZ));
+
       desiredPos.set(camX, camY, camZ);
 
       const forwardLead = 4.8;
@@ -1454,8 +1458,8 @@
     if (!menuP1Type) menuP1Type = 'robot1';
     if (!menuP2Type) menuP2Type = 'robot2';
 
-    playerBot = createBotInstance(menuP1Type, -7.5, 0, Math.PI / 2);
-    enemyBot = createBotInstance(menuP2Type, 7.5, 0, -Math.PI / 2);
+    playerBot = createBotInstance(menuP1Type, 0, 9.626, Math.PI);
+    enemyBot = createBotInstance(menuP2Type, 0, -9.626, 0);
 
     playerBot.weaponActive = true;
     enemyBot.weaponActive = true;
@@ -1504,8 +1508,8 @@
 
       cleanupBots();
 
-      playerBot = createBotInstance(menuP1Type, -7.5, 0, Math.PI / 2);
-      enemyBot = createBotInstance(menuP2Type, 7.5, 0, -Math.PI / 2);
+      playerBot = createBotInstance(menuP1Type, 0, 9.626, Math.PI);
+      enemyBot = createBotInstance(menuP2Type, 0, -9.626, 0);
 
       playerBot.weaponActive = true;
       enemyBot.weaponActive = true;
