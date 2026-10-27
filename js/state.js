@@ -11,7 +11,9 @@ var enemyScore = 0;
 var cameraMode = 0;
 var cameraModeP2 = 0;
 var bothCantFightTimer = 0.0;
-var mutualStallTimer = 0.0; // 0: Follow Direction, 1: Tactical Chase, 2: Top-down, 3: Full Broadcast
+var mutualStallTimer = 0.0;
+var combatEngageTimer = 0.0;
+var gamepadPlayerMap = { p1: 0, p2: 1 }; // Maps Player 1 & Player 2 to connected controller slot (0, 1, ...) or -1 for Keyboard Only
 var cameraHeight = 19.5;
 var cameraDistance = 12.0;
 

@@ -211,6 +211,7 @@
     const oppLabel = document.getElementById('opponent-select-label');
     if (!titleEl || !p1Label || !oppLabel) return;
 
+    if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
     if (gameMode === '1v1') {
       titleEl.textContent = '1V1 BATTLE · SELECT BOTH ROBOTS';
       p1Label.textContent = 'PLAYER 1 ROBOT (WASD TO DRIVE)';
@@ -794,8 +795,11 @@
     }
 
     matchTimeRemaining = 180;
+    bothCantFightTimer = 0.0;
+    combatEngageTimer = 0.0;
     totalDestructionCelebrationTimer = 0.0;
     pendingGameOverData = null;
+    if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
     updateTimerDisplay();
     document.getElementById('flip-warning-container').classList.add('hidden');
     hud.classList.remove('hidden');

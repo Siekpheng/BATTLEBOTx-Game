@@ -582,6 +582,17 @@
       const rvz = playerBot.vz - enemyBot.vz;
       const impactSpeed = Math.hypot(rvx, rvz);
 
+      // Active Combat Engagement ("No Mercy"):
+      // Whenever the two robots collide or strike each other during a match,
+      // immediately reset the 10-second Referee KO / Draw countdowns and hold a 2.5s engagement grace window
+      // so the attacking robot can keep fighting for No Mercy Total Destruction without a premature KO count-out!
+      if (typeof matchState !== 'undefined' && matchState === 'playing' && impactSpeed > 0.3) {
+        combatEngageTimer = 2.5;
+        if (playerBot) playerBot.stoppedTimer = 0.0;
+        if (enemyBot) enemyBot.stoppedTimer = 0.0;
+        bothCantFightTimer = 0.0;
+      }
+
       // Record pre-impact speeds and approach velocities before impulse dampens them
       const pSpeedBefore = Math.hypot(playerBot.vx, playerBot.vz);
       const eSpeedBefore = Math.hypot(enemyBot.vx, enemyBot.vz);
@@ -957,8 +968,8 @@
             const pIsAttacker = (pApproach > 1.2 && pApproach > eApproach * 1.15);
             const eIsAttacker = (eApproach > 1.2 && eApproach > pApproach * 1.15);
 
-            if (pIsAttacker && playerBot.weaponActive !== false) {
-              // Player rammed Enemy with active weapon: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
+            if (pIsAttacker && (playerBot.weaponActive !== false || playerBot.weaponDestroyed)) {
+              // Player rammed Enemy: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
               if (impactSpeed > 4.2) {
                 enemyBot.vy = 0;
                 enemyBot.airY = 0;
@@ -968,8 +979,8 @@
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
-            } else if (eIsAttacker && enemyBot.weaponActive !== false) {
-              // Enemy rammed Player with active weapon: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
+            } else if (eIsAttacker && (enemyBot.weaponActive !== false || enemyBot.weaponDestroyed)) {
+              // Enemy rammed Player: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
               triggerDamageVignette();
               if (impactSpeed > 4.2) {
                 playerBot.vy = 0;
@@ -980,7 +991,7 @@
               if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
               }
-            } else if (playerBot.weaponActive !== false && enemyBot.weaponActive !== false) {
+            } else if ((playerBot.weaponActive !== false || playerBot.weaponDestroyed) && (enemyBot.weaponActive !== false || enemyBot.weaponDestroyed)) {
               // Mutual bumper crunch: detach 1 part on hard collision
               if (impactSpeed > 4.5) {
                 detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
@@ -1038,8 +1049,14 @@
     // - Flipped onto back/side (cannot drive)
     // - All drive wheels detached (cannot translate)
     // - Drive burnout / power lost (drivePower <= 0 or driveHealth <= 0)
+    if (typeof combatEngageTimer !== 'number') combatEngageTimer = 0.0;
+    if (combatEngageTimer > 0) {
+      combatEngageTimer = Math.max(0.0, combatEngageTimer - dt);
+    }
+
     const pSpeed = Math.hypot(playerBot.vx || 0, playerBot.vz || 0);
     const eSpeed = Math.hypot(enemyBot.vx || 0, enemyBot.vz || 0);
+    const distBetweenBots = Math.hypot((playerBot.x || 0) - (enemyBot.x || 0), (playerBot.z || 0) - (enemyBot.z || 0));
 
     const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
     const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
@@ -1050,17 +1067,35 @@
     const isPImmobilized = !!playerBot.flipped || pNoWheels || pNoDrive;
     const isEImmobilized = !!enemyBot.flipped || eNoWheels || eNoDrive;
 
-    const isPStopped = isPImmobilized && (pSpeed < 1.8 || (playerBot.stoppedTimer || 0) > 0.1 || (bothCantFightTimer || 0) > 0.1);
-    const isEStopped = isEImmobilized && (eSpeed < 1.8 || (enemyBot.stoppedTimer || 0) > 0.1 || (bothCantFightTimer || 0) > 0.1);
+    const pThrottleActive = Math.abs(playerBot.throttleInput || 0) > 0.1 || Math.abs(playerBot.steerInput || 0) > 0.15;
+    const eThrottleActive = Math.abs(enemyBot.throttleInput || 0) > 0.1 || Math.abs(enemyBot.steerInput || 0) > 0.15;
+
+    // Active Fighting / "No Mercy" Detection:
+    // If one robot is immobilized and the other mobile robot is still fighting it
+    // (hitting/colliding within the last 2.5s, charging/driving within 5.0m, or AI going for No Mercy),
+    // the 10-second KO countdown MUST reset to 0 so the attacker can go for NO MERCY TOTAL DESTRUCTION!
+    const pGoingForNoMercy = !isPImmobilized && (
+      combatEngageTimer > 0 ||
+      (distBetweenBots < 5.0 && (pSpeed > 1.0 || pThrottleActive))
+    );
+    const eGoingForNoMercy = !isEImmobilized && (
+      combatEngageTimer > 0 ||
+      (distBetweenBots < 5.0 && (eSpeed > 1.0 || eThrottleActive)) ||
+      (gameMode !== '1v1' && gameMode !== 'practice' && enemyBot.aiNoMercyDecision === true)
+    );
+
+    const isPStopped = isPImmobilized && (pSpeed < 1.8) && !eGoingForNoMercy;
+    const isEStopped = isEImmobilized && (eSpeed < 1.8) && !pGoingForNoMercy;
 
     const isGuestOnline = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost);
 
     // Check if BOTH robots cannot fight:
-    // (a) Both robots are immobilized (flipped, wheelless, or motor burnout), OR
-    // (b) Both robots' weapons are destroyed in non-practice mode (neither robot can deal damage anymore)
+    // (a) Both robots are immobilized and not colliding/moving, OR
+    // (b) Both robots' weapons are destroyed in non-practice mode AND neither robot is driving/ramming
     const isPracticeMode = (typeof gameMode !== 'undefined' && gameMode === 'practice');
-    const isBothImmobilized = isPImmobilized && isEImmobilized;
-    const isBothWeaponsDestroyed = !isPracticeMode && (!!playerBot.weaponDestroyed && !!enemyBot.weaponDestroyed);
+    const isBothImmobilized = isPImmobilized && isEImmobilized && pSpeed < 1.5 && eSpeed < 1.5 && combatEngageTimer <= 0;
+    const isBothWeaponsDestroyed = !isPracticeMode && (!!playerBot.weaponDestroyed && !!enemyBot.weaponDestroyed) &&
+      pSpeed < 0.8 && eSpeed < 0.8 && !pThrottleActive && !eThrottleActive && combatEngageTimer <= 0;
     const isBothCantFight = isBothImmobilized || isBothWeaponsDestroyed;
 
     if (typeof bothCantFightTimer !== 'number') bothCantFightTimer = 0.0;

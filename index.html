@@ -275,6 +275,30 @@
         <button class="close-btn" id="btn-select-close" type="button">✕</button>
       </div>
 
+      <!-- 2-PLAYER CONTROLLER MAPPING BAR (Assign any controller to P1 or P2, or Swap) -->
+      <div id="controller-mapping-bar" class="controller-mapping-bar">
+        <div class="controller-map-header">
+          <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+          <span id="controller-connected-status" class="controller-status-pill">0 Controllers Connected</span>
+        </div>
+        <div class="controller-map-row">
+          <button type="button" id="btn-map-p1" class="controller-map-btn p1-map-btn" title="Click or press [A] to cycle P1 Controller · Press [LB] on any controller to claim P1">
+            <span class="map-role-tag p1">🔵 P1</span>
+            <span id="map-p1-label" class="map-device-label">🎮 Controller #1 + WASD</span>
+          </button>
+          <button type="button" id="btn-swap-controllers" class="controller-map-btn swap-map-btn" title="Swap P1 and P2 Controllers [Y]">
+            ⇄ Swap P1 ↔ P2
+          </button>
+          <button type="button" id="btn-map-p2" class="controller-map-btn p2-map-btn" title="Click or press [A] to cycle P2 Controller · Press [RB] on any controller to claim P2">
+            <span class="map-role-tag p2">🔴 P2</span>
+            <span id="map-p2-label" class="map-device-label">🎮 Controller #2 + Arrows</span>
+          </button>
+        </div>
+        <div class="controller-map-hint">
+          Quick Assign: Press <kbd>LB</kbd> on any controller = <strong>Set P1</strong> · Press <kbd>RB</kbd> = <strong>Set P2</strong> · Press <kbd>Y</kbd> or Click = <strong>Swap P1 ↔ P2</strong>
+        </div>
+      </div>
+
       <div id="p1-select-label" style="font-size: 0.82rem; font-weight: 700; color: #60a5fa; letter-spacing: 0.08em; margin-bottom: 6px; text-transform: uppercase;">
         PLAYER 1 ROBOT
       </div>
@@ -569,8 +593,29 @@
 
   <!-- PAUSE MODAL -->
   <div id="modal-pause" class="overlay-screen hidden">
-    <div class="modal-box" style="max-width: 380px; text-align: center;">
+    <div class="modal-box" style="max-width: 460px; text-align: center;">
       <h2>MATCH PAUSED</h2>
+      <div id="pause-controller-mapping" class="controller-mapping-bar pause-map-bar">
+        <div class="controller-map-header">
+          <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+        </div>
+        <div class="controller-map-row">
+          <button type="button" id="btn-pause-map-p1" class="controller-map-btn p1-map-btn">
+            <span class="map-role-tag p1">🔵 P1</span>
+            <span id="pause-map-p1-label" class="map-device-label">🎮 Controller #1</span>
+          </button>
+          <button type="button" id="btn-pause-swap-controllers" class="controller-map-btn swap-map-btn">
+            ⇄ Swap
+          </button>
+          <button type="button" id="btn-pause-map-p2" class="controller-map-btn p2-map-btn">
+            <span class="map-role-tag p2">🔴 P2</span>
+            <span id="pause-map-p2-label" class="map-device-label">🎮 Controller #2</span>
+          </button>
+        </div>
+        <div class="controller-map-hint">
+          Press <kbd>LB</kbd> on controller = P1 · Press <kbd>RB</kbd> = P2 · Click to Cycle
+        </div>
+      </div>
       <button class="action-btn" id="btn-resume-game" type="button">RESUME MATCH</button>
       <button class="action-btn secondary" id="btn-restart-game" type="button">RESTART MATCH</button>
       <button class="action-btn secondary" id="btn-pause-menu" type="button">MAIN MENU</button>

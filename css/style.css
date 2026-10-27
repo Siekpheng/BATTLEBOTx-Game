@@ -1374,3 +1374,121 @@
     body.splitscreen-mode .mobile-action-bar {
       display: none !important;
     }
+
+
+    /* ========================================================
+       CONTROLLER MAPPING BAR (P1 & P2 ASSIGNMENT UI)
+       ======================================================== */
+    .controller-mapping-bar {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      text-align: left;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.35);
+    }
+    .pause-map-bar {
+      margin: 10px 0 14px 0;
+    }
+    .controller-map-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #38bdf8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .controller-status-pill {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: #e2e8f0;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.69rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .controller-status-pill.connected {
+      border-color: rgba(52, 211, 153, 0.65);
+      color: #34d399;
+      background: rgba(6, 78, 59, 0.45);
+    }
+    .controller-map-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .controller-map-btn {
+      flex: 1;
+      min-width: 135px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 9px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      color: #f8fafc;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .controller-map-btn:hover {
+      transform: translateY(-1px);
+      background: rgba(51, 65, 85, 0.95);
+    }
+    .controller-map-btn.p1-map-btn {
+      border-color: rgba(59, 130, 246, 0.65);
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.45), rgba(15, 23, 42, 0.92));
+    }
+    .controller-map-btn.p2-map-btn {
+      border-color: rgba(239, 68, 68, 0.65);
+      background: linear-gradient(135deg, rgba(127, 29, 29, 0.45), rgba(15, 23, 42, 0.92));
+    }
+    .controller-map-btn.swap-map-btn {
+      flex: 0 0 auto;
+      min-width: 110px;
+      justify-content: center;
+      border-color: rgba(250, 204, 21, 0.55);
+      color: #fde047;
+      background: rgba(66, 32, 6, 0.45);
+    }
+    .map-role-tag {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .map-role-tag.p1 {
+      background: rgba(59, 130, 246, 0.25);
+      color: #93c5fd;
+    }
+    .map-role-tag.p2 {
+      background: rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+    }
+    .map-device-label {
+      font-size: 0.76rem;
+      color: #f1f5f9;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .controller-map-hint {
+      margin-top: 7px;
+      font-size: 0.69rem;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.35;
+    }

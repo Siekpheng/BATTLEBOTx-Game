@@ -104,10 +104,170 @@
     return connectedPads;
   }
 
+  // ========================================================
+  // CONTROLLER TO PLAYER (P1 / P2) MAPPER
+  // Allows assigning any connected controller (or Keyboard Only) to P1 or P2,
+  // swapping P1 <-> P2 with 1 click or [Y], or pressing [LB] for P1 / [RB] for P2!
+  // ========================================================
+  const GamepadMapper = {
+    init() {
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const bindClick = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el && !el._mapperBound) {
+          el._mapperBound = true;
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fn();
+          });
+        }
+      };
+      bindClick('btn-map-p1', () => this.cyclePlayerPad(0));
+      bindClick('btn-map-p2', () => this.cyclePlayerPad(1));
+      bindClick('btn-swap-controllers', () => this.swapControllers());
+      bindClick('btn-pause-map-p1', () => this.cyclePlayerPad(0));
+      bindClick('btn-pause-map-p2', () => this.cyclePlayerPad(1));
+      bindClick('btn-pause-swap-controllers', () => this.swapControllers());
+      this.updateUI();
+    },
+
+    getPadForPlayer(playerSlot = 0) {
+      const pads = getConnectedGamepadsList();
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const mappedIdx = (playerSlot === 0) ? gamepadPlayerMap.p1 : gamepadPlayerMap.p2;
+      if (mappedIdx === -1) return null; // Explicitly set to Keyboard Only
+      if (mappedIdx >= 0 && mappedIdx < pads.length) {
+        return pads[mappedIdx];
+      }
+      // In single-player modes (vs_bot / practice), if only 1 controller is connected at slot 0, allow P1 to use it
+      if (playerSlot === 0 && (typeof gameMode === 'undefined' || gameMode !== '1v1') && pads.length === 1 && mappedIdx >= 1) {
+        return pads[0];
+      }
+      return null;
+    },
+
+    setPlayerPad(playerSlot, padIdx) {
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const oldP1 = gamepadPlayerMap.p1;
+      const oldP2 = gamepadPlayerMap.p2;
+
+      if (playerSlot === 0) {
+        gamepadPlayerMap.p1 = padIdx;
+        // If P2 was using this physical controller, automatically swap P2 to P1's previous slot
+        if (padIdx >= 0 && gamepadPlayerMap.p2 === padIdx) {
+          gamepadPlayerMap.p2 = (oldP1 !== padIdx) ? oldP1 : (padIdx === 0 ? 1 : 0);
+        }
+      } else {
+        gamepadPlayerMap.p2 = padIdx;
+        // If P1 was using this physical controller, automatically swap P1 to P2's previous slot
+        if (padIdx >= 0 && gamepadPlayerMap.p1 === padIdx) {
+          gamepadPlayerMap.p1 = (oldP2 !== padIdx) ? oldP2 : (padIdx === 0 ? 1 : 0);
+        }
+      }
+
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(playerSlot === 0 ? 640 : 760, 0.06);
+      }
+      this.updateUI();
+    },
+
+    cyclePlayerPad(playerSlot) {
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const pads = getConnectedGamepadsList();
+      const maxControllers = Math.max(2, pads.length);
+      // Options sequence: Controller #1 (0), Controller #2 (1), ..., Keyboard Only (-1)
+      const options = [];
+      for (let i = 0; i < maxControllers; i++) options.push(i);
+      options.push(-1);
+
+      const cur = (playerSlot === 0) ? gamepadPlayerMap.p1 : gamepadPlayerMap.p2;
+      let idx = options.indexOf(cur);
+      if (idx < 0) idx = 0;
+      const nextVal = options[(idx + 1) % options.length];
+      this.setPlayerPad(playerSlot, nextVal);
+    },
+
+    swapControllers() {
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const tmp = gamepadPlayerMap.p1;
+      gamepadPlayerMap.p1 = gamepadPlayerMap.p2;
+      gamepadPlayerMap.p2 = tmp;
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(720, 0.07);
+      }
+      this.updateUI();
+    },
+
+    formatSlotLabel(padIdx, kbFallback, shortMode = false) {
+      const pads = getConnectedGamepadsList();
+      if (padIdx === -1) {
+        return shortMode ? `⌨️ ${kbFallback} ONLY` : `⌨️ Keyboard Only (${kbFallback})`;
+      }
+      const isConnected = padIdx >= 0 && padIdx < pads.length;
+      const num = padIdx + 1;
+      if (shortMode) {
+        return `🎮 CONTROLLER #${num} / ${kbFallback}`;
+      }
+      return isConnected
+        ? `🎮 Controller #${num} (Ready) + ${kbFallback}`
+        : `🎮 Controller #${num} + ${kbFallback}`;
+    },
+
+    updateUI() {
+      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) return;
+      const pads = getConnectedGamepadsList();
+      const statusEl = document.getElementById('controller-connected-status');
+      if (statusEl) {
+        if (pads.length === 0) {
+          statusEl.textContent = '0 Controllers Connected (Keyboard Active)';
+          statusEl.classList.remove('connected');
+        } else if (pads.length === 1) {
+          statusEl.textContent = '1 Controller Connected';
+          statusEl.classList.add('connected');
+        } else {
+          statusEl.textContent = `${pads.length} Controllers Connected`;
+          statusEl.classList.add('connected');
+        }
+      }
+
+      const p1Label = document.getElementById('map-p1-label');
+      if (p1Label) p1Label.textContent = this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', false);
+      const p2Label = document.getElementById('map-p2-label');
+      if (p2Label) p2Label.textContent = this.formatSlotLabel(gamepadPlayerMap.p2, 'Arrows', false);
+
+      const pauseP1 = document.getElementById('pause-map-p1-label');
+      if (pauseP1) pauseP1.textContent = this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', false);
+      const pauseP2 = document.getElementById('pause-map-p2-label');
+      if (pauseP2) pauseP2.textContent = this.formatSlotLabel(gamepadPlayerMap.p2, 'Arrows', false);
+
+      const p1Badge = document.querySelector('#splitscreen-overlay .p1-badge');
+      if (p1Badge) {
+        p1Badge.textContent = `🔵 P1 · ${this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', true)}`;
+      }
+      const p2Badge = document.querySelector('#splitscreen-overlay .p2-badge');
+      if (p2Badge) {
+        p2Badge.textContent = `🔴 P2 · ${this.formatSlotLabel(gamepadPlayerMap.p2, 'ARROWS', true)}`;
+      }
+    }
+  };
+  window.GamepadMapper = GamepadMapper;
+  setTimeout(() => GamepadMapper.init(), 0);
+
   function pollGamepadControls(playerIndex = 0) {
-    const connectedPads = getConnectedGamepadsList();
-    if (playerIndex >= connectedPads.length) return null;
-    const pad = connectedPads[playerIndex];
+    const pad = GamepadMapper.getPadForPlayer(playerIndex);
+    if (!pad) return null;
 
     const applyDeadzone = (val, threshold = 0.16) => {
       if (Math.abs(val) < threshold) return 0;
@@ -577,8 +737,10 @@
     activeContainerId: null,
     navCooldown: 0,
     prevPadStates: [
-      { a: false, b: false, x: false, start: false, dir: null },
-      { a: false, b: false, x: false, start: false, dir: null }
+      { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
+      { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
+      { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
+      { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null }
     ],
 
     getActiveContainer() {
@@ -609,6 +771,7 @@
       }
       const selector = [
         '.mode-btn:not(.hidden)',
+        '.controller-map-btn:not(.hidden)',
         '.bot-card:not(.hidden)',
         '.mini-bot-card:not(.hidden)',
         '.action-btn:not(.hidden)',
@@ -846,6 +1009,9 @@
     },
 
     update(dt) {
+      if (typeof GamepadMapper !== 'undefined') {
+        GamepadMapper.updateUI();
+      }
       const container = this.getActiveContainer();
       if (!container) {
         if (this.focusedEl) this.clearFocus();
@@ -861,20 +1027,46 @@
         this.navCooldown = Math.max(0, this.navCooldown - dt);
       }
 
-      for (let pIdx = 0; pIdx < Math.min(2, pads.length); pIdx++) {
+      const isMappingModal = (container.id === 'modal-select' || container.id === 'modal-pause');
+
+      for (let pIdx = 0; pIdx < Math.min(4, pads.length); pIdx++) {
         const pad = pads[pIdx];
         if (!pad) continue;
+        if (!this.prevPadStates[pIdx]) {
+          this.prevPadStates[pIdx] = { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null };
+        }
         const prev = this.prevPadStates[pIdx];
         const b = pad.buttons || [];
 
         const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5));
         const bPressed = !!(b[1] && (b[1].pressed || b[1].value > 0.5));
+        const yPressed = !!(b[3] && (b[3].pressed || b[3].value > 0.5));
+        const lbPressed = !!(b[4] && (b[4].pressed || b[4].value > 0.5));
+        const rbPressed = !!(b[5] && (b[5].pressed || b[5].value > 0.5));
         const startPressed = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
         const dir = this.readPadDir(pad);
 
-        // When 2 controllers are connected on the Robot Select screen (#modal-select),
-        // Controller 2 Left/Right directly cycles Player 2's robot selection card!
-        if (pIdx === 1 && container.id === 'modal-select' && pads.length >= 2 && (dir === 'left' || dir === 'right')) {
+        // Quick Controller Mapping Shortcuts on Robot Select & Pause Modals:
+        // - Press [LB] on any controller -> Assigns that controller to PLAYER 1 (P1)
+        // - Press [RB] on any controller -> Assigns that controller to PLAYER 2 (P2)
+        // - Press [Y] on any controller  -> Swaps P1 <-> P2 Controllers
+        if (isMappingModal && typeof GamepadMapper !== 'undefined') {
+          if (lbPressed && !prev.lb) {
+            GamepadMapper.setPlayerPad(0, pIdx);
+          }
+          if (rbPressed && !prev.rb) {
+            GamepadMapper.setPlayerPad(1, pIdx);
+          }
+          if (yPressed && !prev.y) {
+            GamepadMapper.swapControllers();
+          }
+        }
+
+        const isMappedToP2 = (typeof gamepadPlayerMap !== 'undefined' && gamepadPlayerMap.p2 === pIdx && gamepadPlayerMap.p1 !== pIdx);
+
+        // When a controller is mapped to P2 on the Robot Select screen (#modal-select) and another controller or keyboard is P1,
+        // P2's controller Left/Right directly cycles Player 2's robot selection card!
+        if (isMappedToP2 && container.id === 'modal-select' && pads.length >= 2 && (dir === 'left' || dir === 'right')) {
           if (dir !== prev.dir || this.navCooldown <= 0) {
             this.cycleP2BotDirect(dir === 'right' ? 1 : -1);
             this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
@@ -899,6 +1091,9 @@
 
         prev.a = aPressed;
         prev.b = bPressed;
+        prev.y = yPressed;
+        prev.lb = lbPressed;
+        prev.rb = rbPressed;
         prev.start = startPressed;
         prev.dir = dir;
       }
