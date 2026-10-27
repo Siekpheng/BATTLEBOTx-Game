@@ -145,6 +145,8 @@
       activeCountdownInterval = null;
     }
     countoutHornPlayed = false;
+    if (typeof bothCantFightTimer !== 'undefined') bothCantFightTimer = 0.0;
+    if (typeof mutualStallTimer !== 'undefined') mutualStallTimer = 0.0;
     totalDestructionCelebrationTimer = 0.0;
     pendingGameOverData = null;
     AudioSys.stopCombatAudio();
@@ -587,6 +589,21 @@
   }
   camBtn.addEventListener('click', cycleCameraMode);
 
+  function cycleCameraModeP2() {
+    cameraModeP2 = ((typeof cameraModeP2 === 'number' ? cameraModeP2 : 0) + 1) % 4;
+  }
+  window.cycleCameraModeP2 = cycleCameraModeP2;
+
+  function isSplitScreenActive() {
+    return (
+      gameMode === '1v1' &&
+      (typeof NetworkSys === 'undefined' || !NetworkSys.isOnline) &&
+      typeof matchState !== 'undefined' &&
+      (matchState === 'countdown' || matchState === 'playing' || matchState === 'celebrating' || matchState === 'paused')
+    );
+  }
+  window.isSplitScreenActive = isSplitScreenActive;
+
   document.getElementById('btn-cam-up').addEventListener('click', () => {
     cameraHeight = Math.min(32, cameraHeight + 2.5);
   });
@@ -827,7 +844,10 @@
       AudioSys.arenaBuzzer();
       const isGuest = (NetworkSys.isOnline && !NetworkSys.isHost);
       const didIWin = isGuest ? !playerWon : playerWon;
-      if (didIWin) {
+      if (isDraw) {
+        AudioSys.crowdGasp(0.95);
+        AudioSys.beep(320, 0.35);
+      } else if (didIWin) {
         AudioSys.winFanfare();
         AudioSys.crowdCheer(1.0, 5.0);
       } else {
@@ -841,7 +861,10 @@
       const flipPill = warnContainer ? warnContainer.querySelector('.flip-pill span') : null;
       if (warnContainer && warnWho && warnNum) {
         warnContainer.classList.remove('hidden');
-        if (didIWin) {
+        if (isDraw) {
+          warnWho.textContent = '💥 DOUBLE TOTAL DESTRUCTION! DRAW!';
+          if (flipPill) flipPill.textContent = '🤝 MUTUAL KNOCKOUT';
+        } else if (didIWin) {
           warnWho.textContent = '💥 ENEMY TOTAL DESTRUCTION! VICTORY!';
           if (flipPill) flipPill.textContent = '🏆 VICTORY CELEBRATION';
         } else {
@@ -905,9 +928,15 @@
     const detail = document.getElementById('result-detail');
 
     if (isDraw) {
-      heading.textContent = 'DRAW';
-      heading.className = 'result-title';
-      if (detail) detail.textContent = 'Time Expired — Both robots active!';
+      heading.textContent = isTotalDestruction
+        ? 'DRAW — DOUBLE DESTRUCTION!'
+        : (isKO ? 'DRAW — DOUBLE COUNT-OUT!' : 'DRAW');
+      heading.className = 'result-title draw';
+      if (detail) {
+        detail.textContent = isTotalDestruction
+          ? 'Both robots exploded simultaneously!'
+          : (isKO ? 'Both robots unable to fight — Referee declared a Draw!' : 'Time Expired — Both robots active!');
+      }
       AudioSys.beep(300, 0.3);
     } else if (didIWin) {
       heading.textContent = isTotalDestruction ? 'TOTAL DESTRUCTION!' : (isKO ? 'KNOCKOUT!' : 'VICTORY');
@@ -1073,48 +1102,47 @@
     }
   }
 
-  function updateCamera(dt) {
-    if (matchState === 'menu') {
-      updateMenuCamera(dt);
-      return;
-    }
+  const currentCamLookTargetP2 = new THREE.Vector3(0, 0.75, 0);
+  let smoothCamHeadingP2 = 0;
+  let smoothCameraP2Initialized = false;
 
-    const activeTargetBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
-    if (!activeTargetBot) {
-      camera.position.set(0, 20, 18);
-      camera.lookAt(0, 0, 0);
-      return;
-    }
-
+  function updateSingleViewportCamera(camObj, targetBot, otherBot, mode, isP2Cam, dt) {
+    if (!camObj || !targetBot) return;
     const desiredPos = new THREE.Vector3();
     const lookTarget = new THREE.Vector3();
 
-    if (!smoothCameraInitialized) {
-      smoothCamHeading = activeTargetBot.yaw;
-      currentCamLookTarget.set(activeTargetBot.x, 0.75, activeTargetBot.z);
-      smoothCameraInitialized = true;
+    let heading = isP2Cam ? smoothCamHeadingP2 : smoothCamHeading;
+    const curLook = isP2Cam ? currentCamLookTargetP2 : currentCamLookTarget;
+
+    if (isP2Cam ? !smoothCameraP2Initialized : !smoothCameraInitialized) {
+      heading = targetBot.yaw;
+      curLook.set(targetBot.x, 0.75, targetBot.z);
+      if (isP2Cam) {
+        smoothCamHeadingP2 = heading;
+        smoothCameraP2Initialized = true;
+      } else {
+        smoothCamHeading = heading;
+        smoothCameraInitialized = true;
+      }
     }
 
-    // Smooth heading angle with 2*PI wrap-around handling
-    let headingDiff = activeTargetBot.yaw - smoothCamHeading;
+    let headingDiff = targetBot.yaw - heading;
     while (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
     while (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
-    smoothCamHeading += headingDiff * Math.min(1, dt * 5.2);
+    heading += headingDiff * Math.min(1, dt * 5.2);
 
-    if (cameraMode === 0) {
-      // ========================================================
-      // MODE 0: FOLLOW DIRECTION (BEHIND ROBOT CHASE CAM)
-      // Smooth heading ensures no violent camera shaking during continuous hits
-      // ========================================================
+    if (isP2Cam) smoothCamHeadingP2 = heading;
+    else smoothCamHeading = heading;
+
+    if (mode === 0) {
       const followDist = 10.5;
       const followHeight = 5.2;
 
-      let camX = activeTargetBot.x - Math.sin(smoothCamHeading) * followDist;
-      let camZ = activeTargetBot.z - Math.cos(smoothCamHeading) * followDist;
-      let camY = (activeTargetBot.root ? activeTargetBot.root.position.y : 0) + followHeight;
+      let camX = targetBot.x - Math.sin(heading) * followDist;
+      let camZ = targetBot.z - Math.cos(heading) * followDist;
+      let camY = (targetBot.root ? targetBot.root.position.y : 0) + followHeight;
 
-      // Dynamic wall clearance: if behind-camera goes near/past wall, adjust smoothly
-      const pDistCenter = Math.max(Math.abs(activeTargetBot.x), Math.abs(activeTargetBot.z));
+      const pDistCenter = Math.max(Math.abs(targetBot.x), Math.abs(targetBot.z));
       const wallNear = Math.max(0, pDistCenter - (ARENA_HALF - 3.8));
       if (wallNear > 0) {
         camY += wallNear * 1.5;
@@ -1122,23 +1150,19 @@
 
       desiredPos.set(camX, camY, camZ);
 
-      // Look ahead along smoothed heading
       const forwardLead = 4.8;
       lookTarget.set(
-        activeTargetBot.x + Math.sin(smoothCamHeading) * forwardLead,
-        (activeTargetBot.root ? activeTargetBot.root.position.y : 0) + 0.85,
-        activeTargetBot.z + Math.cos(smoothCamHeading) * forwardLead
+        targetBot.x + Math.sin(heading) * forwardLead,
+        (targetBot.root ? targetBot.root.position.y : 0) + 0.85,
+        targetBot.z + Math.cos(heading) * forwardLead
       );
-    } else if (cameraMode === 1) {
-      // ========================================================
-      // MODE 1: TACTICAL 1v1 ARENA CHASE (FRAMES BOTH BOTS)
-      // ========================================================
-      const pDistFromCenter = Math.max(Math.abs(playerBot.x), Math.abs(playerBot.z));
+    } else if (mode === 1) {
+      const pDistFromCenter = Math.max(Math.abs(targetBot.x), Math.abs(targetBot.z));
       const wallDanger = Math.max(0, pDistFromCenter - (ARENA_HALF - 4.2));
 
       const baseDist = 12.8;
-      let rawCamX = playerBot.x - Math.sin(smoothCamHeading) * baseDist * 0.72;
-      let rawCamZ = playerBot.z - Math.cos(smoothCamHeading) * baseDist * 0.72;
+      let rawCamX = targetBot.x - Math.sin(heading) * baseDist * 0.72;
+      let rawCamZ = targetBot.z - Math.cos(heading) * baseDist * 0.72;
 
       const dynamicHeight = 17.5 + wallDanger * 2.2;
 
@@ -1154,39 +1178,55 @@
 
       desiredPos.set(rawCamX, dynamicHeight, rawCamZ);
 
-      const midX = enemyBot ? (playerBot.x * 0.58 + enemyBot.x * 0.42) : playerBot.x;
-      const midZ = enemyBot ? (playerBot.z * 0.58 + enemyBot.z * 0.42) : playerBot.z;
+      const midX = otherBot ? (targetBot.x * 0.58 + otherBot.x * 0.42) : targetBot.x;
+      const midZ = otherBot ? (targetBot.z * 0.58 + otherBot.z * 0.42) : targetBot.z;
       lookTarget.set(midX, 0.75, midZ);
-    } else if (cameraMode === 2) {
-      // ========================================================
-      // MODE 2: TOP-DOWN AERIAL OVERVIEW
-      // ========================================================
+    } else if (mode === 2) {
       desiredPos.set(0, 28.5, 0.1);
       lookTarget.set(0, 0, 0);
     } else {
-      // ========================================================
-      // MODE 3: FULL ARENA BROADCAST (MATCHES USER PHOTO)
-      // ========================================================
       desiredPos.set(0, 24.0, 22.5);
       lookTarget.set(0, 2.0, -1.5);
     }
 
-    // Smooth position interpolation
-    camera.position.lerp(desiredPos, Math.min(1, dt * 6.0));
+    camObj.position.lerp(desiredPos, Math.min(1, dt * 6.0));
 
-    // Dynamic Combat Camera Shake Trauma
     if (cameraTrauma > 0) {
-      const shake = cameraTrauma * cameraTrauma; // Quadratic trauma curve
-      const maxOffset = 0.95; // Maximum offset in meters
-      camera.position.x += (Math.random() * 2 - 1) * maxOffset * shake;
-      camera.position.y += (Math.random() * 2 - 1) * (maxOffset * 0.7) * shake;
-      camera.position.z += (Math.random() * 2 - 1) * maxOffset * shake;
-      cameraTrauma = Math.max(0, cameraTrauma - dt * 2.8);
+      const shake = cameraTrauma * cameraTrauma;
+      const maxOffset = 0.95;
+      camObj.position.x += (Math.random() * 2 - 1) * maxOffset * shake;
+      camObj.position.y += (Math.random() * 2 - 1) * (maxOffset * 0.7) * shake;
+      camObj.position.z += (Math.random() * 2 - 1) * maxOffset * shake;
     }
 
-    // Smooth lookTarget interpolation (completely filters out collision vibration / shaking!)
-    currentCamLookTarget.lerp(lookTarget, Math.min(1, dt * 5.0));
-    camera.lookAt(currentCamLookTarget);
+    curLook.lerp(lookTarget, Math.min(1, dt * 5.0));
+    camObj.lookAt(curLook);
+  }
+
+  function updateCamera(dt) {
+    if (matchState === 'menu') {
+      smoothCameraP2Initialized = false;
+      updateMenuCamera(dt);
+      return;
+    }
+
+    const activeTargetBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
+    const otherBot = (activeTargetBot === enemyBot) ? playerBot : enemyBot;
+    if (!activeTargetBot) {
+      camera.position.set(0, 20, 18);
+      camera.lookAt(0, 0, 0);
+      return;
+    }
+
+    updateSingleViewportCamera(camera, activeTargetBot, otherBot, cameraMode, false, dt);
+
+    if (isSplitScreenActive() && typeof cameraP2 !== 'undefined' && enemyBot) {
+      updateSingleViewportCamera(cameraP2, enemyBot, playerBot, typeof cameraModeP2 === 'number' ? cameraModeP2 : 0, true, dt);
+    }
+
+    if (cameraTrauma > 0) {
+      cameraTrauma = Math.max(0, cameraTrauma - dt * 2.8);
+    }
   }
 
   // ========================================================
@@ -1564,8 +1604,13 @@
       }
     }
 
-    // Always poll Controller 1 every frame (LB weapon toggle and RB camera cycle respond during countdown & playing)
+    // Always poll Controller 1 & Controller 2 every frame + run Controller UI Menu Navigation
     const gp1 = pollGamepadControls(0);
+    const gp2 = pollGamepadControls(1);
+    window._latestGp2 = gp2;
+    if (typeof updateGamepadMenuNavigation === 'function') {
+      updateGamepadMenuNavigation(dt);
+    }
 
     if (matchState === 'menu') {
       if (playerBot) {
@@ -1876,10 +1921,95 @@
       controlsBottomBar.style.opacity = '1.0';
     }
 
-    updateArenaWallTransparency(dt);
+    // Update Split-Screen Overlay & Player 2 Weapon RPM Gauge when in Local 1v1 Split Screen
+    const splitOverlay = document.getElementById('splitscreen-overlay');
+    const splitActive = isSplitScreenActive();
+    document.body.classList.toggle('splitscreen-mode', splitActive);
+    if (splitOverlay) {
+      if (splitActive) {
+        splitOverlay.classList.remove('hidden');
+        if (enemyBot) {
+          const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / 95.0) * 100));
+          const p2RpmText = document.getElementById('p2-weapon-rpm-text');
+          const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');
+          if (p2RpmText && p2RpmFill) {
+            if (enemyBot.weaponDestroyed || enemyBot.isEntirelyDestroyed) {
+              p2RpmText.textContent = '0% (WEAPON DESTROYED)';
+              p2RpmText.style.color = '#ef4444';
+              p2RpmFill.style.width = '0%';
+              p2RpmFill.classList.remove('ready');
+              p2RpmFill.style.background = '#475569';
+            } else if (enemyBot.weaponActive === false) {
+              p2RpmText.textContent = p2RpmPct > 0 ? `${p2RpmPct}% (COASTING)` : 'OFF (R-SHIFT / LB)';
+              p2RpmText.style.color = p2RpmPct > 0 ? '#f59e0b' : '#94a3b8';
+              p2RpmFill.style.width = `${p2RpmPct}%`;
+              p2RpmFill.classList.remove('ready');
+              p2RpmFill.style.background = p2RpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
+            } else if (p2RpmPct >= 92) {
+              p2RpmText.textContent = '100% (SMASH READY!)';
+              p2RpmText.style.color = '#34d399';
+              p2RpmFill.style.width = '100%';
+              p2RpmFill.classList.add('ready');
+              p2RpmFill.style.background = '';
+            } else if (p2RpmPct <= 5) {
+              p2RpmText.textContent = '0% (STALLED — WINDING UP...)';
+              p2RpmText.style.color = '#ef4444';
+              p2RpmFill.style.width = `${p2RpmPct}%`;
+              p2RpmFill.classList.remove('ready');
+              p2RpmFill.style.background = '';
+            } else {
+              p2RpmText.textContent = `${p2RpmPct}% (WINDING UP...)`;
+              p2RpmText.style.color = '#f87171';
+              p2RpmFill.style.width = `${p2RpmPct}%`;
+              p2RpmFill.classList.remove('ready');
+              p2RpmFill.style.background = '';
+            }
+          }
+        }
+      } else {
+        splitOverlay.classList.add('hidden');
+      }
+    }
+
     updateCamera(dt);
     updateBotBadges();
-    renderer.render(scene, camera);
+
+    if (splitActive && typeof cameraP2 !== 'undefined') {
+      const fullW = window.innerWidth;
+      const fullH = window.innerHeight;
+      const halfW = Math.floor(fullW * 0.5);
+      const rightW = fullW - halfW;
+
+      renderer.setScissorTest(true);
+
+      // Left Viewport: Player 1 (Blue Corner)
+      camera.aspect = halfW / fullH;
+      camera.updateProjectionMatrix();
+      renderer.setViewport(0, 0, halfW, fullH);
+      renderer.setScissor(0, 0, halfW, fullH);
+      updateArenaWallTransparency(dt, camera, playerBot);
+      renderer.render(scene, camera);
+
+      // Right Viewport: Player 2 (Red Corner)
+      cameraP2.aspect = rightW / fullH;
+      cameraP2.updateProjectionMatrix();
+      renderer.setViewport(halfW, 0, rightW, fullH);
+      renderer.setScissor(halfW, 0, rightW, fullH);
+      updateArenaWallTransparency(dt, cameraP2, enemyBot);
+      renderer.render(scene, cameraP2);
+
+      renderer.setScissorTest(false);
+    } else {
+      renderer.setScissorTest(false);
+      renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+      const targetAspect = window.innerWidth / window.innerHeight;
+      if (Math.abs(camera.aspect - targetAspect) > 0.001) {
+        camera.aspect = targetAspect;
+        camera.updateProjectionMatrix();
+      }
+      updateArenaWallTransparency(dt, camera, playerBot);
+      renderer.render(scene, camera);
+    }
   }
 
   window.addEventListener('resize', () => {

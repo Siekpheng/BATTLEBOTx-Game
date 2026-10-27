@@ -8,7 +8,10 @@ var matchTimeRemaining = 180;
 var playerScore = 0;
 var enemyScore = 0;
 
-var cameraMode = 0; // 0: Follow Direction, 1: Tactical Chase, 2: Top-down, 3: Full Broadcast
+var cameraMode = 0;
+var cameraModeP2 = 0;
+var bothCantFightTimer = 0.0;
+var mutualStallTimer = 0.0; // 0: Follow Direction, 1: Tactical Chase, 2: Top-down, 3: Full Broadcast
 var cameraHeight = 19.5;
 var cameraDistance = 12.0;
 

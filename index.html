@@ -134,8 +134,8 @@
       </div>
       <button class="mode-btn primary" type="button" id="btn-1v1-local">
         <div class="mode-btn-text">
-          <strong>Local 2-Player</strong>
-          <small>SAME KEYBOARD · WASD VS ARROWS</small>
+          <strong>Local 2-Player (Split Screen)</strong>
+          <small>2 CONTROLLERS OR KEYBOARD · WASD VS ARROWS</small>
         </div>
         <span>➔</span>
       </button>
@@ -527,6 +527,34 @@
           <div class="slider-knob" id="throttle-knob">⇅</div>
         </div>
         <span class="slider-label">DRIVE</span>
+      </div>
+    </div>
+
+    <!-- Split-Screen 2-Player Overlay (Center Divider, Viewport Badges & Player 2 Weapon RPM HUD) -->
+    <div id="splitscreen-overlay" class="hidden">
+      <div class="splitscreen-divider-line"></div>
+      <div class="splitscreen-badge p1-badge">🔵 P1 · CONTROLLER 1 / WASD</div>
+      <div class="splitscreen-badge p2-badge">🔴 P2 · CONTROLLER 2 / ARROWS</div>
+      <div class="p2-hud-panel" id="p2-hud-panel">
+        <div class="desktop-hint p2-hint-card">
+          <div class="weapon-rpm-wrap" id="p2-weapon-rpm-wrap" title="Click or press [Right Shift] / Controller 2 [LB] to toggle P2 weapon">
+            <div class="weapon-rpm-header">
+              <span style="display:flex; align-items:center; gap:6px;">
+                <span style="color:#f87171;">⚡</span> P2 WEAPON RPM
+              </span>
+              <strong id="p2-weapon-rpm-text">0%</strong>
+            </div>
+            <div class="weapon-rpm-bar">
+              <div class="weapon-rpm-fill" id="p2-weapon-rpm-fill"></div>
+            </div>
+          </div>
+          <div id="p2-hint-controls-text">
+            <strong>P2:</strong> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>R-SHIFT</kbd> Weapon · <kbd>M</kbd> Cam
+          </div>
+          <div style="margin-top:5px; font-size:0.70rem; color:#94a3b8; line-height:1.35;">
+            🎮 Controller 2: <kbd>RT</kbd>/<kbd>LT</kbd> Drive · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Cam
+          </div>
+        </div>
       </div>
     </div>
 

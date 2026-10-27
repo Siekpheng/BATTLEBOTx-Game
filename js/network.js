@@ -224,6 +224,7 @@
         type: 'state',
         ms: typeof matchState !== 'undefined' ? matchState : 'playing',
         tm: typeof matchTimeRemaining === 'number' ? matchTimeRemaining : 180,
+        bt: typeof bothCantFightTimer === 'number' ? bothCantFightTimer : 0,
         p1: {
           x: playerBot.x, z: playerBot.z, y: playerBot.root.position.y,
           ay: playerBot.airY || 0, wt: playerBot.wheelTilt || 0,
@@ -262,6 +263,9 @@
         matchState = data.ms;
       }
 
+      if (typeof data.bt === 'number' && typeof bothCantFightTimer !== 'undefined') {
+        bothCantFightTimer = data.bt;
+      }
       if (typeof data.tm === 'number' && typeof matchTimeRemaining !== 'undefined') {
         matchTimeRemaining = data.tm;
         if (typeof updateTimerDisplay === 'function') updateTimerDisplay();

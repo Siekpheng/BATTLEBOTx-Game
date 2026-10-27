@@ -463,6 +463,12 @@
     }
 
     if (gameMode === '1v1') {
+      if (enemyBot.flipped) {
+        enemyBot.drivePower = 0;
+        enemyBot.throttleInput = 0;
+        enemyBot.steerInput = 0;
+        return;
+      }
       let t = 0, s = 0;
       if (keys['ArrowUp']) t += 1;
       if (keys['ArrowDown']) t -= 1;
@@ -470,7 +476,7 @@
       if (keys['ArrowRight']) s += 1;
 
       // Controller 2 input (if connected)
-      const gp2 = pollGamepadControls(1);
+      const gp2 = (typeof window._latestGp2 !== 'undefined') ? window._latestGp2 : pollGamepadControls(1);
       if (gp2 && gp2.hasInput) {
         t = gp2.throttle;
         s = gp2.steer;
@@ -695,10 +701,11 @@
           detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
           if (impactSpeed > 6.5) detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
 
-          if (!isPractice && playerBot.isEntirelyDestroyed) {
+          if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
+          } else if (!isPractice && playerBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
-          }
-          if (enemyBot.isEntirelyDestroyed) {
+          } else if (enemyBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
           }
         } else if (isPWeaponHit) {
@@ -979,10 +986,11 @@
                 detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
                 detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
               }
-              if (playerBot.isEntirelyDestroyed) {
+              if (playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
+              } else if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
-              }
-              if (enemyBot.isEntirelyDestroyed) {
+              } else if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
             }
@@ -1005,7 +1013,13 @@
     const flipPill = warnContainer ? warnContainer.querySelector('.flip-pill span') : null;
     if (!warnContainer || !warnWho || !warnNum) return;
 
-    // 1. Instant Win on Total Destruction (when all parts have flown off!) -> triggers 5s celebration delay
+    // 1. Instant Win / Draw on Total Destruction (when all parts have flown off!) -> triggers 5s celebration delay
+    if (playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+      warnContainer.classList.add('hidden');
+      countoutHornPlayed = false;
+      endMatch(false, true, true, true);
+      return;
+    }
     if (playerBot.isEntirelyDestroyed) {
       warnContainer.classList.add('hidden');
       countoutHornPlayed = false;
@@ -1019,7 +1033,7 @@
       return;
     }
 
-    // 2. BattleBots Referee 10-Second Count-out for Immobilization:
+    // 2. BattleBots Referee 10-Second Count-out for Immobilization & Mutual Stalemate (Draw):
     // A bot cannot move or fight back if:
     // - Flipped onto back/side (cannot drive)
     // - All drive wheels detached (cannot translate)
@@ -1033,31 +1047,88 @@
     const pNoDrive = (playerBot.driveHealth <= 0) || (playerBot.drivePower <= 0);
     const eNoDrive = (enemyBot.driveHealth <= 0) || (enemyBot.drivePower <= 0);
 
-    const isPStopped = (playerBot.flipped && pSpeed < 0.45) ||
-                      (pNoWheels && pSpeed < 0.35) ||
-                      (pNoDrive && pSpeed < 0.35);
+    const isPImmobilized = !!playerBot.flipped || pNoWheels || pNoDrive;
+    const isEImmobilized = !!enemyBot.flipped || eNoWheels || eNoDrive;
 
-    const isEStopped = (enemyBot.flipped && eSpeed < 0.45) ||
-                      (eNoWheels && eSpeed < 0.35) ||
-                      (eNoDrive && eSpeed < 0.35);
+    const isPStopped = isPImmobilized && (pSpeed < 1.8 || (playerBot.stoppedTimer || 0) > 0.1 || (bothCantFightTimer || 0) > 0.1);
+    const isEStopped = isEImmobilized && (eSpeed < 1.8 || (enemyBot.stoppedTimer || 0) > 0.1 || (bothCantFightTimer || 0) > 0.1);
 
     const isGuestOnline = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost);
 
+    // Check if BOTH robots cannot fight:
+    // (a) Both robots are immobilized (flipped, wheelless, or motor burnout), OR
+    // (b) Both robots' weapons are destroyed in non-practice mode (neither robot can deal damage anymore)
+    const isPracticeMode = (typeof gameMode !== 'undefined' && gameMode === 'practice');
+    const isBothImmobilized = isPImmobilized && isEImmobilized;
+    const isBothWeaponsDestroyed = !isPracticeMode && (!!playerBot.weaponDestroyed && !!enemyBot.weaponDestroyed);
+    const isBothCantFight = isBothImmobilized || isBothWeaponsDestroyed;
+
+    if (typeof bothCantFightTimer !== 'number') bothCantFightTimer = 0.0;
     if (typeof playerBot.stoppedTimer !== 'number') playerBot.stoppedTimer = 0.0;
     if (typeof enemyBot.stoppedTimer !== 'number') enemyBot.stoppedTimer = 0.0;
 
     if (!isGuestOnline) {
-      if (isPStopped) {
-        playerBot.stoppedTimer += dt;
-      } else {
+      if (isBothCantFight) {
+        bothCantFightTimer += dt;
+        // Pause single-bot knockout timers while both robots are unable to fight so it resolves fairly as a DRAW
         playerBot.stoppedTimer = 0.0;
+        enemyBot.stoppedTimer = 0.0;
+      } else {
+        bothCantFightTimer = 0.0;
+        if (isPStopped) {
+          playerBot.stoppedTimer += dt;
+        } else {
+          playerBot.stoppedTimer = 0.0;
+        }
+
+        if (isEStopped) {
+          enemyBot.stoppedTimer += dt;
+        } else {
+          enemyBot.stoppedTimer = 0.0;
+        }
+      }
+    }
+
+    // 2A. Simultaneous Mutual Stalemate / Double Count-Out -> Referee 10s Countdown to DRAW!
+    if (bothCantFightTimer > 0.4) {
+      if (!countoutHornPlayed) {
+        if (typeof AudioSys !== 'undefined' && AudioSys.refereeWarningHorn) {
+          AudioSys.refereeWarningHorn();
+        }
+        if (typeof addCameraTrauma === 'function') {
+          addCameraTrauma(0.25);
+        }
+        countoutHornPlayed = true;
       }
 
-      if (isEStopped) {
-        enemyBot.stoppedTimer += dt;
+      warnContainer.classList.remove('hidden');
+      if (flipPill) flipPill.textContent = '⚠️ DRAW COUNTDOWN IN';
+      const remainingDrawTime = Math.max(0, 10.0 - bothCantFightTimer);
+      const ceilDrawSec = Math.max(1, Math.ceil(remainingDrawTime));
+      warnNum.textContent = String(ceilDrawSec);
+
+      if (isBothImmobilized) {
+        warnWho.textContent = 'BOTH ROBOTS IMMOBILIZED — REFEREE DRAW COUNTDOWN!';
+      } else if (isBothWeaponsDestroyed) {
+        warnWho.textContent = 'BOTH WEAPONS DESTROYED (CANNOT FIGHT) — DRAW COUNTDOWN!';
       } else {
-        enemyBot.stoppedTimer = 0.0;
+        warnWho.textContent = 'BOTH ROBOTS UNABLE TO FIGHT — DRAW COUNTDOWN!';
       }
+
+      if (ceilDrawSec !== lastCountoutSec) {
+        lastCountoutSec = ceilDrawSec;
+        if (typeof AudioSys !== 'undefined' && AudioSys.alarmBeep) {
+          AudioSys.alarmBeep(ceilDrawSec);
+        }
+      }
+
+      if (!isGuestOnline && bothCantFightTimer >= 10.0) {
+        warnContainer.classList.add('hidden');
+        countoutHornPlayed = false;
+        bothCantFightTimer = 0.0;
+        endMatch(false, true, true, false); // Declared a DRAW by Referee Count-Out!
+      }
+      return;
     }
 
     let activeBot = null;

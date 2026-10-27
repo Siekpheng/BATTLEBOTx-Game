@@ -12,6 +12,7 @@
   scene.fog = new THREE.FogExp2(0x0a0507, 0.010);
 
   const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 240);
+  const cameraP2 = new THREE.PerspectiveCamera(46, (window.innerWidth * 0.5) / window.innerHeight, 0.1, 240);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -605,9 +606,10 @@
 
   // 6. Overhead combat lighting is provided by roofSpot1 and roofSpot2 directly above.
 
-  function updateArenaWallTransparency(dt) {
-    const cx = camera.position.x;
-    const cz = camera.position.z;
+  function updateArenaWallTransparency(dt, activeCam = camera, primaryBot = playerBot) {
+    const camRef = activeCam || camera;
+    const cx = camRef.position.x;
+    const cz = camRef.position.z;
 
     for (let i = 0; i < arenaWallMeshes.length; i++) {
       const w = arenaWallMeshes[i];

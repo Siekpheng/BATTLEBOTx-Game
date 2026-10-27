@@ -41,6 +41,9 @@
         togglePlayerWeapon(enemyBot);
       }
     }
+    if ((e.code === 'KeyM' || e.code === 'Numpad1') && gameMode === '1v1' && (matchState === 'playing' || matchState === 'countdown')) {
+      if (typeof cycleCameraModeP2 === 'function') cycleCameraModeP2();
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -68,6 +71,12 @@
       togglePlayerWeapon(playerBot);
     });
   }
+  const p2WeaponRpmWrap = document.getElementById('p2-weapon-rpm-wrap');
+  if (p2WeaponRpmWrap) {
+    p2WeaponRpmWrap.addEventListener('click', () => {
+      if (enemyBot && gameMode === '1v1') togglePlayerWeapon(enemyBot);
+    });
+  }
 
   // ========================================================
   // 7.5 GAMEPAD / CONTROLLER ENGINE
@@ -81,15 +90,22 @@
     { lb: false, rb: false, start: false }
   ];
 
-  function pollGamepadControls(playerIndex = 0) {
-    if (typeof navigator.getGamepads !== 'function') return null;
+  function getConnectedGamepadsList() {
+    if (window._mockGamepads && Array.isArray(window._mockGamepads) && window._mockGamepads.length > 0) {
+      return window._mockGamepads.filter(p => p && p.connected !== false);
+    }
+    if (typeof navigator.getGamepads !== 'function') return [];
     const rawGamepads = navigator.getGamepads();
-    if (!rawGamepads) return null;
-
+    if (!rawGamepads) return [];
     const connectedPads = [];
     for (let i = 0; i < rawGamepads.length; i++) {
       if (rawGamepads[i] && rawGamepads[i].connected) connectedPads.push(rawGamepads[i]);
     }
+    return connectedPads;
+  }
+
+  function pollGamepadControls(playerIndex = 0) {
+    const connectedPads = getConnectedGamepadsList();
     if (playerIndex >= connectedPads.length) return null;
     const pad = connectedPads[playerIndex];
 
@@ -172,11 +188,13 @@
     }
     prev.lb = lbPressed;
 
-    // 4. Right button (RB / buttons[5]) for changing camera angle
+    // 4. Right button (RB / buttons[5]) for changing camera angle (P1 cycles Cam 1, P2 cycles Cam 2 in Split Screen!)
     const rbPressed = !!(pad.buttons && pad.buttons[5] && (pad.buttons[5].pressed || pad.buttons[5].value > 0.5));
     if (rbPressed && !prev.rb) {
       if (playerIndex === 0 && (matchState === 'playing' || matchState === 'countdown')) {
         cycleCameraMode();
+      } else if (playerIndex === 1 && gameMode === '1v1' && (matchState === 'playing' || matchState === 'countdown')) {
+        if (typeof cycleCameraModeP2 === 'function') cycleCameraModeP2();
       }
     }
     prev.rb = rbPressed;
@@ -547,3 +565,348 @@
   window.addEventListener('touchend', handleTouchEnd);
   window.addEventListener('touchcancel', handleTouchEnd);
 
+
+
+  // ========================================================
+  // 7.6 CONTROLLER UI & MENU NAVIGATION ENGINE (1 & 2 CONTROLLERS)
+  // Navigate all menus, modals, and robot cards with D-Pad / Left Stick,
+  // [A / Cross] to Select, [B / Circle] to Go Back, [Start] to Launch Match!
+  // ========================================================
+  const GamepadUINav = {
+    focusedEl: null,
+    activeContainerId: null,
+    navCooldown: 0,
+    prevPadStates: [
+      { a: false, b: false, x: false, start: false, dir: null },
+      { a: false, b: false, x: false, start: false, dir: null }
+    ],
+
+    getActiveContainer() {
+      const modalPriority = [
+        'modal-gameover',
+        'modal-pause',
+        'modal-online-host',
+        'modal-online-join',
+        'modal-select',
+        'modal-1v1'
+      ];
+      for (const id of modalPriority) {
+        const el = document.getElementById(id);
+        if (el && !el.classList.contains('hidden')) return el;
+      }
+      if (typeof matchState === 'undefined' || matchState === 'menu') {
+        const menuEl = document.getElementById('menu-screen');
+        if (menuEl && !menuEl.classList.contains('hidden')) return menuEl;
+      }
+      return null;
+    },
+
+    getFocusableElements(container) {
+      if (!container) return [];
+      if (container.id === 'menu-screen' && typeof isMenuSpectating === 'function' && isMenuSpectating()) {
+        const restoreBtn = document.getElementById('btn-menu-restore');
+        return restoreBtn ? [restoreBtn] : [];
+      }
+      const selector = [
+        '.mode-btn:not(.hidden)',
+        '.bot-card:not(.hidden)',
+        '.mini-bot-card:not(.hidden)',
+        '.action-btn:not(.hidden)',
+        '.close-btn:not(.hidden)',
+        '.menu-nav-btn:not(.hidden)',
+        '.menu-music-btn:not(.hidden)',
+        '.menu-fullscreen-btn:not(.hidden)'
+      ].join(', ');
+      const nodes = Array.from(container.querySelectorAll(selector));
+      return nodes.filter(el => {
+        if (el.disabled || el.classList.contains('hidden')) return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+    },
+
+    setFocus(el) {
+      if (this.focusedEl && this.focusedEl !== el) {
+        this.focusedEl.classList.remove('gamepad-focus');
+      }
+      this.focusedEl = el;
+      if (el) {
+        el.classList.add('gamepad-focus');
+        try {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        } catch (e) {}
+      }
+    },
+
+    clearFocus() {
+      if (this.focusedEl) {
+        this.focusedEl.classList.remove('gamepad-focus');
+        this.focusedEl = null;
+      }
+      this.activeContainerId = null;
+    },
+
+    ensureValidFocus() {
+      const container = this.getActiveContainer();
+      if (!container) {
+        this.clearFocus();
+        return null;
+      }
+      const items = this.getFocusableElements(container);
+      if (items.length === 0) {
+        this.clearFocus();
+        return null;
+      }
+      if (this.activeContainerId !== container.id || !this.focusedEl || !items.includes(this.focusedEl)) {
+        this.activeContainerId = container.id;
+        // Pick a sensible default focus element in the new container
+        let def = null;
+        if (container.id === 'menu-screen') {
+          def = container.querySelector('.menu-actions .mode-btn.primary') || container.querySelector('.menu-actions .mode-btn');
+        } else if (container.id === 'modal-1v1') {
+          def = document.getElementById('btn-1v1-local');
+        } else if (container.id === 'modal-select') {
+          def = container.querySelector('#p1-bot-selector .bot-card.selected') || container.querySelector('#p1-bot-selector .bot-card');
+        } else if (container.id === 'modal-pause') {
+          def = document.getElementById('btn-resume-game');
+        } else if (container.id === 'modal-gameover') {
+          def = document.getElementById('btn-play-again');
+        } else if (container.id === 'modal-online-host') {
+          def = container.querySelector('#host-bot-selector .mini-bot-card.selected') || document.getElementById('btn-copy-code');
+        } else if (container.id === 'modal-online-join') {
+          def = container.querySelector('#join-bot-selector .mini-bot-card.selected') || document.getElementById('btn-join-connect');
+        }
+        this.setFocus((def && items.includes(def)) ? def : items[0]);
+      } else {
+        this.focusedEl.classList.add('gamepad-focus');
+      }
+      return this.focusedEl;
+    },
+
+    moveFocus(dir) {
+      const container = this.getActiveContainer();
+      if (!container) return false;
+      if (container.id === 'menu-screen' && typeof isMenuSpectating === 'function' && isMenuSpectating()) {
+        toggleMenuSpectate(false);
+        return true;
+      }
+      const items = this.getFocusableElements(container);
+      if (items.length === 0) return false;
+
+      const current = this.ensureValidFocus();
+      if (!current) return false;
+
+      const curRect = current.getBoundingClientRect();
+      const fx = curRect.left + curRect.width * 0.5;
+      const fy = curRect.top + curRect.height * 0.5;
+
+      let bestCandidate = null;
+      let bestScore = Infinity;
+
+      for (const el of items) {
+        if (el === current) continue;
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width * 0.5;
+        const cy = r.top + r.height * 0.5;
+        const dx = cx - fx;
+        const dy = cy - fy;
+
+        if (dir === 'right') {
+          if (dx <= 8) continue;
+          const sameRow = Math.abs(dy) < Math.max(curRect.height, r.height) * 0.75;
+          const score = sameRow ? dx + Math.abs(dy) * 2.5 : 10000 + dx + Math.abs(dy) * 8.0;
+          if (score < bestScore) { bestScore = score; bestCandidate = el; }
+        } else if (dir === 'left') {
+          if (dx >= -8) continue;
+          const sameRow = Math.abs(dy) < Math.max(curRect.height, r.height) * 0.75;
+          const score = sameRow ? Math.abs(dx) + Math.abs(dy) * 2.5 : 10000 + Math.abs(dx) + Math.abs(dy) * 8.0;
+          if (score < bestScore) { bestScore = score; bestCandidate = el; }
+        } else if (dir === 'down') {
+          if (dy <= 10) continue;
+          const score = dy * 2.2 + Math.abs(dx) * 0.85;
+          if (score < bestScore) { bestScore = score; bestCandidate = el; }
+        } else if (dir === 'up') {
+          if (dy >= -10) continue;
+          const score = Math.abs(dy) * 2.2 + Math.abs(dx) * 0.85;
+          if (score < bestScore) { bestScore = score; bestCandidate = el; }
+        }
+      }
+
+      if (bestCandidate) {
+        this.setFocus(bestCandidate);
+        if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+          AudioSys.init();
+          AudioSys.beep(520, 0.04);
+        }
+        if (typeof resetMenuIdleTimer === 'function') resetMenuIdleTimer();
+        return true;
+      }
+      return false;
+    },
+
+    confirmSelection() {
+      const container = this.getActiveContainer();
+      if (!container) return false;
+      if (container.id === 'menu-screen' && typeof isMenuSpectating === 'function' && isMenuSpectating()) {
+        toggleMenuSpectate(false);
+        return true;
+      }
+      const current = this.ensureValidFocus();
+      if (!current) return false;
+
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(680, 0.07);
+      }
+      if (typeof resetMenuIdleTimer === 'function') resetMenuIdleTimer();
+
+      const isP1Card = current.closest && current.closest('#p1-bot-selector');
+      const isP2Card = current.closest && current.closest('#p2-bot-selector');
+
+      current.click();
+
+      // Ergonomic Controller Flow in Robot Select Modal:
+      // Selecting a P1 robot card advances focus to P2 robot row; selecting a P2 robot card advances focus to START MATCH!
+      if (isP1Card) {
+        const p2Selected = container.querySelector('#p2-bot-selector .bot-card.selected') || container.querySelector('#p2-bot-selector .bot-card');
+        if (p2Selected) this.setFocus(p2Selected);
+      } else if (isP2Card) {
+        const startBtn = document.getElementById('btn-start-match');
+        if (startBtn) this.setFocus(startBtn);
+      } else {
+        setTimeout(() => this.ensureValidFocus(), 30);
+      }
+      return true;
+    },
+
+    cancelOrBack() {
+      const container = this.getActiveContainer();
+      if (!container) return false;
+      if (container.id === 'menu-screen') {
+        if (typeof isMenuSpectating === 'function' && isMenuSpectating()) {
+          toggleMenuSpectate(false);
+          return true;
+        }
+        return false;
+      }
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(380, 0.06);
+      }
+      const backMap = {
+        'modal-select': 'btn-select-close',
+        'modal-1v1': 'btn-1v1-back',
+        'modal-online-host': 'btn-host-cancel',
+        'modal-online-join': 'btn-join-back',
+        'modal-pause': 'btn-resume-game',
+        'modal-gameover': 'btn-back-menu'
+      };
+      const btnId = backMap[container.id];
+      const backBtn = btnId ? document.getElementById(btnId) : null;
+      if (backBtn) {
+        backBtn.click();
+        setTimeout(() => this.ensureValidFocus(), 30);
+        return true;
+      }
+      return false;
+    },
+
+    cycleP2BotDirect(step) {
+      const modalSelect = document.getElementById('modal-select');
+      if (!modalSelect || modalSelect.classList.contains('hidden')) return false;
+      const cards = Array.from(modalSelect.querySelectorAll('#p2-bot-selector .bot-card'));
+      if (cards.length === 0) return false;
+      let idx = cards.findIndex(c => c.classList.contains('selected'));
+      if (idx < 0) idx = 0;
+      idx = (idx + step + cards.length) % cards.length;
+      cards[idx].click();
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(580, 0.04);
+      }
+      return true;
+    },
+
+    readPadDir(pad) {
+      if (!pad) return null;
+      const b = pad.buttons || [];
+      if (b[12] && (b[12].pressed || b[12].value > 0.5)) return 'up';
+      if (b[13] && (b[13].pressed || b[13].value > 0.5)) return 'down';
+      if (b[14] && (b[14].pressed || b[14].value > 0.5)) return 'left';
+      if (b[15] && (b[15].pressed || b[15].value > 0.5)) return 'right';
+      const axX = (pad.axes && pad.axes.length > 0) ? pad.axes[0] : 0;
+      const axY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
+      if (axY < -0.55) return 'up';
+      if (axY > 0.55) return 'down';
+      if (axX < -0.55) return 'left';
+      if (axX > 0.55) return 'right';
+      return null;
+    },
+
+    update(dt) {
+      const container = this.getActiveContainer();
+      if (!container) {
+        if (this.focusedEl) this.clearFocus();
+        return;
+      }
+
+      const pads = getConnectedGamepadsList();
+      if (pads.length > 0) {
+        this.ensureValidFocus();
+      }
+
+      if (this.navCooldown > 0) {
+        this.navCooldown = Math.max(0, this.navCooldown - dt);
+      }
+
+      for (let pIdx = 0; pIdx < Math.min(2, pads.length); pIdx++) {
+        const pad = pads[pIdx];
+        if (!pad) continue;
+        const prev = this.prevPadStates[pIdx];
+        const b = pad.buttons || [];
+
+        const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5));
+        const bPressed = !!(b[1] && (b[1].pressed || b[1].value > 0.5));
+        const startPressed = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
+        const dir = this.readPadDir(pad);
+
+        // When 2 controllers are connected on the Robot Select screen (#modal-select),
+        // Controller 2 Left/Right directly cycles Player 2's robot selection card!
+        if (pIdx === 1 && container.id === 'modal-select' && pads.length >= 2 && (dir === 'left' || dir === 'right')) {
+          if (dir !== prev.dir || this.navCooldown <= 0) {
+            this.cycleP2BotDirect(dir === 'right' ? 1 : -1);
+            this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
+          }
+        } else if (dir) {
+          if (dir !== prev.dir || this.navCooldown <= 0) {
+            this.moveFocus(dir);
+            this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
+          }
+        }
+
+        if (aPressed && !prev.a) {
+          this.confirmSelection();
+        }
+        if (bPressed && !prev.b) {
+          this.cancelOrBack();
+        }
+        if (startPressed && !prev.start && container.id === 'modal-select') {
+          const startBtn = document.getElementById('btn-start-match');
+          if (startBtn) startBtn.click();
+        }
+
+        prev.a = aPressed;
+        prev.b = bPressed;
+        prev.start = startPressed;
+        prev.dir = dir;
+      }
+    }
+  };
+
+  function updateGamepadMenuNavigation(dt) {
+    GamepadUINav.update(dt || 0.016);
+  }
+  window.GamepadUINav = GamepadUINav;
+  window.updateGamepadMenuNavigation = updateGamepadMenuNavigation;
