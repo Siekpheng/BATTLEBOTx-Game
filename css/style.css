@@ -927,9 +927,12 @@
     @media (max-width: 768px) {
       /* Clean compact HUD on mobile */
       #btn-cam-down,
-      #btn-cam-up,
-      #btn-toggle-touch {
+      #btn-cam-up {
         display: none !important;
+      }
+      #btn-toggle-touch {
+        padding: 6px 10px;
+        font-size: 0.78rem;
       }
       .hud-top-bar {
         top: calc(8px + env(safe-area-inset-top, 0px));

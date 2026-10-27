@@ -439,19 +439,26 @@
     }
   }, 200);
 
-  // HUD Touch Controls Toggle
+  // HUD Touch Controls Toggle: OFF by default
   const btnToggleTouch = document.getElementById('btn-toggle-touch');
-  let touchControlsActive = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 1024);
-  if (!touchControlsActive) {
+  const storedTouch = (function() {
+    try { return localStorage.getItem('battlebotx_touch_controls'); } catch (e) { return null; }
+  })();
+  const touchEnabled = (storedTouch === 'on'); // OFF by default
+  if (!touchEnabled) {
     document.body.classList.add('hide-touch-controls');
     if (btnToggleTouch) btnToggleTouch.textContent = '🎮 Touch: OFF';
   } else {
+    document.body.classList.remove('hide-touch-controls');
     if (btnToggleTouch) btnToggleTouch.textContent = '🎮 Touch: ON';
   }
   if (btnToggleTouch) {
     btnToggleTouch.addEventListener('click', () => {
       const isHidden = document.body.classList.toggle('hide-touch-controls');
       btnToggleTouch.textContent = isHidden ? '🎮 Touch: OFF' : '🎮 Touch: ON';
+      try {
+        localStorage.setItem('battlebotx_touch_controls', isHidden ? 'off' : 'on');
+      } catch (e) {}
     });
   }
 
