@@ -1487,30 +1487,46 @@
     hitStopRemaining = Math.max(hitStopRemaining, durationSec);
   }
 
-  function triggerGamepadRumble(intensity = 0.7, durationMs = 200) {
+  function triggerGamepadRumble(intensity = 0.7, durationMs = 200, targetBotOrSlot = null) {
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
-    // 1. Dual-Motor Gamepad Haptics (Xbox / PlayStation / USB Controller)
-    if (typeof navigator.getGamepads === 'function') {
-      try {
-        const pads = navigator.getGamepads();
-        if (pads) {
-          for (let i = 0; i < pads.length; i++) {
-            const pad = pads[i];
-            if (pad && pad.connected && pad.vibrationActuator && pad.vibrationActuator.type === 'dual-rumble') {
-              pad.vibrationActuator.playEffect('dual-rumble', {
-                startDelay: 0,
-                duration: Math.min(1000, durationMs),
-                weakMagnitude: Math.min(1.0, intensity * 0.75),
-                strongMagnitude: Math.min(1.0, intensity)
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch (err) {}
+
+    // Resolve target slots to rumble (0 = P1, 1 = P2, null/'both' = all connected controllers)
+    let targetSlots = [0, 1];
+    if (targetBotOrSlot === 0 || (typeof playerBot !== 'undefined' && targetBotOrSlot === playerBot)) {
+      targetSlots = [0];
+    } else if (targetBotOrSlot === 1 || (typeof enemyBot !== 'undefined' && targetBotOrSlot === enemyBot)) {
+      targetSlots = [1];
+    } else if (Array.isArray(targetBotOrSlot)) {
+      targetSlots = targetBotOrSlot;
     }
 
-    // 2. Mobile Device Vibration Haptics
-    if (typeof navigator.vibrate === 'function') {
+    const rumpledPads = new Set();
+    targetSlots.forEach(slot => {
+      let pad = null;
+      if (typeof GamepadMapper !== 'undefined' && typeof GamepadMapper.getPadForPlayer === 'function') {
+        pad = GamepadMapper.getPadForPlayer(slot);
+      }
+      if (!pad && typeof navigator.getGamepads === 'function') {
+        const pads = navigator.getGamepads();
+        if (pads && pads[slot]) pad = pads[slot];
+      }
+      if (pad && !rumpledPads.has(pad)) {
+        rumpledPads.add(pad);
+        if (pad.connected && pad.vibrationActuator && typeof pad.vibrationActuator.playEffect === 'function') {
+          try {
+            pad.vibrationActuator.playEffect('dual-rumble', {
+              startDelay: 0,
+              duration: Math.min(1000, durationMs),
+              weakMagnitude: Math.min(1.0, intensity * 0.75),
+              strongMagnitude: Math.min(1.0, intensity)
+            }).catch(() => {});
+          } catch (e) {}
+        }
+      }
+    });
+
+    // 2. Mobile Device Vibration Haptics (for Player 1)
+    if (targetSlots.includes(0) && typeof navigator.vibrate === 'function') {
       try {
         navigator.vibrate(Math.min(350, durationMs));
       } catch (err) {}

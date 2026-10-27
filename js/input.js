@@ -572,13 +572,19 @@
     }
 
     if (!prevGamepadButtons[playerIndex]) {
-      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false };
+      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false, back: false, a: false, x: false, y: false };
     }
     const prev = prevGamepadButtons[playerIndex];
+    const inMatch = (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'));
 
-    // 4. Left button (LB / buttons[4]) for turning weapon on/off
+    // 4. Weapon ON / OFF toggle:
+    // Left Bumper [LB] (buttons[4]) OR Face Buttons [A] (buttons[0]) / [X] (buttons[2])
     const lbPressed = !!(pad.buttons && pad.buttons[4] && (pad.buttons[4].pressed || pad.buttons[4].value > 0.5));
-    if (lbPressed && !prev.lb && (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'))) {
+    const aPressed  = !!(pad.buttons && pad.buttons[0] && (pad.buttons[0].pressed || pad.buttons[0].value > 0.5));
+    const xPressed  = !!(pad.buttons && pad.buttons[2] && (pad.buttons[2].pressed || pad.buttons[2].value > 0.5));
+    const weaponTriggered = (lbPressed && !prev.lb) || (aPressed && !prev.a) || (xPressed && !prev.x);
+
+    if (weaponTriggered && inMatch) {
       if (playerIndex === 0 && playerBot) {
         togglePlayerWeapon(playerBot);
       } else if (playerIndex === 1 && enemyBot && gameMode === '1v1') {
@@ -586,27 +592,38 @@
       }
     }
     prev.lb = lbPressed;
+    prev.a = aPressed;
+    prev.x = xPressed;
 
-    // 5. Right button (RB / buttons[5]) for changing camera angle
+    // 5. Change Camera Angle:
+    // Right Bumper [RB] (buttons[5]) OR Top Face Button [Y] (buttons[3])
     const rbPressed = !!(pad.buttons && pad.buttons[5] && (pad.buttons[5].pressed || pad.buttons[5].value > 0.5));
-    if (rbPressed && !prev.rb) {
-      if (playerIndex === 0 && (matchState === 'playing' || matchState === 'countdown')) {
+    const yPressed  = !!(pad.buttons && pad.buttons[3] && (pad.buttons[3].pressed || pad.buttons[3].value > 0.5));
+    const cameraTriggered = (rbPressed && !prev.rb) || (yPressed && !prev.y);
+
+    if (cameraTriggered && inMatch) {
+      if (playerIndex === 0) {
         cycleCameraMode();
-      } else if (playerIndex === 1 && gameMode === '1v1' && (matchState === 'playing' || matchState === 'countdown')) {
+      } else if (playerIndex === 1 && gameMode === '1v1') {
         if (typeof cycleCameraModeP2 === 'function') cycleCameraModeP2();
       }
     }
     prev.rb = rbPressed;
+    prev.y = yPressed;
 
-    // 6. Start / Menu button (buttons[9]) for pause toggle
-    const startPressed = !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
-    if (startPressed && !prev.start) {
+    // 6. Start / Menu button (buttons[9]) or Back / Select (buttons[8]) for pause toggle
+    const startPressed   = !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
+    const backBtnPressed = !!(pad.buttons && pad.buttons[8] && (pad.buttons[8].pressed || pad.buttons[8].value > 0.5));
+    const pauseTriggered = (startPressed && !prev.start) || (backBtnPressed && !prev.back);
+
+    if (pauseTriggered) {
       const btnPause = document.getElementById('btn-pause');
       const btnResume = document.getElementById('btn-resume-game');
       if (matchState === 'playing' && btnPause) btnPause.click();
       else if (matchState === 'paused' && btnResume) btnResume.click();
     }
     prev.start = startPressed;
+    prev.back = backBtnPressed;
 
     return {
       throttle,
@@ -643,7 +660,7 @@
     console.log(`🎮 Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
     const hint = document.getElementById('hint-controls-text');
     if (hint) {
-      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER CONNECTED:</span> <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera`;
+      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER READY:</span> <kbd>RT</kbd> Drive · <kbd>LT</kbd> Rev · Stick: Steer · <kbd>A</kbd>/<kbd>X</kbd>/<kbd>LB</kbd> Weapon · <kbd>Y</kbd>/<kbd>RB</kbd> Cam`;
     }
   });
 

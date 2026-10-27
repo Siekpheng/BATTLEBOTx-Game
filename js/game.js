@@ -969,6 +969,9 @@
 
     document.getElementById('result-score').textContent = `YOU ${playerScore} - ${enemyScore} OPPONENT`;
     modalGameover.classList.remove('hidden');
+    if (typeof GamepadUINav !== 'undefined' && typeof GamepadUINav.ensureValidFocus === 'function') {
+      GamepadUINav.ensureValidFocus();
+    }
   }
 
   function updateTimerDisplay() {

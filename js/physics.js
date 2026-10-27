@@ -251,6 +251,7 @@
         if (velDot > 0) {
           bot.vx -= 1.6 * velDot * outNx;
           bot.vz -= 1.6 * velDot * outNz;
+          triggerGamepadRumble(Math.min(0.55, 0.2 + Math.abs(velDot) * 0.08), 120, bot);
         }
 
         // Wall weapon collision: if front strikes arena wall with spinning weapon, stop weapon
@@ -286,7 +287,31 @@
 
     const inAir = (bot.airY > 0.05 || bot.vy > 0);
 
+    // 2.2 WEAPON GYROSCOPIC PRECESSION & ANGULAR INERTIA (BattleBots Authentic Kinematics)
+    const hasSpinningWeapon = (bot.weaponMesh && !bot.weaponDestroyed && (bot.weaponSpinSpeed || 0) > 15.0);
+    const spinFactor = hasSpinningWeapon ? Math.min(1.0, bot.weaponSpinSpeed / 95.0) : 0;
+    const isVertSpinner = (bot.type === 'robot1' || bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6');
+
     if (inAir) {
+      if (hasSpinningWeapon) {
+        if (isVertSpinner) {
+          // Vertical Spinner / Drum: Angular momentum is transverse (Pitch axis).
+          // Mid-air pitch flip couples with yaw/roll precession, creating authentic dynamic roll twist
+          const gyroRollPrecession = -Math.sign(bot.pitchVel || 1) * spinFactor * 4.2;
+          bot.rollVel += gyroRollPrecession * dt;
+          // Mid-air gyroscopic pitch stiffness resists uncontrolled end-over-end pinwheeling
+          bot.pitchVel *= Math.pow(0.50, dt);
+        } else {
+          // Horizontal Spinner (Robot 2, Robot 3): Angular momentum is vertical (Yaw axis).
+          // Acts like a spinning gyroscope/frisbee: strongly resists pitching and rolling in mid-air,
+          // keeping the chassis flat and level while airborne!
+          bot.pitchVel *= Math.pow(0.18, dt);
+          bot.rollVel  *= Math.pow(0.18, dt);
+          // Subtle gyroscopic nutation wobble
+          bot.roll += Math.sin(performance.now() * 0.025) * 0.035 * spinFactor;
+        }
+      }
+
       // Free tumbling mid-air rotation
       bot.pitch += bot.pitchVel * dt;
       bot.roll += bot.rollVel * dt;
@@ -297,6 +322,11 @@
       bot.pitchVel *= Math.pow(0.65, dt);
       bot.rollVel *= Math.pow(0.65, dt);
     } else {
+      // On Ground: Vertical spinners turning sharp at full RPM slightly lift an edge wheel (authentic BattleBots Gyro Dance)
+      if (hasSpinningWeapon && isVertSpinner && Math.abs(steerIn) > 0.25) {
+        const gyroDanceTilt = -steerIn * spinFactor * 0.07;
+        bot.roll = THREE.MathUtils.lerp(bot.roll, gyroDanceTilt, Math.min(1.0, 10.0 * dt));
+      }
       // Bi-stable Pitch Physics (end-over-end frontflip/backflip on ground)
       if (bot.flipped || Math.abs(bot.pitch) > 0.04 || Math.abs(bot.pitchVel) > 0.04) {
         bot.pitch += bot.pitchVel * dt;
@@ -593,23 +623,73 @@
         bothCantFightTimer = 0.0;
       }
 
-      // Record pre-impact speeds and approach velocities before impulse dampens them
+      // Record pre-impact speeds and approach velocities
       const pSpeedBefore = Math.hypot(playerBot.vx, playerBot.vz);
       const eSpeedBefore = Math.hypot(enemyBot.vx, enemyBot.vz);
       const pApproach = Math.max(0, playerBot.vx * nx + playerBot.vz * nz);
       const eApproach = Math.max(0, enemyBot.vx * (-nx) + enemyBot.vz * (-nz));
 
-      // Proportional impulse scaling naturally with impact speed
-      const impulse = Math.min(5.2, impactSpeed * 0.52);
-      if (impulse > 0.08) {
-        playerBot.vx -= nx * impulse;
-        playerBot.vz -= nz * impulse;
-        enemyBot.vx += nx * impulse;
-        enemyBot.vz += nz * impulse;
+      // Relative normal velocity (closing speed along collision normal)
+      const relNormalVel = (playerBot.vx - enemyBot.vx) * nx + (playerBot.vz - enemyBot.vz) * nz;
+
+      // Check weapon readiness for kinetic energy strike:
+      const pFwdDot = Math.sin(playerBot.yaw) * nx + Math.cos(playerBot.yaw) * nz;
+      const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
+      const minWpSpin = 40.0;
+      const isPrac = (gameMode === 'practice');
+      const isPWeaponImpact = (playerBot.weaponActive !== false && pFwdDot > 0.35 && playerBot.weaponSpinSpeed >= minWpSpin);
+      const isEWeaponImpact = (!isPrac && enemyBot.weaponActive !== false && eFwdDot > 0.35 && enemyBot.weaponSpinSpeed >= minWpSpin);
+      const isKineticStrike = (impactSpeed > 1.8) && (isPWeaponImpact || isEWeaponImpact);
+
+      if (isKineticStrike) {
+        // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
+        const kineticRecoil = Math.min(4.8, impactSpeed * 0.42);
+        playerBot.vx -= nx * kineticRecoil;
+        playerBot.vz -= nz * kineticRecoil;
+        enemyBot.vx += nx * kineticRecoil;
+        enemyBot.vz += nz * kineticRecoil;
+      } else {
+        // ========================================================
+        // 2.1 HEAD-ON BUMPER SPRING DAMPING (Eliminates Jitter & Ping-Pong Bouncing)
+        // Inelastic steel crunch (e = 0.08) absorbs relative approach speed cleanly,
+        // turning high-speed head-on rams into solid, crunchy, weighted collisions!
+        // ========================================================
+        if (relNormalVel > 0.04) {
+          const restitution = 0.08; // 8% minimal bounce (solid steel energy absorption)
+          const dampedNormalImpulse = (1.0 + restitution) * relNormalVel * 0.50;
+          playerBot.vx -= nx * dampedNormalImpulse;
+          playerBot.vz -= nz * dampedNormalImpulse;
+          enemyBot.vx += nx * dampedNormalImpulse;
+          enemyBot.vz += nz * dampedNormalImpulse;
+        }
+
+        // Tangential contact friction: prevents frictionless sliding when locked horns
+        const tx = -nz;
+        const tz = nx;
+        const relTangentialVel = (playerBot.vx - enemyBot.vx) * tx + (playerBot.vz - enemyBot.vz) * tz;
+        const frictionImpulse = relTangentialVel * 0.24;
+        playerBot.vx -= tx * frictionImpulse;
+        playerBot.vz -= tz * frictionImpulse;
+        enemyBot.vx += tx * frictionImpulse;
+        enemyBot.vz += tz * frictionImpulse;
+
+        // Continuous Head-on Pushing Traction Contest:
+        // When both robots are grinding bumpers and applying throttle,
+        // the robot with more drive power and intact drive wheels pushes the opponent backward!
+        const pWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.filter(w => w.attached).length : 2;
+        const eWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.filter(w => w.attached).length : 2;
+        const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * (pWheels / 2);
+        const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * (eWheels / 2);
+        const netPushTraction = (pDriveForce - eDriveForce) * 2.4 * 0.016;
+
+        playerBot.vx += nx * netPushTraction;
+        playerBot.vz += nz * netPushTraction;
+        enemyBot.vx += nx * netPushTraction;
+        enemyBot.vz += nz * netPushTraction;
       }
 
       // Realistic horizontal yaw deflection
-      const yawTorque = (nx * (playerBot.vz - enemyBot.vz) - nz * (playerBot.vx - enemyBot.vx)) * 0.09;
+      const yawTorque = (nx * (playerBot.vz - enemyBot.vz) - nz * (playerBot.vx - enemyBot.vx)) * 0.08;
       playerBot.yaw += yawTorque;
       enemyBot.yaw -= yawTorque;
 
@@ -746,11 +826,13 @@
           if (canFlipEnemy) {
             AudioSys.crowdCheer(0.85, 1.6);
             addCameraTrauma(0.70);
-            triggerGamepadRumble(0.9, 300);
+            triggerGamepadRumble(0.75, 200, 0); // Crisp weapon strike feedback for P1
+            triggerGamepadRumble(1.0, 360, 1);  // Heavy impact shudder for P2 victim
             triggerHitStop(0.045);
           } else {
             addCameraTrauma(0.38);
-            triggerGamepadRumble(0.60, 200);
+            triggerGamepadRumble(0.50, 150, 0);
+            triggerGamepadRumble(0.80, 240, 1);
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
@@ -856,11 +938,13 @@
           if (canFlipPlayer) {
             AudioSys.crowdCheer(0.85, 1.6);
             addCameraTrauma(0.70);
-            triggerGamepadRumble(0.9, 300);
+            triggerGamepadRumble(0.75, 200, 1); // Crisp weapon strike feedback for P2
+            triggerGamepadRumble(1.0, 360, 0);  // Heavy impact shudder for P1 victim
             triggerHitStop(0.045);
           } else {
             addCameraTrauma(0.38);
-            triggerGamepadRumble(0.60, 200);
+            triggerGamepadRumble(0.50, 150, 1);
+            triggerGamepadRumble(0.80, 240, 0);
           }
 
           // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
@@ -947,7 +1031,7 @@
           // ========================================================
           AudioSys.metalClashSound(Math.min(1.8, 0.55 + impactSpeed * 0.22), false);
           addCameraTrauma(Math.min(0.35, 0.08 + impactSpeed * 0.04));
-          triggerGamepadRumble(Math.min(0.55, 0.2 + impactSpeed * 0.06), 140);
+          triggerGamepadRumble(Math.min(0.55, 0.2 + impactSpeed * 0.06), 140, 'both');
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: Math.min(1.8, 0.55 + impactSpeed * 0.22), h: false });
           }
