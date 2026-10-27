@@ -374,29 +374,29 @@
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '700 80px "Koulen", "Kantumruy Pro", "Leelawadee UI", "Khmer UI", sans-serif';
+      ctx.font = '700 114px "Koulen", "Kantumruy Pro", "Leelawadee UI", "Khmer UI", sans-serif';
       ctx.fillStyle = '#222630';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetY = 2;
-      ctx.fillText('សង្វៀន រ៉ូបូត', cx, 590);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.40)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 3;
+      ctx.fillText('សង្វៀន រ៉ូបូត', cx, 562);
       ctx.restore();
 
       // 11. English Text Below Center: "BATTLEBOTx"
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '900 84px Orbitron, sans-serif';
-      ctx.letterSpacing = '0.08em';
+      ctx.font = '900 104px Orbitron, sans-serif';
+      ctx.letterSpacing = '0.05em';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
       ctx.strokeStyle = '#181b22';
-      ctx.lineWidth = 6;
-      ctx.strokeText('BATTLEBOTx', cx, 1468);
+      ctx.lineWidth = 8;
+      ctx.strokeText('BATTLEBOTx', cx, 1487);
       ctx.shadowColor = 'transparent';
       ctx.fillStyle = '#656b78';
-      ctx.fillText('BATTLEBOTx', cx, 1468);
+      ctx.fillText('BATTLEBOTx', cx, 1487);
       ctx.restore();
     };
 
