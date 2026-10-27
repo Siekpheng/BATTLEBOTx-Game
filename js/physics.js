@@ -323,8 +323,9 @@
       bot.rollVel *= Math.pow(0.65, dt);
     } else {
       // On Ground: Vertical spinners turning sharp at full RPM slightly lift an edge wheel (authentic BattleBots Gyro Dance)
-      if (hasSpinningWeapon && isVertSpinner && Math.abs(steerIn) > 0.25) {
-        const gyroDanceTilt = -steerIn * spinFactor * 0.07;
+      const steerVal = (bot.steerInput || 0);
+      if (hasSpinningWeapon && isVertSpinner && Math.abs(steerVal) > 0.25) {
+        const gyroDanceTilt = -steerVal * spinFactor * 0.07;
         bot.roll = THREE.MathUtils.lerp(bot.roll, gyroDanceTilt, Math.min(1.0, 10.0 * dt));
       }
       // Bi-stable Pitch Physics (end-over-end frontflip/backflip on ground)
