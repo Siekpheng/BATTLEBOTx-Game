@@ -215,11 +215,18 @@
     bot.weaponSpinSpeed = 0;
     bot.weaponActive = false;
 
-    // Catastrophic explosion FX
+    // 1. Immediately extinguish all active chassis fire on this robot
+    clearBotFlames();
+
+    // 2. Catastrophic Fire Explosion Effect!
     const explosionCenter = hitPoint || botPos;
+    const botVelocity = (bot.vx || bot.vz) ? { x: bot.vx || 0, z: bot.vz || 0 } : null;
+    spawnFireExplosion(explosionCenter, botVelocity);
     spawnCollisionSparks(explosionCenter, 95);
+
     if (typeof AudioSys !== 'undefined') {
-      if (AudioSys.metalClashSound) AudioSys.metalClashSound(3.0, true);
+      if (AudioSys.explosionSound) AudioSys.explosionSound();
+      else if (AudioSys.metalClashSound) AudioSys.metalClashSound(3.0, true);
       if (AudioSys.weaponStallSound) AudioSys.weaponStallSound();
       if (AudioSys.crowdCheer) AudioSys.crowdCheer(1.0, 5.0);
     }
@@ -326,6 +333,15 @@
           }
         }
       });
+    }
+
+    // Check if ALL wheels on the robot are now detached
+    const attachedWheelsRemaining = bot.detachableParts.filter(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent);
+    if (attachedWheelsRemaining.length === 0) {
+      if (bot.wheels) bot.wheels.forEach(w => { w.attached = false; });
+      bot.drivePower = 0;
+      bot.throttleInput = 0;
+      bot.steerInput = 0;
     }
 
     // Capture exact world position, orientation, scale
@@ -500,6 +516,15 @@
   const smokePool = [];
   const emberPool = [];
 
+  // Dedicated High-Impact Fire Explosion Particle System
+  const EXPLOSION_FIRE_POOL_SIZE = 55;
+  const EXPLOSION_SMOKE_POOL_SIZE = 40;
+  const explosionFirePool = [];
+  const explosionSmokePool = [];
+
+  const explosionFireLight = new THREE.PointLight(0xff6600, 0, 26, 1.4);
+  scene.add(explosionFireLight);
+
   for (let i = 0; i < FIRE_POOL_SIZE; i++) {
     const mat = new THREE.SpriteMaterial({
       map: fireTex,
@@ -563,6 +588,123 @@
       vx: 0, vy: 0, vz: 0
     });
   }
+
+  // Pre-allocate explosion fire sprites (Additive Blending for incandescent bloom)
+  for (let i = 0; i < EXPLOSION_FIRE_POOL_SIZE; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: fireTex,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+      opacity: 1.0
+    });
+    const s = new THREE.Sprite(mat);
+    s.visible = false;
+    scene.add(s);
+    explosionFirePool.push({
+      sprite: s,
+      active: false,
+      life: 0,
+      maxLife: 1.0,
+      vx: 0, vy: 0, vz: 0,
+      baseScale: 1.0
+    });
+  }
+
+  // Pre-allocate explosion smoke sprites (Normal Blending for dense dark billowing smoke)
+  for (let i = 0; i < EXPLOSION_SMOKE_POOL_SIZE; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: smokeTex,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.65
+    });
+    const s = new THREE.Sprite(mat);
+    s.visible = false;
+    scene.add(s);
+    explosionSmokePool.push({
+      sprite: s,
+      active: false,
+      life: 0,
+      maxLife: 1.5,
+      vx: 0, vy: 0, vz: 0,
+      baseScale: 1.0,
+      rotSpeed: 0
+    });
+  }
+
+  function spawnFireExplosion(pos, botVel = null) {
+    if (!pos) return;
+
+    // 1. Dynamic Incandescent Arena Flash
+    explosionFireLight.position.set(pos.x, pos.y + 0.65, pos.z);
+    explosionFireLight.intensity = 15.0;
+
+    // 2. Expanding Spherical Fireball Burst
+    const fireCount = 42;
+    for (let i = 0; i < fireCount; i++) {
+      const p = explosionFirePool.find(item => !item.active);
+      if (!p) break;
+      p.active = true;
+      p.life = 0;
+      p.maxLife = 0.55 + Math.random() * 0.45;
+      p.sprite.visible = true;
+
+      const jx = (Math.random() - 0.5) * 0.6;
+      const jy = (Math.random() - 0.5) * 0.4;
+      const jz = (Math.random() - 0.5) * 0.6;
+      p.sprite.position.set(pos.x + jx, pos.y + 0.4 + jy, pos.z + jz);
+
+      const speed = 6.5 + Math.random() * 11.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.48; // Upward hemisphere
+      p.vx = Math.cos(theta) * Math.sin(phi) * speed + (botVel ? botVel.x * 0.35 : 0);
+      p.vy = Math.cos(phi) * speed * 0.85 + 2.8;
+      p.vz = Math.sin(theta) * Math.sin(phi) * speed + (botVel ? botVel.z * 0.35 : 0);
+
+      p.baseScale = 1.35 + Math.random() * 1.65;
+      p.sprite.scale.set(p.baseScale * 0.45, p.baseScale * 0.45, 1);
+      p.sprite.material.color.setRGB(1.0, 1.0, 0.95); // White-hot ignition
+      p.sprite.material.opacity = 1.0;
+    }
+
+    // 3. Dense Billowing Explosion Smoke Clouds
+    const smokeCount = 28;
+    for (let i = 0; i < smokeCount; i++) {
+      const s = explosionSmokePool.find(item => !item.active);
+      if (!s) break;
+      s.active = true;
+      s.life = 0;
+      s.maxLife = 1.25 + Math.random() * 0.85;
+      s.sprite.visible = true;
+
+      const jx = (Math.random() - 0.5) * 0.8;
+      const jz = (Math.random() - 0.5) * 0.8;
+      s.sprite.position.set(pos.x + jx, pos.y + 0.5, pos.z + jz);
+
+      const speed = 3.5 + Math.random() * 6.0;
+      const angle = Math.random() * Math.PI * 2;
+      s.vx = Math.cos(angle) * speed + (botVel ? botVel.x * 0.25 : 0);
+      s.vy = 2.0 + Math.random() * 3.2;
+      s.vz = Math.sin(angle) * speed + (botVel ? botVel.z * 0.25 : 0);
+
+      s.baseScale = 1.6 + Math.random() * 1.8;
+      s.rotSpeed = (Math.random() - 0.5) * 2.5;
+      s.sprite.material.rotation = Math.random() * Math.PI * 2;
+      s.sprite.material.opacity = 0.70;
+      s.sprite.scale.set(s.baseScale * 0.5, s.baseScale * 0.5, 1);
+    }
+
+    // 4. Fiery Embers & Sparks Burst
+    for (let i = 0; i < 35; i++) {
+      spawnEmberParticle(pos, {
+        x: (Math.random() - 0.5) * 14.0,
+        z: (Math.random() - 0.5) * 14.0
+      });
+    }
+  }
+  window.spawnFireExplosion = spawnFireExplosion;
 
   function spawnFlameParticle(pos, botVel) {
     const p = firePool.find(item => !item.active);
@@ -635,11 +777,20 @@
   }
 
   function isBotFlaming(bot) {
-    return getBotDamagePercent(bot) >= 80;
+    // If bot is destroyed, fire burning MUST stop!
+    if (!bot || bot.isEntirelyDestroyed) return false;
+
+    // Per user specification: fire effect starts when 50% of the parts have fallen off!
+    if (bot.detachableParts && bot.detachableParts.length > 0) {
+      const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
+      const initialTotal = bot.totalInitialParts || bot.detachableParts.length;
+      return remainingCount <= Math.round(initialTotal * 0.50);
+    }
+    return getBotDamagePercent(bot) >= 50;
   }
 
   function checkAndSpawnBotFlames(bot, fireLight, dt) {
-    if (!bot || !bot.root) {
+    if (!bot || !bot.root || bot.isEntirelyDestroyed) {
       if (fireLight) fireLight.intensity = 0;
       return false;
     }
@@ -674,6 +825,68 @@
   }
 
   function updateFlames(dt) {
+    // Decay dynamic explosion light
+    if (explosionFireLight && explosionFireLight.intensity > 0) {
+      explosionFireLight.intensity = Math.max(0, explosionFireLight.intensity - dt * 25.0);
+    }
+
+    // Simulate Catastrophic Explosion Fireballs
+    for (const p of explosionFirePool) {
+      if (!p.active) continue;
+      p.life += dt;
+      const progress = p.life / p.maxLife;
+      if (progress >= 1.0) {
+        p.active = false;
+        p.sprite.visible = false;
+        continue;
+      }
+      p.sprite.position.x += p.vx * dt;
+      p.sprite.position.y += p.vy * dt;
+      p.sprite.position.z += p.vz * dt;
+      p.vx *= Math.pow(0.70, dt);
+      p.vz *= Math.pow(0.70, dt);
+      p.vy += 3.5 * dt; // Strong convective thermal lift
+
+      // Rapid fireball expansion
+      const scaleProg = (progress < 0.28) ? (progress / 0.28) : 1.0;
+      const curScale = p.baseScale * (0.45 + scaleProg * 2.2);
+      p.sprite.scale.set(curScale, curScale, 1);
+
+      // Incandescent color progression: White-hot -> Fire orange -> Crimson -> Dark ash
+      if (progress < 0.15) {
+        p.sprite.material.color.setRGB(1.0, 1.0, 0.95);
+      } else if (progress < 0.45) {
+        p.sprite.material.color.setRGB(1.0, 0.62, 0.08);
+      } else if (progress < 0.75) {
+        p.sprite.material.color.setRGB(0.90, 0.18, 0.03);
+      } else {
+        p.sprite.material.color.setRGB(0.35, 0.08, 0.02);
+      }
+      p.sprite.material.opacity = Math.max(0, 1.0 - Math.pow(progress, 1.4));
+    }
+
+    // Simulate Billowing Explosion Smoke Clouds
+    for (const s of explosionSmokePool) {
+      if (!s.active) continue;
+      s.life += dt;
+      const progress = s.life / s.maxLife;
+      if (progress >= 1.0) {
+        s.active = false;
+        s.sprite.visible = false;
+        continue;
+      }
+      s.sprite.position.x += s.vx * dt;
+      s.sprite.position.y += s.vy * dt;
+      s.sprite.position.z += s.vz * dt;
+      s.vx *= Math.pow(0.80, dt);
+      s.vz *= Math.pow(0.80, dt);
+      s.vy += 1.8 * dt; // Slow rising smoke column
+      s.sprite.material.rotation += s.rotSpeed * dt;
+
+      const curScale = s.baseScale * (0.50 + progress * 2.5);
+      s.sprite.scale.set(curScale, curScale, 1);
+      s.sprite.material.opacity = Math.max(0, 0.65 * (1.0 - progress));
+    }
     for (const p of firePool) {
       if (!p.active) continue;
       p.life += dt;
@@ -760,6 +973,14 @@
     if (playerFireLight) playerFireLight.intensity = 0;
     if (enemyFireLight) enemyFireLight.intensity = 0;
   }
+
+  function clearAllFlamesAndExplosions() {
+    clearBotFlames();
+    for (const p of explosionFirePool) { p.active = false; p.sprite.visible = false; }
+    for (const s of explosionSmokePool) { s.active = false; s.sprite.visible = false; }
+    if (explosionFireLight) explosionFireLight.intensity = 0;
+  }
+  window.clearAllFlamesAndExplosions = clearAllFlamesAndExplosions;
 
   // Expose inspection & dev testing helpers on window
   window.getBotDamagePercent = getBotDamagePercent;

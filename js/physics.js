@@ -46,37 +46,56 @@
       ? Math.max(1, Math.round(bot.totalInitialParts * 0.20))
       : 2;
 
-    // Check attached wheels dynamically synchronized with detachable parts
+    // Check wheels from both bot.detachableParts (category === 'wheel') and bot.wheels
+    const wheelParts = (bot.detachableParts && bot.detachableParts.length > 0)
+      ? bot.detachableParts.filter(p => p.category === 'wheel')
+      : [];
+    const hasWheelParts = (wheelParts.length > 0);
+    const attachedWheelParts = wheelParts.filter(p => p.attached && p.mesh && p.mesh.parent);
+
+    let totalWheels = 0;
     let leftWheels = 0;
     let rightWheels = 0;
-    if (bot.wheels && bot.wheels.length > 0) {
+
+    if (hasWheelParts) {
+      totalWheels = attachedWheelParts.length;
+      if (totalWheels === 0) {
+        if (bot.wheels) bot.wheels.forEach(w => { w.attached = false; });
+      } else {
+        attachedWheelParts.forEach(p => {
+          const lx = p.localCenter ? p.localCenter.x : 0;
+          const isLeft = (lx > 0) || (p.name && (p.name.includes('_L') || p.name.includes('Left') || p.name.endsWith('L')));
+          if (isLeft) leftWheels++;
+          else rightWheels++;
+        });
+      }
+    } else if (bot.wheels && bot.wheels.length > 0) {
       bot.wheels.forEach(w => {
         if (w.attached) {
-          const hasMeshesAttached = bot.detachableParts
-            ? bot.detachableParts.some(p => p.attached && (p.mesh === w.mesh || (p.mesh && p.mesh.parent === w.mesh) || (p.name && p.name.startsWith(w.name))))
-            : true;
-          if (!hasMeshesAttached) {
-            w.attached = false;
-          } else {
-            if (w.side === 'left') leftWheels++;
-            else rightWheels++;
-          }
+          totalWheels++;
+          if (w.side === 'left') leftWheels++;
+          else rightWheels++;
         }
       });
     } else {
-      leftWheels = 1;
-      rightWheels = 1;
+      totalWheels = 0;
+      leftWheels = 0;
+      rightWheels = 0;
     }
-    const totalWheels = leftWheels + rightWheels;
-    const maxWheels = (bot.wheels && bot.wheels.length > 0) ? bot.wheels.length : 2;
+
+    const maxWheels = Math.max(1, hasWheelParts ? wheelParts.length : (bot.wheels && bot.wheels.length > 0 ? bot.wheels.length : 2));
 
     // A robot with no wheels, depleted drive health, <= 20% parts remaining, or entirely destroyed CANNOT move!
     if (totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) {
       bot.drivePower = 0;
       bot.throttleInput = 0;
       bot.steerInput = 0;
+      // High ground friction: a chassis sitting on its belly with no wheels stops immediately!
+      const bellyDrag = Math.pow(0.005, dt);
+      bot.vx *= bellyDrag;
+      bot.vz *= bellyDrag;
     } else {
-      // Symmetrically balanced wheel factor for both robots
+      // Symmetrically balanced wheel factor
       const wheelFactor = Math.min(1.0, (totalWheels / maxWheels) * 0.70 + 0.30);
       bot.drivePower = (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor);
     }
@@ -85,10 +104,10 @@
     const turnRate = 3.4 * (0.35 + 0.65 * bot.drivePower);
     const accel = 46.0 * bot.drivePower;
 
-    // Normal driving or limping when wheels are detached
-    if (!bot.flipped && bot.drivePower > 0) {
+    // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
+    if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
       if (leftWheels > 0 && rightWheels === 0) {
-        // Only left wheels: counter-steerable asymmetric drag (allows player to fight back!)
+        // Only left wheels: counter-steerable asymmetric drag
         const asymmetricPull = -0.75 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate + asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
@@ -109,8 +128,8 @@
         if (Math.abs(bot.throttleInput) > 0.1 && Math.random() < 0.25) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(-0.65, 0.1, 0)), 1);
         }
-      } else {
-        // Both sides have wheels: slight asymmetric pull if unbalanced
+      } else if (leftWheels > 0 && rightWheels > 0) {
+        // Both sides have wheels
         const asymmetricPull = (leftWheels - rightWheels) * 0.25 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate - asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
@@ -404,8 +423,8 @@
     // BattleBots Referee Countout Rule:
     // If player is immobilized (countdown started, flipped, drive burned out, or all wheels detached):
     // Opponent backs off to let referee 10s countout proceed!
-    const pNoWheels = playerBot.wheels && playerBot.wheels.length > 0 &&
-      playerBot.wheels.filter(w => w.attached).length === 0;
+    const pNoWheels = (playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0) ||
+      (playerBot.detachableParts && playerBot.detachableParts.length > 0 && playerBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
     const isPlayerImmobilized = (playerBot.stoppedTimer > 0.20) || playerBot.flipped || (playerBot.drivePower <= 0) || (playerBot.driveHealth <= 0) || pNoWheels;
 
     if (isPlayerImmobilized) {
@@ -918,10 +937,10 @@
     const pSpeed = Math.hypot(playerBot.vx || 0, playerBot.vz || 0);
     const eSpeed = Math.hypot(enemyBot.vx || 0, enemyBot.vz || 0);
 
-    const pNoWheels = playerBot.wheels && playerBot.wheels.length > 0 &&
-      playerBot.wheels.filter(w => w.attached).length === 0;
-    const eNoWheels = enemyBot.wheels && enemyBot.wheels.length > 0 &&
-      enemyBot.wheels.filter(w => w.attached).length === 0;
+    const pNoWheels = (playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0) ||
+      (playerBot.detachableParts && playerBot.detachableParts.length > 0 && playerBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
+    const eNoWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.filter(w => w.attached).length === 0) ||
+      (enemyBot.detachableParts && enemyBot.detachableParts.length > 0 && enemyBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
 
     const pNoDrive = (playerBot.driveHealth <= 0) || (playerBot.drivePower <= 0);
     const eNoDrive = (enemyBot.driveHealth <= 0) || (enemyBot.drivePower <= 0);

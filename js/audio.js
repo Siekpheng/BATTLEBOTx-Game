@@ -1158,6 +1158,63 @@
       sNode.stop(actNow + 0.15);
     },
 
+    // 6.2 Catastrophic Robot Destruction Fire Explosion Sound
+    explosionSound() {
+      if (!this.ctx || !this.isCombatAudioAllowed()) return;
+      const now = this.ctx.currentTime;
+      const dest = this.masterGain || this.ctx.destination;
+
+      // Layer 1: Heavy sub-bass detonation boom (110Hz -> 24Hz pitch sweep)
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(110, now);
+      subOsc.frequency.exponentialRampToValueAtTime(24, now + 0.65);
+      subGain.gain.setValueAtTime(0.85, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.70);
+      subOsc.connect(subGain);
+      subGain.connect(dest);
+      subOsc.start(now);
+      subOsc.stop(now + 0.72);
+
+      // Layer 2: Distorted low-pass explosion rumble & concussive blast
+      if (this.noiseBuffer) {
+        const nNode = this.ctx.createBufferSource();
+        const nFilter = this.ctx.createBiquadFilter();
+        const nGain = this.ctx.createGain();
+        nNode.buffer = this.noiseBuffer;
+        nFilter.type = 'lowpass';
+        nFilter.frequency.setValueAtTime(450, now);
+        nFilter.frequency.exponentialRampToValueAtTime(60, now + 0.85);
+        nGain.gain.setValueAtTime(0.70, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+        nNode.connect(nFilter);
+        nFilter.connect(nGain);
+        nGain.connect(dest);
+        nNode.start(now);
+        nNode.stop(now + 0.90);
+      }
+
+      // Layer 3: High-energy pyrotechnic flame hiss
+      if (this.noiseBuffer) {
+        const hNode = this.ctx.createBufferSource();
+        const hFilter = this.ctx.createBiquadFilter();
+        const hGain = this.ctx.createGain();
+        hNode.buffer = this.noiseBuffer;
+        hFilter.type = 'bandpass';
+        hFilter.frequency.setValueAtTime(1200, now);
+        hFilter.frequency.linearRampToValueAtTime(350, now + 0.50);
+        hFilter.Q.setValueAtTime(2.2, now);
+        hGain.gain.setValueAtTime(0.40, now);
+        hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+        hNode.connect(hFilter);
+        hFilter.connect(hGain);
+        hGain.connect(dest);
+        hNode.start(now);
+        hNode.stop(now + 0.55);
+      }
+    },
+
     // 6. Realistic Thermal Ember Snap & LiPo Cell Rupture Pop
     playFireCrackle() {
       if (!this.ctx || this.fireSoundEnabled === false || !this.isCombatAudioAllowed()) return;
