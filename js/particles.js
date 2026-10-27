@@ -93,7 +93,8 @@
         priority = 5; // Innermost structural spine remains until the absolute core
       } else if (isGenuineWheel) {
         category = 'wheel';
-        priority = 1; // Wheels are on the far lateral outside! Struck early when hit on flanks/sides.
+        // 2WD bots (Robot 3, Robot 5) protect their vital drive wheels behind side armor/hubs:
+        priority = (bot.type === 'robot3' || bot.type === 'robot5') ? 2 : 1;
       } else if (isArmor) {
         category = 'armor';
         priority = 1; // Outermost armor panels, wedges & bumpers take initial exterior impacts
@@ -127,7 +128,8 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    bot.maxDriveHealth = bot.totalInitialParts * 10;
+    // Buffed reinforced chassis for Robot 3 (380 HP base instead of 290 HP)
+    bot.maxDriveHealth = (bot.type === 'robot3') ? 380 : bot.totalInitialParts * 10;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;

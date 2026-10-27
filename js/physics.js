@@ -169,8 +169,9 @@
     }
 
     const maxSpeed = 15.0 * (0.35 + 0.65 * bot.drivePower);
-    const turnRate = 3.4 * (0.35 + 0.65 * bot.drivePower);
-    const accel = 46.0 * bot.drivePower;
+    const isR3 = (bot.type === 'robot3');
+    const turnRate = (isR3 ? 3.85 : 3.4) * (0.35 + 0.65 * bot.drivePower);
+    const accel = (isR3 ? 52.0 : 46.0) * bot.drivePower;
 
     // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
     if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
@@ -410,9 +411,10 @@
         const spinDownDecel = 24.0; // Smooth realistic deceleration (~4.0s from full 95 rad/s)
         bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - spinDownDecel * dt);
       } else {
-        // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s)
-        const targetSpin = 95.0;
-        const windUpRate = isMenu ? 190.0 : 38.0; // Instant aggressive wind-up in menu demo fight!
+        // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s, buffed 102.0 for Robot 3)
+        const isR3Bot = (bot.type === 'robot3');
+        const targetSpin = isR3Bot ? 102.0 : 95.0;
+        const windUpRate = isMenu ? 190.0 : (isR3Bot ? 48.0 : 38.0); // Faster brushless recovery for Robot 3 KineticBar
         if (bot.weaponSpinSpeed < targetSpin) {
           bot.weaponSpinSpeed = Math.min(targetSpin, bot.weaponSpinSpeed + windUpRate * dt);
         }
@@ -638,8 +640,10 @@
       const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
       const minWpSpin = 40.0;
       const isPrac = (gameMode === 'practice');
-      const isPWeaponImpact = (playerBot.weaponActive !== false && pFwdDot > 0.35 && playerBot.weaponSpinSpeed >= minWpSpin);
-      const isEWeaponImpact = (!isPrac && enemyBot.weaponActive !== false && eFwdDot > 0.35 && enemyBot.weaponSpinSpeed >= minWpSpin);
+      const pReach = (playerBot.type === 'robot3') ? 0.15 : 0.35; // Sweeping 150-degree horizontal bar reach for Robot 3
+      const eReach = (enemyBot.type === 'robot3') ? 0.15 : 0.35;
+      const isPWeaponImpact = (playerBot.weaponActive !== false && pFwdDot > pReach && playerBot.weaponSpinSpeed >= minWpSpin);
+      const isEWeaponImpact = (!isPrac && enemyBot.weaponActive !== false && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= minWpSpin);
       const isKineticStrike = (impactSpeed > 1.8) && (isPWeaponImpact || isEWeaponImpact);
 
       if (isKineticStrike) {
@@ -679,8 +683,10 @@
         // the robot with more drive power and intact drive wheels pushes the opponent backward!
         const pWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.filter(w => w.attached).length : 2;
         const eWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.filter(w => w.attached).length : 2;
-        const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * (pWheels / 2);
-        const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * (eWheels / 2);
+        const pTraction = (playerBot.type === 'robot3' || playerBot.type === 'robot5') ? Math.min(2.0, pWheels) : (pWheels / 2);
+        const eTraction = (enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? Math.min(2.0, eWheels) : (eWheels / 2);
+        const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * pTraction;
+        const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * eTraction;
         const netPushTraction = (pDriveForce - eDriveForce) * 2.4 * 0.016;
 
         playerBot.vx += nx * netPushTraction;
@@ -712,8 +718,10 @@
       const isPractice = (gameMode === 'practice');
 
       if (impactSpeed > 1.8) {
-        const isPWeaponHit = (playerBot.weaponActive !== false && pForwardDot > 0.35 && playerBot.weaponSpinSpeed >= minWeaponSpin);
-        const isEWeaponHit = (!isPractice && enemyBot.weaponActive !== false && eForwardDot > 0.35 && enemyBot.weaponSpinSpeed >= minWeaponSpin);
+        const pReachHit = (playerBot.type === 'robot3') ? 0.15 : 0.35;
+        const eReachHit = (enemyBot.type === 'robot3') ? 0.15 : 0.35;
+        const isPWeaponHit = (playerBot.weaponActive !== false && pForwardDot > pReachHit && playerBot.weaponSpinSpeed >= minWeaponSpin);
+        const isEWeaponHit = (!isPractice && enemyBot.weaponActive !== false && eForwardDot > eReachHit && enemyBot.weaponSpinSpeed >= minWeaponSpin);
         const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
 
         if (isBothWeaponClash) {
@@ -816,6 +824,7 @@
           //    - Even on hard vertical hits, only a ~24% probability to flip;
           //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
           const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= 88.0);
+          const wasPSpinFast = (playerBot.weaponSpinSpeed >= 75.0);
           const isPTravelFast = (pSpeedBefore >= 6.5 && (pApproach >= 4.5 || impactSpeed >= 8.0));
           const isVerticalBiteP = isFrontalOrRear || (playerBot.vy > 0.35);
           const isHardVerticalHitP = isPWeaponMax && isPTravelFast && isVerticalBiteP;
@@ -870,8 +879,9 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
-            enemyBot.vx += nx * (4.0 + impactSpeed * 0.45);
-            enemyBot.vz += nz * (4.0 + impactSpeed * 0.45);
+            const pFling = (playerBot.type === 'robot3') ? (5.8 + impactSpeed * 0.52) : (4.0 + impactSpeed * 0.45);
+            enemyBot.vx += nx * pFling;
+            enemyBot.vz += nz * pFling;
 
             if (isFrontalOrRear) {
               enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
@@ -902,7 +912,7 @@
 
           // Parts fly off 1 by 1 with each solid hit until NOTHING left!
           detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          if (canFlipEnemy || impactSpeed > 6.0) {
+          if (canFlipEnemy || impactSpeed > 6.0 || (playerBot.type === 'robot3' && wasPSpinFast)) {
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
           }
 
@@ -928,6 +938,7 @@
           //    - Even on hard vertical hits, only a ~24% probability to flip;
           //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
           const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= 88.0);
+          const wasESpinFast = (enemyBot.weaponSpinSpeed >= 75.0);
           const isETravelFast = (eSpeedBefore >= 6.5 && (eApproach >= 4.5 || impactSpeed >= 8.0));
           const isVerticalBiteE = isFrontalOrRear || (enemyBot.vy > 0.35);
           const isHardVerticalHitE = isEWeaponMax && isETravelFast && isVerticalBiteE;
@@ -982,8 +993,9 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
-            playerBot.vx -= nx * (4.0 + impactSpeed * 0.45);
-            playerBot.vz -= nz * (4.0 + impactSpeed * 0.45);
+            const eFling = (enemyBot.type === 'robot3') ? (5.8 + impactSpeed * 0.52) : (4.0 + impactSpeed * 0.45);
+            playerBot.vx -= nx * eFling;
+            playerBot.vz -= nz * eFling;
 
             if (isFrontalOrRear) {
               playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);
@@ -1016,7 +1028,7 @@
 
           // Parts fly off 1 by 1 with each solid hit until NOTHING left!
           detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-          if (canFlipPlayer || impactSpeed > 6.0) {
+          if (canFlipPlayer || impactSpeed > 6.0 || (enemyBot.type === 'robot3' && wasESpinFast)) {
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
           }
 
