@@ -43,7 +43,7 @@
 
     const meshes = [];
     bot.tiltGroup.traverse(obj => {
-      if (obj.isMesh && obj.name !== 'CAD_Outline') {
+      if (obj.isMesh && obj.visible && obj.name !== 'CAD_Outline' && (!obj.material || obj.material.visible !== false)) {
         meshes.push(obj);
       }
     });

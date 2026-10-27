@@ -10,27 +10,101 @@
   // Evaluates all 8 3D bounding corners under current Euler XYZ rotation (pitch & roll)
   // Ensures robot NEVER clips through floor during flips at ANY orientation (0 to 360 deg)
   // ========================================================
-  function getBotGroundElevation(bot) {
+  const _elevCorner = new THREE.Vector3();
+  const _elevEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+
+  function computeBotLocalBounds(bot) {
+    if (!bot || !bot.tiltGroup || !bot.root) return;
+    try {
+      const origRootX = bot.root.position.x;
+      const origRootY = bot.root.position.y;
+      const origRootZ = bot.root.position.z;
+      const origYaw = bot.root.rotation.y;
+      const origP = bot.tiltGroup.rotation.x;
+      const origR = bot.tiltGroup.rotation.z;
+      const origWheelRots = bot.wheels ? bot.wheels.map(w => (w.mesh ? w.mesh.rotation.x : 0)) : [];
+
+      bot.root.position.set(0, 0, 0);
+      bot.root.rotation.set(0, 0, 0);
+      bot.tiltGroup.rotation.set(0, 0, 0);
+      bot.root.updateMatrixWorld(true);
+
+      const box = new THREE.Box3();
+      let hasVisible = false;
+
+      // Sample wheel rotations across 8 angles to capture full envelope of spinning wheels
+      const wheelAngles = [0, Math.PI * 0.25, Math.PI * 0.5, Math.PI * 0.75, Math.PI, Math.PI * 1.25, Math.PI * 1.5, Math.PI * 1.75];
+
+      wheelAngles.forEach(ang => {
+        if (bot.wheels) {
+          bot.wheels.forEach(w => { if (w.mesh) w.mesh.rotation.x = ang; });
+        }
+        bot.root.updateMatrixWorld(true);
+        bot.tiltGroup.traverse(o => {
+          if (o.isMesh && o.visible && o.name !== 'CAD_Outline' && (!o.material || o.material.visible !== false)) {
+            box.expandByObject(o);
+            hasVisible = true;
+          }
+        });
+      });
+
+      // Restore original transforms
+      if (bot.wheels) {
+        bot.wheels.forEach((w, idx) => { if (w.mesh) w.mesh.rotation.x = origWheelRots[idx] || 0; });
+      }
+      bot.root.position.set(origRootX, origRootY, origRootZ);
+      bot.root.rotation.y = origYaw;
+      bot.tiltGroup.rotation.x = origP;
+      bot.tiltGroup.rotation.z = origR;
+      bot.root.updateMatrixWorld(true);
+
+      if (hasVisible && !box.isEmpty()) {
+        bot.localBounds = {
+          minX: box.min.x,
+          maxX: box.max.x,
+          minY: Math.min(0, box.min.y),
+          maxY: Math.max(0.6, box.max.y),
+          minZ: box.min.z,
+          maxZ: box.max.z
+        };
+      } else {
+        bot.localBounds = { minX: -1.05, maxX: 1.05, minY: -0.11, maxY: 1.10, minZ: -1.35, maxZ: 1.35 };
+      }
+    } catch (e) {
+      bot.localBounds = { minX: -1.05, maxX: 1.05, minY: -0.11, maxY: 1.10, minZ: -1.35, maxZ: 1.35 };
+    }
+  }
+  window.computeBotLocalBounds = computeBotLocalBounds;
+
+  function getBotGroundElevation(bot, pitchOverride, rollOverride) {
     if (!bot || !bot.tiltGroup) return 0;
+    if (!bot.localBounds && typeof computeBotLocalBounds === 'function') {
+      computeBotLocalBounds(bot);
+    }
     const b = bot.localBounds || {
-      minX: -1.55, maxX: 1.55,
-      minY: 0.0,   maxY: 1.50,
-      minZ: -1.75, maxZ: 1.75
+      minX: -1.05, maxX: 1.05,
+      minY: 0.0,   maxY: 1.20,
+      minZ: -1.45, maxZ: 1.45
     };
 
-    const cp = Math.cos(bot.pitch || 0);
-    const sp = Math.sin(bot.pitch || 0);
-    const cr = Math.cos(bot.roll || 0);
-    const sr = Math.sin(bot.roll || 0);
+    const curPitch = (typeof pitchOverride !== 'undefined')
+      ? pitchOverride
+      : (bot.pitch || 0);
+
+    const curRoll = (typeof rollOverride !== 'undefined')
+      ? rollOverride
+      : (typeof bot.wheelTilt !== 'undefined'
+          ? (bot.roll || 0) + bot.wheelTilt
+          : (bot.tiltGroup ? bot.tiltGroup.rotation.z : (bot.roll || 0)));
+
+    _elevEuler.set(curPitch, 0, curRoll, 'XYZ');
 
     let lowestY = 0;
     for (const x of [b.minX, b.maxX]) {
       for (const y of [b.minY, b.maxY]) {
         for (const z of [b.minZ, b.maxZ]) {
-          // Three.js Euler order 'XYZ': Rx(pitch) then Rz(roll)
-          // yRot = x * sin(roll) + (y * cos(pitch) - z * sin(pitch)) * cos(roll)
-          const yRot = x * sr + (y * cp - z * sp) * cr;
-          if (yRot < lowestY) lowestY = yRot;
+          _elevCorner.set(x, y, z).applyEuler(_elevEuler);
+          if (_elevCorner.y < lowestY) lowestY = _elevCorner.y;
         }
       }
     }
@@ -46,30 +120,11 @@
       ? Math.max(1, Math.round(bot.totalInitialParts * 0.20))
       : 2;
 
-    // Check wheels from both bot.detachableParts (category === 'wheel') and bot.wheels
-    const wheelParts = (bot.detachableParts && bot.detachableParts.length > 0)
-      ? bot.detachableParts.filter(p => p.category === 'wheel')
-      : [];
-    const hasWheelParts = (wheelParts.length > 0);
-    const attachedWheelParts = wheelParts.filter(p => p.attached && p.mesh && p.mesh.parent);
-
     let totalWheels = 0;
     let leftWheels = 0;
     let rightWheels = 0;
 
-    if (hasWheelParts) {
-      totalWheels = attachedWheelParts.length;
-      if (totalWheels === 0) {
-        if (bot.wheels) bot.wheels.forEach(w => { w.attached = false; });
-      } else {
-        attachedWheelParts.forEach(p => {
-          const lx = p.localCenter ? p.localCenter.x : 0;
-          const isLeft = (lx > 0) || (p.name && (p.name.includes('_L') || p.name.includes('Left') || p.name.endsWith('L')));
-          if (isLeft) leftWheels++;
-          else rightWheels++;
-        });
-      }
-    } else if (bot.wheels && bot.wheels.length > 0) {
+    if (bot.wheels && bot.wheels.length > 0) {
       bot.wheels.forEach(w => {
         if (w.attached) {
           totalWheels++;
@@ -77,13 +132,18 @@
           else rightWheels++;
         }
       });
-    } else {
-      totalWheels = 0;
-      leftWheels = 0;
-      rightWheels = 0;
+    } else if (bot.detachableParts && bot.detachableParts.length > 0) {
+      const wheelParts = bot.detachableParts.filter(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent);
+      totalWheels = wheelParts.length;
+      wheelParts.forEach(p => {
+        const lx = p.localCenter ? p.localCenter.x : 0;
+        const isLeft = (lx > 0) || (p.name && (p.name.includes('_L') || p.name.includes('Left') || p.name.endsWith('L')));
+        if (isLeft) leftWheels++;
+        else rightWheels++;
+      });
     }
 
-    const maxWheels = Math.max(1, hasWheelParts ? wheelParts.length : (bot.wheels && bot.wheels.length > 0 ? bot.wheels.length : 2));
+    const maxWheels = Math.max(1, bot.wheels && bot.wheels.length > 0 ? bot.wheels.length : 2);
 
     // A robot with no wheels, depleted drive health, <= 20% parts remaining, or entirely destroyed CANNOT move!
     if (totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) {
@@ -273,12 +333,16 @@
 
     bot.flipped = (Math.abs(bot.pitch) > Math.PI * 0.48) || (Math.abs(bot.roll) > Math.PI * 0.48);
 
-    bot.groundElevation = getBotGroundElevation(bot);
-    const wheelTilt = (rightWheels - leftWheels) * 0.045;
+    const wheelDiff = (rightWheels - leftWheels);
+    const wheelTilt = Math.max(-0.10, Math.min(0.10, wheelDiff * 0.045));
+    bot.wheelTilt = wheelTilt;
+
+    const targetRoll = bot.roll + wheelTilt;
+    bot.groundElevation = getBotGroundElevation(bot, bot.pitch, targetRoll);
     bot.root.position.set(bot.x, bot.groundElevation + (bot.airY || 0), bot.z);
     bot.root.rotation.y = bot.yaw;
     bot.tiltGroup.rotation.x = bot.pitch;
-    bot.tiltGroup.rotation.z = bot.roll + wheelTilt;
+    bot.tiltGroup.rotation.z = targetRoll;
 
     // Active Weapon Rotation & Continuous Electric Motor Wind-Up
     if (bot.weaponMesh) {
@@ -1055,14 +1119,13 @@
 
   function updateBotVisuals(bot, dt) {
     if (!bot || !bot.root) return;
-    if (typeof bot.groundElevation === 'undefined') {
-      bot.groundElevation = getBotGroundElevation(bot);
-    }
+    const effectiveRoll = (bot.roll || 0) + (bot.wheelTilt || 0);
+    bot.groundElevation = getBotGroundElevation(bot, bot.pitch, effectiveRoll);
     bot.root.position.set(bot.x, (bot.airY || 0) + (bot.groundElevation || 0), bot.z);
     bot.root.rotation.y = bot.yaw;
     if (bot.tiltGroup) {
       bot.tiltGroup.rotation.x = bot.pitch;
-      bot.tiltGroup.rotation.z = bot.roll;
+      bot.tiltGroup.rotation.z = effectiveRoll;
     }
     if (bot.weaponMesh && bot.weaponSpinSpeed) {
       if (bot.type === 'robot1') {

@@ -52,6 +52,9 @@
     if (typeof initBotDetachableParts === 'function') {
       initBotDetachableParts(bot);
     }
+    if (typeof computeBotLocalBounds === 'function') {
+      computeBotLocalBounds(bot);
+    }
     return bot;
   }
 
