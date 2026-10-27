@@ -597,7 +597,7 @@
         return;
       }
       const now = this.ctx.currentTime;
-      const isCombatActive = (matchState === 'playing' || matchState === 'countdown');
+      const isCombatActive = (matchState === 'playing');
       const menuVol = 1.0;
 
       // --- PLAYER WEAPON WINDING & SPIN SOUND ---

@@ -360,7 +360,11 @@
     // Active Weapon Rotation & Continuous Electric Motor Wind-Up
     if (bot.weaponMesh) {
       const isMenu = (typeof matchState !== 'undefined' && matchState === 'menu');
-      if (!isMenu && gameMode === 'practice' && bot === enemyBot) {
+      const isCountdown = (typeof matchState !== 'undefined' && matchState === 'countdown');
+      if (isCountdown) {
+        // Weapon blade remains completely stationary (0 RPM) until the 3s countdown finishes!
+        bot.weaponSpinSpeed = 0;
+      } else if (!isMenu && gameMode === 'practice' && bot === enemyBot) {
         // Practice dummy weapon stays completely disarmed & inactive (0 RPM)
         bot.weaponSpinSpeed = 0;
       } else if (!isMenu && bot.drivePower <= 0) {

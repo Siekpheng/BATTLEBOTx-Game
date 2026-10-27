@@ -656,6 +656,9 @@
 
   async function startMatchSequence() {
     AudioSys.init();
+    // Set matchState to 'countdown' immediately so the menu loop does not respawn menu bots
+    // and createBotInstance / attachCadToBot initialize weaponSpinSpeed to 0.0 during the 3s countdown!
+    matchState = 'countdown';
     cleanupBots();
     smoothCameraInitialized = false;
     menuCamInitialized = false;
@@ -741,6 +744,22 @@
     if (enemyBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(enemyBot);
     if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
     if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
+
+    // Strictly keep weapons at 0 RPM during the 3-second countdown; blades only begin winding up after the countdown finishes!
+    playerBot.weaponSpinSpeed = 0.0;
+    enemyBot.weaponSpinSpeed = 0.0;
+    updateBotVisuals(playerBot, 0);
+    updateBotVisuals(enemyBot, 0);
+
+    const rpmTextInit = document.getElementById('weapon-rpm-text');
+    const rpmFillInit = document.getElementById('weapon-rpm-fill');
+    if (rpmTextInit && rpmFillInit) {
+      rpmTextInit.textContent = '0% (WAITING FOR FIGHT...)';
+      rpmTextInit.style.color = '#94a3b8';
+      rpmFillInit.style.width = '0%';
+      rpmFillInit.classList.remove('ready');
+      rpmFillInit.style.background = '';
+    }
 
     matchTimeRemaining = 180;
     totalDestructionCelebrationTimer = 0.0;
@@ -1563,6 +1582,16 @@
         updateBotPhysics(enemyBot, simDt);
         handleBotCollision();
         checkMenuBotKnockout(dt);
+      }
+    } else if (matchState === 'countdown') {
+      // During the 3-second pre-match countdown, keep weapons strictly at 0 RPM so blades only begin spinning when the countdown finishes!
+      if (playerBot) {
+        playerBot.weaponSpinSpeed = 0.0;
+        updateBotVisuals(playerBot, 0);
+      }
+      if (enemyBot) {
+        enemyBot.weaponSpinSpeed = 0.0;
+        updateBotVisuals(enemyBot, 0);
       }
     } else if ((matchState === 'playing' || matchState === 'celebrating') && playerBot && enemyBot) {
       let t = sliderThrottleVal;
