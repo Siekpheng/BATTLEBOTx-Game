@@ -235,6 +235,18 @@
           if (ev.t === 'slice') AudioSys.weaponSliceSound();
           if (ev.t === 'stall') AudioSys.weaponStallSound();
           if (ev.t === 'sparks') spawnCollisionSparks(new THREE.Vector3(ev.x, ev.y, ev.z), ev.c);
+          if (ev.t === 'detach') {
+            const targetBot = (ev.w === 'p1') ? playerBot : enemyBot;
+            if (targetBot && typeof detachSinglePart === 'function') {
+              detachSinglePart(targetBot, { x: ev.dx || 0, z: ev.dz || 1 }, new THREE.Vector3(ev.hx || 0, ev.hy || 0.3, ev.hz || 0));
+            }
+          }
+          if (ev.t === 'explode') {
+            const targetBot = (ev.w === 'p1') ? playerBot : enemyBot;
+            if (targetBot && typeof explodeRobot === 'function') {
+              explodeRobot(targetBot, { x: ev.dx || 0, z: ev.dz || 1 }, new THREE.Vector3(ev.hx || 0, ev.hy || 0.3, ev.hz || 0));
+            }
+          }
         });
       }
     },

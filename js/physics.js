@@ -361,9 +361,10 @@
     if (bot.weaponMesh) {
       const isMenu = (typeof matchState !== 'undefined' && matchState === 'menu');
       const isCountdown = (typeof matchState !== 'undefined' && matchState === 'countdown');
-      if (isCountdown) {
-        // Weapon blade remains completely stationary (0 RPM) until the 3s countdown finishes!
+      if (isCountdown || bot.weaponDestroyed) {
+        // Weapon blade remains completely stationary (0 RPM) during the 3s countdown or if the weapon blade was detached!
         bot.weaponSpinSpeed = 0;
+        if (bot.weaponDestroyed) bot.weaponActive = false;
       } else if (!isMenu && gameMode === 'practice' && bot === enemyBot) {
         // Practice dummy weapon stays completely disarmed & inactive (0 RPM)
         bot.weaponSpinSpeed = 0;
@@ -503,26 +504,35 @@
       return;
     }
 
-    // BattleBots Referee Countout Rule:
+    // BattleBots Referee Countout vs. AI "No Mercy" Total Destruction:
     // If player is immobilized (countdown started, flipped, drive burned out, or all wheels detached):
-    // Opponent backs off to let referee 10s countout proceed!
+    // - By default, AI decides once per immobilization whether to show mercy (back off for 10s referee countout)
+    //   or go for NO MERCY TOTAL DESTRUCTION (keep attacking until the player's robot explodes at 20% parts)!
     const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
     const isPlayerImmobilized = (playerBot.stoppedTimer > 0.20) || playerBot.flipped || (playerBot.drivePower <= 0) || (playerBot.driveHealth <= 0) || pNoWheels;
 
     if (isPlayerImmobilized) {
-      if (distToPlayer < 7.0) {
-        // Reverse away smoothly from the immobilized player
-        enemyBot.throttleInput = -0.55;
-        enemyBot.steerInput = (diff > 0) ? -0.35 : 0.35;
-      } else {
-        // Stand by at neutral distance and idle
-        enemyBot.throttleInput = 0;
-        enemyBot.steerInput = 0;
+      if (typeof enemyBot.aiNoMercyDecision !== 'boolean') {
+        // 45% chance AI goes for ruthless Total Destruction instead of showing mercy!
+        enemyBot.aiNoMercyDecision = (Math.random() < 0.45);
       }
-      return;
+      if (!enemyBot.aiNoMercyDecision) {
+        if (distToPlayer < 7.0) {
+          // Reverse away smoothly from the immobilized player to let referee 10s countout proceed
+          enemyBot.throttleInput = -0.55;
+          enemyBot.steerInput = (diff > 0) ? -0.35 : 0.35;
+        } else {
+          // Stand by at neutral distance and idle
+          enemyBot.throttleInput = 0;
+          enemyBot.steerInput = 0;
+        }
+        return;
+      }
+    } else {
+      enemyBot.aiNoMercyDecision = undefined;
     }
 
-    const weaponReady = (enemyBot.weaponSpinSpeed >= 60.0);
+    const weaponReady = (enemyBot.weaponSpinSpeed >= 60.0) || enemyBot.weaponDestroyed;
 
     // Realistic combat driver tactics:
     // If weapon stalled on impact and too close to player, back off or circle to build RPM
@@ -625,6 +635,11 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
+          // Record pre-impact weapon spin speeds BEFORE stalling them to 0!
+          const bothWeaponsMax = (playerBot.weaponSpinSpeed >= 88.0 && enemyBot.weaponSpinSpeed >= 88.0);
+          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0);
+          const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
+
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             playerBot.weaponSpinSpeed = 0;
             enemyBot.weaponSpinSpeed = 0;
@@ -638,11 +653,6 @@
           playerBot.vz -= nz * clashImpulse;
           enemyBot.vx += nx * clashImpulse;
           enemyBot.vz += nz * clashImpulse;
-
-          // Head-on kinetic explosion: rare, realistic vertical lift on extreme high-speed clash
-          const bothWeaponsMax = (playerBot.weaponSpinSpeed >= 88.0 && enemyBot.weaponSpinSpeed >= 88.0);
-          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0);
-          const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
 
           if (canClashFlip) {
             playerBot.vy = 2.0 + Math.random() * 0.3;
@@ -925,15 +935,14 @@
           }
 
           if (isPractice) {
-            // Practice dummy: only takes damage if player weapon is enabled
-            if (playerBot.weaponActive !== false) {
-              const driveDmg = Math.max(0, impactSpeed * 0.85);
-              enemyBot.driveHealth = Math.max(0, enemyBot.driveHealth - driveDmg);
-              if (impactSpeed > 6.5 && Math.random() < 0.35) {
-                detachArmorPiece(enemyBot, { x: nx, z: nz }, midPos);
-              }
-              if (impactSpeed > 5.0 && Math.abs(eHitRight) > 0.35 && enemyBot.wheels) {
-                if (Math.random() < 0.35) detachWheel(enemyBot, { x: nx, z: nz }, midPos);
+            // Practice dummy: detach parts 1 by 1 on solid hits and trigger 20% explosion when player weapon is active!
+            if (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && impactSpeed > 4.2) {
+              enemyBot.vy = 0;
+              enemyBot.airY = 0;
+              enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+              if (enemyBot.isEntirelyDestroyed) {
+                if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
             }
           } else {

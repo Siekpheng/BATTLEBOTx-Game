@@ -507,6 +507,7 @@
     bot.drivePower = 0;
     bot.throttleInput = 0;
     bot.steerInput = 0;
+    bot.weaponDestroyed = true;
     bot.weaponSpinSpeed = 0;
     bot.weaponActive = false;
 
@@ -531,8 +532,16 @@
     if (typeof triggerDamageVignette === 'function') triggerDamageVignette();
 
     if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-      NetworkSys.queueEvent({ t: 'sparks', x: explosionCenter.x, y: explosionCenter.y, z: explosionCenter.z, c: 95 });
-      NetworkSys.queueEvent({ t: 'clash', i: 3.0, h: true });
+      const targetWho = (typeof playerBot !== 'undefined' && bot === playerBot) ? 'p1' : 'p2';
+      NetworkSys.queueEvent({
+        t: 'explode',
+        w: targetWho,
+        dx: impactDir ? (impactDir.x || 0) : 0,
+        dz: impactDir ? (impactDir.z || 1) : 1,
+        hx: explosionCenter.x,
+        hy: explosionCenter.y,
+        hz: explosionCenter.z
+      });
     }
 
     return explodedParts;
@@ -687,6 +696,15 @@
       bot.vz = 0;
     }
 
+    // Check if ALL weapon parts on the robot are now detached
+    const hadWeaponParts = bot.detachableParts.some(p => p.category === 'weapon');
+    const remainingWeaponParts = bot.detachableParts.filter(p => p.category === 'weapon' && p.attached && p.mesh && p.mesh.parent).length;
+    if ((hadWeaponParts && remainingWeaponParts === 0) || chosen.category === 'weapon' && remainingWeaponParts === 0) {
+      bot.weaponDestroyed = true;
+      bot.weaponSpinSpeed = 0;
+      bot.weaponActive = false;
+    }
+
     const isWheelPart = (chosen.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(chosen.mesh)));
     const flySpeed = 5.4 + Math.random() * 4.6;
     const outwardX = (impactDir.x || 0) + (Math.random() - 0.5) * 0.45;
@@ -709,6 +727,19 @@
     if (typeof AudioSys !== 'undefined' && AudioSys.crowdGasp) AudioSys.crowdGasp(0.75);
     addCameraTrauma(0.26);
     triggerGamepadRumble(0.60, 190);
+
+    if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+      const targetWho = (typeof playerBot !== 'undefined' && bot === playerBot) ? 'p1' : 'p2';
+      NetworkSys.queueEvent({
+        t: 'detach',
+        w: targetWho,
+        dx: impactDir ? (impactDir.x || 0) : 0,
+        dz: impactDir ? (impactDir.z || 1) : 1,
+        hx: hitPoint ? hitPoint.x : worldPos.x,
+        hy: hitPoint ? hitPoint.y : worldPos.y,
+        hz: hitPoint ? hitPoint.z : worldPos.z
+      });
+    }
 
     // Update remaining count & driveHealth
     const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;

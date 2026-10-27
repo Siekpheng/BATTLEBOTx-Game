@@ -137,8 +137,13 @@
 
   let totalDestructionCelebrationTimer = 0.0;
   let pendingGameOverData = null;
+  let activeCountdownInterval = null;
 
   function cleanupBots() {
+    if (activeCountdownInterval) {
+      clearInterval(activeCountdownInterval);
+      activeCountdownInterval = null;
+    }
     countoutHornPlayed = false;
     totalDestructionCelebrationTimer = 0.0;
     pendingGameOverData = null;
@@ -776,7 +781,10 @@
     countdownText.textContent = steps[0];
     AudioSys.countdownBeat(3);
 
-    const interval = setInterval(() => {
+    if (activeCountdownInterval) {
+      clearInterval(activeCountdownInterval);
+    }
+    activeCountdownInterval = setInterval(() => {
       idx++;
       if (idx < steps.length) {
         countdownText.textContent = steps[idx];
@@ -790,7 +798,8 @@
           AudioSys.countdownBeat(3 - idx);
         }
       } else {
-        clearInterval(interval);
+        clearInterval(activeCountdownInterval);
+        activeCountdownInterval = null;
         countdownOverlay.classList.add('hidden');
         matchState = 'playing';
       }
@@ -1666,7 +1675,13 @@
       const rpmText = document.getElementById('weapon-rpm-text');
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
-        if (playerBot.weaponActive === false) {
+        if (playerBot.weaponDestroyed || playerBot.isEntirelyDestroyed) {
+          rpmText.textContent = '0% (WEAPON DESTROYED)';
+          rpmText.style.color = '#ef4444';
+          rpmFill.style.width = '0%';
+          rpmFill.classList.remove('ready');
+          rpmFill.style.background = '#475569';
+        } else if (playerBot.weaponActive === false) {
           rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
           rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
           rpmFill.style.width = `${rpmPct}%`;
@@ -1744,6 +1759,40 @@
     }
 
     for (const d of detachedDebris) {
+      // Physical interaction: moving robots kick/push detached debris across the arena floor!
+      if (d.mesh.position.y < 0.75) {
+        const activeBots = [playerBot, enemyBot];
+        for (let bIdx = 0; bIdx < activeBots.length; bIdx++) {
+          const b = activeBots[bIdx];
+          if (!b || b.isEntirelyDestroyed) continue;
+          const bdx = d.mesh.position.x - b.x;
+          const bdz = d.mesh.position.z - b.z;
+          const bDist = Math.hypot(bdx, bdz);
+          const hitRad = 1.38;
+          if (bDist < hitRad && bDist > 0.001) {
+            const pushNx = bdx / bDist;
+            const pushNz = bdz / bDist;
+            const overlap = hitRad - bDist;
+            d.mesh.position.x += pushNx * overlap;
+            d.mesh.position.z += pushNz * overlap;
+
+            const botSpeed = Math.hypot(b.vx || 0, b.vz || 0);
+            const kickSpeed = Math.max(2.2, botSpeed * 1.15);
+            d.vx = (b.vx || 0) * 0.65 + pushNx * kickSpeed;
+            d.vz = (b.vz || 0) * 0.65 + pushNz * kickSpeed;
+            if (botSpeed > 3.5 && d.mesh.position.y <= 0.20) {
+              d.vy = Math.min(3.2, 1.2 + botSpeed * 0.22);
+              d.rx = (Math.random() - 0.5) * 14;
+              d.ry = (Math.random() - 0.5) * 14;
+              d.rz = (Math.random() - 0.5) * 14;
+              if (typeof AudioSys !== 'undefined' && AudioSys.hitSound && Math.random() < 0.35) {
+                AudioSys.hitSound(0.15);
+              }
+            }
+          }
+        }
+      }
+
       if (d.mesh.position.y > 0.06 || Math.abs(d.vy) > 0.1 || Math.hypot(d.vx, d.vz) > 0.05) {
         d.vy -= 18 * dt;
         d.mesh.position.x += d.vx * dt;

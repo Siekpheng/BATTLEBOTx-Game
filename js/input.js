@@ -6,7 +6,7 @@
   // 7. INPUT HANDLING
   // ========================================================
   function togglePlayerWeapon(bot = playerBot) {
-    if (!bot) return;
+    if (!bot || bot.weaponDestroyed || bot.isEntirelyDestroyed) return;
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     bot.weaponActive = (bot.weaponActive === false) ? true : false;
     // When turning off, do not stop abruptly: let mechanical inertia smoothly coast down in updateRobotPhysics
