@@ -1163,7 +1163,9 @@
 
   function driveMenuBotAI(bot, target, dt, isP1) {
     if (!bot || !target) return;
-    if (bot.driveHealth <= 0 || bot.flipped) {
+    const bNoWheels = (!bot.wheels || bot.wheels.length === 0 || bot.wheels.filter(w => w.attached).length === 0);
+    if (bot.driveHealth <= 0 || bot.flipped || bot.isEntirelyDestroyed || bNoWheels) {
+      bot.drivePower = 0;
       bot.throttleInput = 0;
       bot.steerInput = 0;
       return;
@@ -1286,6 +1288,18 @@
     if (bot.isEntirelyDestroyed) {
       bot.menuDestroyedTimer = (bot.menuDestroyedTimer || 0) + dt;
       return bot.menuDestroyedTimer > 1.2;
+    }
+
+    const bNoWheels = (!bot.wheels || bot.wheels.length === 0 || bot.wheels.filter(w => w.attached).length === 0);
+    if (bNoWheels && !bot.isEntirelyDestroyed) {
+      bot.menuNoWheelsTimer = (bot.menuNoWheelsTimer || 0) + dt;
+      if (bot.menuNoWheelsTimer > 2.5) {
+        bot.isEntirelyDestroyed = true;
+        bot.menuDestroyedTimer = 0.0;
+        return false;
+      }
+    } else {
+      bot.menuNoWheelsTimer = 0.0;
     }
 
     // If bot has been motionless/stuck against wall/opponent for > 4.5s, mark destroyed so clean replacement occurs
@@ -1590,8 +1604,15 @@
           s = gp1.steer;
         }
 
-        playerBot.throttleInput = t;
-        playerBot.steerInput = s;
+        const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
+        if (playerBot.driveHealth <= 0 || playerBot.flipped || playerBot.isEntirelyDestroyed || pNoWheels) {
+          playerBot.drivePower = 0;
+          playerBot.throttleInput = 0;
+          playerBot.steerInput = 0;
+        } else {
+          playerBot.throttleInput = t;
+          playerBot.steerInput = s;
+        }
 
         throttleKnob.style.transform = `translateY(${-t * 42}px)`;
         steerKnob.style.transform = `translateX(${s * 46}px)`;

@@ -59,12 +59,12 @@
       const localCenter = bot.root ? bot.root.worldToLocal(center.clone()) : center.clone();
       const radialDist = Math.hypot(localCenter.x, localCenter.z);
 
-      const isGenuineWheel = (
+      const isGenuineWheel = !name.startsWith('Chassis_') && !name.startsWith('Weapon_') && !name.startsWith('Armor_') && (
         name.startsWith('Wheel_') || name.includes('Wheel') ||
         name.includes('Tire') || name.includes('Rim') ||
         parentName.startsWith('Wheel_') || parentName.includes('Wheel') ||
         parentName.startsWith('Belt_') || parentName.includes('Belt') ||
-        ((typeof isWheelMesh === 'function' && isWheelMesh(obj)) && (radialDist > 0.55 || name.includes('Wheel')))
+        (bot.wheels && bot.wheels.some(w => w.mesh === obj || (w.mesh && w.mesh.children && w.mesh.children.includes(obj))))
       );
       const isWeapon = (
         name.startsWith('Weapon_') || name.includes('Weapon') ||
@@ -311,6 +311,9 @@
       const ap = bot.armorPanels.find(p => p.mesh === chosen.mesh || p.name === chosen.name);
       if (ap) ap.attached = false;
     }
+    // Synchronize wheel assemblies:
+    // When a wheel part detaches, detach the ENTIRE wheel assembly so no floating ghost parts remain!
+    let detachedWheelObj = null;
     if (bot.wheels) {
       bot.wheels.forEach(w => {
         if (
@@ -319,29 +322,84 @@
           (w.mesh && w.mesh.parent === chosen.mesh) ||
           w.name === chosen.name ||
           (chosen.mesh && chosen.mesh.parent && w.name === chosen.mesh.parent.name) ||
-          (chosen.name && w.name && (chosen.name.startsWith(w.name) || w.name.startsWith(chosen.name)))
+          (chosen.parentName && w.name === chosen.parentName) ||
+          (chosen.name && w.name && (chosen.name === w.name || chosen.name.startsWith(w.name + '_')))
         ) {
-          const hasRemaining = bot.detachableParts.some(p =>
-            p !== chosen && p.attached && (
-              p.mesh === w.mesh ||
-              (p.mesh && p.mesh.parent === w.mesh) ||
-              (p.name && p.name.startsWith(w.name))
-            )
-          );
-          if (!hasRemaining) {
-            w.attached = false;
-          }
+          w.attached = false;
+          detachedWheelObj = w;
         }
       });
     }
 
-    // Check if ALL wheels on the robot are now detached
-    const attachedWheelsRemaining = bot.detachableParts.filter(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent);
-    if (attachedWheelsRemaining.length === 0) {
+    // If this part is a wheel (or belongs to a wheel assembly), detach all sibling sub-meshes of that wheel too
+    if (detachedWheelObj || chosen.category === 'wheel') {
+      const targetWheelName = detachedWheelObj ? detachedWheelObj.name : chosen.parentName;
+      const targetWheelMesh = detachedWheelObj ? detachedWheelObj.mesh : (chosen.mesh ? chosen.mesh.parent : null);
+
+      const siblingParts = bot.detachableParts.filter(p =>
+        p !== chosen && p.attached && (
+          (targetWheelMesh && (p.mesh === targetWheelMesh || (p.mesh && p.mesh.parent === targetWheelMesh))) ||
+          (targetWheelName && (p.name === targetWheelName || p.parentName === targetWheelName || (p.name && p.name.startsWith(targetWheelName + '_'))))
+        )
+      );
+
+      siblingParts.forEach(sp => {
+        sp.attached = false;
+        const spWorldPos = new THREE.Vector3();
+        const spWorldQuat = new THREE.Quaternion();
+        const spWorldScale = new THREE.Vector3();
+        sp.mesh.getWorldPosition(spWorldPos);
+        sp.mesh.getWorldQuaternion(spWorldQuat);
+        sp.mesh.getWorldScale(spWorldScale);
+
+        if (sp.mesh.children && sp.mesh.children.length > 0) {
+          const toRem = sp.mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
+          toRem.forEach(c => sp.mesh.remove(c));
+        }
+        if (sp.mesh.parent) {
+          sp.mesh.parent.remove(sp.mesh);
+        }
+        sp.mesh.position.copy(spWorldPos);
+        sp.mesh.quaternion.copy(spWorldQuat);
+        sp.mesh.scale.copy(spWorldScale);
+        sp.mesh.visible = true;
+        scene.add(sp.mesh);
+
+        detachedDebris.push({
+          mesh: sp.mesh,
+          isWheel: true,
+          vx: (impactDir.x || 0) * (5.0 + Math.random() * 4.0) + (Math.random() - 0.5) * 3.0,
+          vy: 4.0 + Math.random() * 3.0,
+          vz: (impactDir.z || 0) * (5.0 + Math.random() * 4.0) + (Math.random() - 0.5) * 3.0,
+          rx: (Math.random() - 0.5) * 20,
+          ry: (Math.random() - 0.5) * 20,
+          rz: (Math.random() - 0.5) * 20
+        });
+      });
+
+      // Remove the wheel group itself from the bot tiltGroup if it still exists
+      if (targetWheelMesh && targetWheelMesh.parent) {
+        targetWheelMesh.parent.remove(targetWheelMesh);
+      }
+    }
+
+    // Check if ALL functional wheels on the robot are now detached
+    const remainingAttachedWheels = bot.wheels
+      ? bot.wheels.filter(w => w.attached).length
+      : bot.detachableParts.filter(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent).length;
+
+    if (remainingAttachedWheels === 0) {
       if (bot.wheels) bot.wheels.forEach(w => { w.attached = false; });
+      if (bot.detachableParts) {
+        bot.detachableParts.forEach(p => {
+          if (p.category === 'wheel') p.attached = false;
+        });
+      }
       bot.drivePower = 0;
       bot.throttleInput = 0;
       bot.steerInput = 0;
+      bot.vx = 0;
+      bot.vz = 0;
     }
 
     // Capture exact world position, orientation, scale

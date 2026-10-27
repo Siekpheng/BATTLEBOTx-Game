@@ -151,9 +151,14 @@
       bot.throttleInput = 0;
       bot.steerInput = 0;
       // High ground friction: a chassis sitting on its belly with no wheels stops immediately!
-      const bellyDrag = Math.pow(0.005, dt);
-      bot.vx *= bellyDrag;
-      bot.vz *= bellyDrag;
+      if (!bot.airY || bot.airY <= 0.05) {
+        bot.vx = 0;
+        bot.vz = 0;
+      } else {
+        const bellyDrag = Math.pow(0.005, dt);
+        bot.vx *= bellyDrag;
+        bot.vz *= bellyDrag;
+      }
     } else {
       // Symmetrically balanced wheel factor
       const wheelFactor = Math.min(1.0, (totalWheels / maxWheels) * 0.70 + 0.30);
@@ -207,6 +212,11 @@
     if (speed > maxSpeed) {
       bot.vx = (bot.vx / speed) * maxSpeed;
       bot.vz = (bot.vz / speed) * maxSpeed;
+    }
+
+    if ((totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) && (!bot.airY || bot.airY <= 0.05)) {
+      bot.vx = 0;
+      bot.vz = 0;
     }
 
     bot.x += bot.vx * dt;
@@ -430,7 +440,9 @@
   function updateEnemyAI(dt) {
     if (!enemyBot || !playerBot) return;
 
-    if (enemyBot.driveHealth <= 0) {
+    const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
+    if (enemyBot.driveHealth <= 0 || enemyBot.isEntirelyDestroyed || eNoWheels) {
+      enemyBot.drivePower = 0;
       enemyBot.throttleInput = 0;
       enemyBot.steerInput = 0;
       return;
@@ -487,8 +499,7 @@
     // BattleBots Referee Countout Rule:
     // If player is immobilized (countdown started, flipped, drive burned out, or all wheels detached):
     // Opponent backs off to let referee 10s countout proceed!
-    const pNoWheels = (playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0) ||
-      (playerBot.detachableParts && playerBot.detachableParts.length > 0 && playerBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
+    const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
     const isPlayerImmobilized = (playerBot.stoppedTimer > 0.20) || playerBot.flipped || (playerBot.drivePower <= 0) || (playerBot.driveHealth <= 0) || pNoWheels;
 
     if (isPlayerImmobilized) {
@@ -1001,10 +1012,8 @@
     const pSpeed = Math.hypot(playerBot.vx || 0, playerBot.vz || 0);
     const eSpeed = Math.hypot(enemyBot.vx || 0, enemyBot.vz || 0);
 
-    const pNoWheels = (playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.filter(w => w.attached).length === 0) ||
-      (playerBot.detachableParts && playerBot.detachableParts.length > 0 && playerBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
-    const eNoWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.filter(w => w.attached).length === 0) ||
-      (enemyBot.detachableParts && enemyBot.detachableParts.length > 0 && enemyBot.detachableParts.filter(p => p.category === 'wheel' && p.attached).length === 0);
+    const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
+    const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
 
     const pNoDrive = (playerBot.driveHealth <= 0) || (playerBot.drivePower <= 0);
     const eNoDrive = (enemyBot.driveHealth <= 0) || (enemyBot.drivePower <= 0);
