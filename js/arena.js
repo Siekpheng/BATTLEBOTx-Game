@@ -83,228 +83,327 @@
 
   function createFloorTexture() {
     const c = document.createElement('canvas');
-    c.width = 1024;
-    c.height = 1024;
+    c.width = 2048;
+    c.height = 2048;
     const ctx = c.getContext('2d');
     const tex = new THREE.CanvasTexture(c);
-    tex.anisotropy = 8;
+    tex.anisotropy = 16;
 
     const bbxImg = new Image();
     bbxImg.src = 'logo_battlebotx.png';
 
     const renderFloor = () => {
-      // 1. Clean matte slate-steel combat floor (#2b3544)
-      ctx.fillStyle = '#2b3544';
-      ctx.fillRect(0, 0, 1024, 1024);
+      const W = 2048;
+      const H = 2048;
+      const margin = 36;
+      const cx = 1024;
+      const cy = 1024;
 
-      // 2. Subtle arena floor tile seams
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.lineWidth = 1.5;
-      const step = 64;
-      for (let i = 0; i <= 1024; i += step) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1024); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1024, i); ctx.stroke();
-      }
+      // 1. Base Industrial Satin Combat Steel Floor
+      ctx.fillStyle = '#737884';
+      ctx.fillRect(0, 0, W, H);
 
-      // 3. Outer perimeter boundary caution line
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(36, 36, 952, 952);
-
-      // Inner subtle border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(48, 48, 928, 928);
-
-      // ========================================================
-      // 4. BLUE STARTING SQUARE (West / Left Spawn: x=-7.5, z=0 -> canvas 198, 512)
-      // ========================================================
-      const blueX = 198, blueY = 512, sqSize = 200, halfSq = sqSize / 2;
-      const bx = blueX - halfSq, by = blueY - halfSq;
-
-      // Subtle blue glow fill
-      ctx.fillStyle = 'rgba(14, 165, 233, 0.12)';
-      ctx.fillRect(bx, by, sqSize, sqSize);
-
-      // Outer Blue Border
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 5;
-      ctx.strokeRect(bx, by, sqSize, sqSize);
-
-      // Inner Blue Accent Frame
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(bx + 8, by + 8, sqSize - 16, sqSize - 16);
-
-      // High-tech Corner Brackets
-      const bLen = 22;
-      ctx.strokeStyle = '#bae6fd';
-      ctx.lineWidth = 3.5;
-      // Top-Left
-      ctx.beginPath(); ctx.moveTo(bx, by + bLen); ctx.lineTo(bx, by); ctx.lineTo(bx + bLen, by); ctx.stroke();
-      // Top-Right
-      ctx.beginPath(); ctx.moveTo(bx + sqSize, by + bLen); ctx.lineTo(bx + sqSize, by); ctx.lineTo(bx + sqSize - bLen, by); ctx.stroke();
-      // Bottom-Left
-      ctx.beginPath(); ctx.moveTo(bx, by + sqSize - bLen); ctx.lineTo(bx, by + sqSize); ctx.lineTo(bx + bLen, by + sqSize); ctx.stroke();
-      // Bottom-Right
-      ctx.beginPath(); ctx.moveTo(bx + sqSize, by + sqSize - bLen); ctx.lineTo(bx + sqSize, by + sqSize); ctx.lineTo(bx - bLen + sqSize, by + sqSize); ctx.stroke();
-
-      // Blue Square Start Label (Top)
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '900 17px Orbitron, sans-serif';
-      ctx.fillText('BLUE SQUARE', blueX, by + 24);
-
-      // Start alignment chevron pointing East (towards arena center)
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.85)';
-      ctx.font = '700 13px Orbitron, sans-serif';
-      ctx.fillText('► START ►', blueX, by + sqSize - 22);
-
-      // Crosshair center pip
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(blueX - 18, blueY); ctx.lineTo(blueX + 18, blueY);
-      ctx.moveTo(blueX, blueY - 18); ctx.lineTo(blueX, blueY + 18);
-      ctx.stroke();
-
-      // ========================================================
-      // 5. RED STARTING SQUARE (East / Right Spawn: x=+7.5, z=0 -> canvas 826, 512)
-      // ========================================================
-      const redX = 826, redY = 512;
-      const rx = redX - halfSq, ry = redY - halfSq;
-
-      // Subtle red glow fill
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
-      ctx.fillRect(rx, ry, sqSize, sqSize);
-
-      // Outer Red Border
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 5;
-      ctx.strokeRect(rx, ry, sqSize, sqSize);
-
-      // Inner Red Accent Frame
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(rx + 8, ry + 8, sqSize - 16, sqSize - 16);
-
-      // High-tech Corner Brackets
-      ctx.strokeStyle = '#fca5a5';
-      ctx.lineWidth = 3.5;
-      // Top-Left
-      ctx.beginPath(); ctx.moveTo(rx, ry + bLen); ctx.lineTo(rx, ry); ctx.lineTo(rx + bLen, ry); ctx.stroke();
-      // Top-Right
-      ctx.beginPath(); ctx.moveTo(rx + sqSize, ry + bLen); ctx.lineTo(rx + sqSize, ry); ctx.lineTo(rx + sqSize - bLen, ry); ctx.stroke();
-      // Bottom-Left
-      ctx.beginPath(); ctx.moveTo(rx, ry + sqSize - bLen); ctx.lineTo(rx, ry + sqSize); ctx.lineTo(rx + bLen, ry + sqSize); ctx.stroke();
-      // Bottom-Right
-      ctx.beginPath(); ctx.moveTo(rx + sqSize, ry + sqSize - bLen); ctx.lineTo(rx + sqSize, ry + sqSize); ctx.lineTo(rx - bLen + sqSize, ry + sqSize); ctx.stroke();
-
-      // Red Square Start Label (Top)
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#ef4444';
-      ctx.font = '900 17px Orbitron, sans-serif';
-      ctx.fillText('RED SQUARE', redX, ry + 24);
-
-      // Start alignment chevron pointing West (towards arena center)
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-      ctx.font = '700 13px Orbitron, sans-serif';
-      ctx.fillText('◄ START ◄', redX, ry + sqSize - 22);
-
-      // Crosshair center pip
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.40)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(redX - 18, redY); ctx.lineTo(redX + 18, redY);
-      ctx.moveTo(redX, redY - 18); ctx.lineTo(redX, redY + 18);
-      ctx.stroke();
-
-      // ========================================================
-      // 6. ARENA CENTER DECAL & BATTLEBOTx LOGO
-      // ========================================================
-      const cx = 512, cy = 512;
-
-      // Outer circular tournament ring
+      // Subtle metallic rolled steel plate grain
       ctx.save();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, cy, 195, 0, Math.PI * 2); ctx.stroke();
-
-      // Inner gold hazard ring
-      ctx.strokeStyle = 'rgba(253, 201, 17, 0.55)';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([8, 8]);
-      ctx.beginPath(); ctx.arc(cx, cy, 180, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
+      for (let i = 0; i < 60; i++) {
+        const py = Math.floor(Math.random() * H);
+        const ph = Math.floor(Math.random() * 8) + 2;
+        ctx.fillRect(0, py, W, ph);
+      }
       ctx.restore();
 
-      // Subtle center circle fill
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.40)';
-      ctx.beginPath(); ctx.arc(cx, cy, 175, 0, Math.PI * 2); ctx.fill();
+      // Outer boundary line
+      ctx.strokeStyle = '#222630';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(margin, margin, W - margin * 2, H - margin * 2);
 
-      // Draw BATTLEBOTx Logo emblem with white background
-      if (bbxImg.complete && bbxImg.naturalWidth > 0) {
-        const logoW = 146;
-        const logoH = Math.round(logoW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
-        const badgePad = 8;
-        const badgeW = logoW + badgePad * 2;
-        const badgeH = logoH + badgePad * 2;
-        const badgeX = cx - badgeW / 2;
-        const badgeY = cy - badgeH / 2 - 76;
+      // 2. Four Corner Light-Silver Triangular Plates (Brushed Aluminum / Stainless Steel)
+      const cornerSize = 380;
+      const cornerPlates = [
+        // Top-Left
+        [ [margin, margin], [margin + cornerSize, margin], [margin, margin + cornerSize] ],
+        // Top-Right
+        [ [W - margin, margin], [W - margin - cornerSize, margin], [W - margin, margin + cornerSize] ],
+        // Bottom-Left
+        [ [margin, H - margin], [margin + cornerSize, H - margin], [margin, H - margin - cornerSize] ],
+        // Bottom-Right
+        [ [W - margin, H - margin], [W - margin - cornerSize, H - margin], [W - margin, H - margin - cornerSize] ]
+      ];
 
+      cornerPlates.forEach(pts => {
         ctx.save();
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#fdc911';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-        ctx.shadowBlur = 10;
         ctx.beginPath();
-        if (ctx.roundRect) {
-          ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 14);
-        } else {
-          ctx.rect(badgeX, badgeY, badgeW, badgeH);
-        }
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.lineTo(pts[1][0], pts[1][1]);
+        ctx.lineTo(pts[2][0], pts[2][1]);
+        ctx.closePath();
+        ctx.fillStyle = '#cfd3dc';
         ctx.fill();
+        ctx.strokeStyle = '#252932';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 3. Three Modular Floor Panels with 2 Vertical Seams
+      const seamX1 = 580;
+      const seamX2 = 1468;
+
+      [seamX1, seamX2].forEach(sx => {
+        // Dark groove
+        ctx.beginPath();
+        ctx.moveTo(sx, margin);
+        ctx.lineTo(sx, H - margin);
+        ctx.strokeStyle = '#222630';
+        ctx.lineWidth = 4;
         ctx.stroke();
 
-        ctx.clip();
-        ctx.drawImage(bbxImg, cx - logoW / 2, badgeY + badgePad, logoW, logoH);
-        ctx.restore();
-      } else {
-        // Fallback procedural chevron
-        ctx.fillStyle = '#fdc911';
-        ctx.strokeStyle = '#7d973c';
-        ctx.lineWidth = 4;
+        // Light metallic bevel highlight
         ctx.beginPath();
-        ctx.moveTo(cx - 50, cy - 100);
-        ctx.lineTo(cx + 40, cy - 65);
-        ctx.lineTo(cx - 10, cy - 65);
-        ctx.lineTo(cx + 40, cy - 30);
-        ctx.lineTo(cx - 50, cy - 30);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        ctx.moveTo(sx + 2.5, margin);
+        ctx.lineTo(sx + 2.5, H - margin);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+
+      // 4. M8 Hex Bolt Fasteners along Seams & Perimeter
+      const drawBolt = (x, y, r = 7) => {
+        ctx.save();
+        // Bolt head shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.beginPath(); ctx.arc(x + 1, y + 1.5, r, 0, Math.PI * 2); ctx.fill();
+        // Bolt dark steel base
+        ctx.fillStyle = '#1a1d24';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        // Metallic specular rim
+        ctx.strokeStyle = '#9ca3af';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, r - 2, 0, Math.PI * 2); ctx.stroke();
+        // Inner socket hole
+        ctx.fillStyle = '#121418';
+        ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      };
+
+      const drawBoltPair = (x, y, dx = 14) => {
+        drawBolt(x - dx, y);
+        drawBolt(x + dx, y);
+      };
+
+      // Bolt pairs along the two vertical seams
+      const seamBoltYs = [120, 260, 520, 880, 1168, 1528, 1788, 1928];
+      seamBoltYs.forEach(by => {
+        drawBoltPair(seamX1, by);
+        drawBoltPair(seamX2, by);
+      });
+
+      // Outer perimeter bolts
+      for (let bx = 450; bx <= W - 450; bx += 220) {
+        drawBolt(bx, margin + 12);
+        drawBolt(bx, H - margin - 12);
+      }
+      for (let by = 450; by <= H - 450; by += 220) {
+        drawBolt(margin + 12, by);
+        drawBolt(W - margin - 12, by);
       }
 
-      // Exact Capitalization: BATTLEBOTx (capital BATTLEBOT, lowercase x)
+      // 5. Team Starting Boxes
+      // Top Red Starting Box (North)
+      const redW = 320, redH = 320;
+      const redX = cx - redW / 2, redY = margin;
+      ctx.save();
+      ctx.fillStyle = '#b23630';
+      ctx.fillRect(redX, redY, redW, redH);
+      ctx.strokeStyle = '#1a1d24';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(redX, redY, redW, redH);
+      // Subtle metallic highlight
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(redX + 4, redY + 4, redW - 8, redH - 8);
+      ctx.restore();
+
+      // Bottom Green Starting Box (South)
+      const greenW = 320, greenH = 320;
+      const greenX = cx - greenW / 2, greenY = H - margin - greenH;
+      ctx.save();
+      ctx.fillStyle = '#2e7d32';
+      ctx.fillRect(greenX, greenY, greenW, greenH);
+      ctx.strokeStyle = '#1a1d24';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(greenX, greenY, greenW, greenH);
+      // Subtle metallic highlight
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(greenX + 4, greenY + 4, greenW - 8, greenH - 8);
+      ctx.restore();
+
+      // 6. Left Panel Features (Two Circular Milled Rings)
+      [830, 1218].forEach(py => {
+        ctx.save();
+        // Outer dark ring
+        ctx.strokeStyle = '#252932';
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(310, py, 52, 0, Math.PI * 2); ctx.stroke();
+        // Inner ring
+        ctx.strokeStyle = '#252932';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(310, py, 36, 0, Math.PI * 2); ctx.stroke();
+        // Center pin
+        ctx.fillStyle = '#1e222a';
+        ctx.beginPath(); ctx.arc(310, py, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      });
+
+      // 7. Right Panel Features (Two Square Milled Hatches)
+      [830, 1218].forEach(py => {
+        ctx.save();
+        // Outer square
+        ctx.strokeStyle = '#252932';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(1738 - 50, py - 50, 100, 100);
+        // Inner square
+        ctx.strokeStyle = '#252932';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(1738 - 34, py - 34, 68, 68);
+        ctx.restore();
+      });
+
+      // 8. Hazard Markings
+      // Top-Left Orange Hazard Ring
+      ctx.save();
+      ctx.strokeStyle = '#e67e22';
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(490, 490, 52, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#222630';
+      ctx.beginPath(); ctx.arc(490, 490, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      // Bottom-Right Orange Hazard Ring
+      ctx.save();
+      ctx.strokeStyle = '#e67e22';
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(1558, 1558, 52, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#222630';
+      ctx.beginPath(); ctx.arc(1558, 1558, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      // Bottom-Left Triangular Chevron (pointing outward toward corner)
+      ctx.save();
+      ctx.strokeStyle = '#222630';
+      ctx.lineWidth = 7;
+      ctx.lineJoin = 'miter';
+      ctx.beginPath();
+      ctx.moveTo(490 - 45, 1558 + 45);
+      ctx.lineTo(490 + 45, 1558 + 20);
+      ctx.lineTo(490 - 20, 1558 - 45);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // Top-Right Triangular Chevron (pointing outward toward corner)
+      ctx.save();
+      ctx.strokeStyle = '#222630';
+      ctx.lineWidth = 7;
+      ctx.lineJoin = 'miter';
+      ctx.beginPath();
+      ctx.moveTo(1558 + 45, 490 - 45);
+      ctx.lineTo(1558 - 45, 490 - 20);
+      ctx.lineTo(1558 + 20, 490 + 45);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // 9. Center Emblem Square Box
+      const boxSize = 580;
+      const halfBox = boxSize / 2;
+      const bx1 = cx - halfBox;
+      const by1 = cy - halfBox;
+
+      ctx.save();
+      // Drop shadow for the center plate
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.40)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
+      // White/platinum box background
+      ctx.fillStyle = '#f5f7f9';
+      ctx.fillRect(bx1, by1, boxSize, boxSize);
+      ctx.shadowColor = 'transparent';
+      // Green perimeter frame
+      ctx.strokeStyle = '#284e20';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(bx1, by1, boxSize, boxSize);
+      ctx.restore();
+
+      // Center Emblem Graphic
+      if (bbxImg.complete && bbxImg.naturalWidth > 0) {
+        ctx.save();
+        const pad = 14;
+        ctx.beginPath();
+        ctx.rect(bx1 + pad, by1 + pad, boxSize - pad * 2, boxSize - pad * 2);
+        ctx.clip();
+        const logoW = boxSize - pad * 2;
+        const logoH = Math.round(logoW * (bbxImg.naturalHeight / bbxImg.naturalWidth));
+        ctx.drawImage(bbxImg, bx1 + pad, cy - logoH / 2, logoW, logoH);
+        ctx.restore();
+      } else {
+        // Fallback procedural emblem
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(bx1, by1, boxSize, boxSize);
+        ctx.clip();
+        ctx.fillStyle = '#d4972c';
+        ctx.strokeStyle = '#284e20';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(bx1, by1 + boxSize);
+        ctx.lineTo(bx1, by1 + 40);
+        ctx.lineTo(bx1 + boxSize - 30, by1 + 40);
+        ctx.lineTo(cx + 40, cy);
+        ctx.lineTo(bx1 + boxSize, cy + 60);
+        ctx.lineTo(bx1 + boxSize, by1 + boxSize);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 10. Khmer Text Above Center: "សង្គ្រាម រ៉ូបូត"
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.font = '700 80px "Koulen", "Kantumruy Pro", "Leelawadee UI", "Khmer UI", sans-serif';
+      ctx.fillStyle = '#222630';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 2;
+      ctx.fillText('សង្គ្រាម រ៉ូបូត', cx, 590);
+      ctx.restore();
 
-      // Drop shadow for crisp contrast against any floor lighting
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetX = 0;
+      // 11. English Text Below Center: "BATTLEBOTx"
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 84px Orbitron, sans-serif';
+      ctx.letterSpacing = '0.08em';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 8;
       ctx.shadowOffsetY = 3;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 44px Orbitron, sans-serif';
-      ctx.fillText('BATTLEBOTx', cx, cy + 58);
+      ctx.strokeStyle = '#181b22';
+      ctx.lineWidth = 6;
+      ctx.strokeText('BATTLEBOTx', cx, 1468);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#656b78';
+      ctx.fillText('BATTLEBOTx', cx, 1468);
       ctx.restore();
     };
 
     bbxImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
+    if (document.fonts) {
+      document.fonts.ready.then(() => { renderFloor(); tex.needsUpdate = true; });
+    }
     renderFloor();
 
     return tex;
@@ -430,8 +529,8 @@
   const floorGeo = new THREE.BoxGeometry(ARENA_SIZE, 0.4, ARENA_SIZE);
   const floorMat = new THREE.MeshStandardMaterial({
     map: createFloorTexture(),
-    roughness: 0.65, // Authentic satin steel combat surface (gives subtle sheen without blinding glare)
-    metalness: 0.22  // Real painted steel combat floor
+    roughness: 0.58, // Authentic satin steel combat surface (gives crisp metallic sheen under arena lights)
+    metalness: 0.25  // Real painted steel combat floor
   });
   const floorMesh = new THREE.Mesh(floorGeo, floorMat);
   floorMesh.position.y = -0.2;
@@ -440,9 +539,9 @@
 
   // 3. Lower Steel Bumper / Kickplate (Curb around bottom perimeter)
   const curbMat = new THREE.MeshStandardMaterial({
-    color: 0x94a3b8,
-    metalness: 0.88,
-    roughness: 0.22
+    color: 0x222630,
+    metalness: 0.65,
+    roughness: 0.35
   });
 
   const curbH = 0.55;
