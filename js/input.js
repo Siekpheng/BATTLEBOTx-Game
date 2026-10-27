@@ -96,6 +96,38 @@
     window.gamepadPlayerMap = { p1: 0, p2: 1 };
   }
 
+  // ========================================================
+  // NATIVE WINDOWS XINPUT / DIRECTINPUT BRIDGE FALLBACK
+  // Fixes Windows 11 (26H2) XBOX Synthetic Gamepad Bus issue where
+  // browser navigator.getGamepads() returns [null, null, null, null]
+  // even when physical controllers are connected and active in Windows.
+  // ========================================================
+  window._nativeWinPads = [];
+  let _nativePollInFlight = false;
+  const _isLocalHostServer = (typeof location !== 'undefined') &&
+    (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]');
+
+  function pollNativeWinGamepads() {
+    if (!_isLocalHostServer || _nativePollInFlight) return;
+    if (window._mockGamepads && Array.isArray(window._mockGamepads) && window._mockGamepads.length > 0) return;
+    _nativePollInFlight = true;
+    fetch('/__gamepads', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        _nativePollInFlight = false;
+        if (data && Array.isArray(data.pads)) {
+          window._nativeWinPads = data.pads;
+        }
+      })
+      .catch(() => {
+        _nativePollInFlight = false;
+      });
+  }
+  if (_isLocalHostServer) {
+    setInterval(pollNativeWinGamepads, 32);
+    pollNativeWinGamepads();
+  }
+
   function isStandardGamepad(pad) {
     if (!pad) return false;
     if (pad.mapping === 'standard') return true;
@@ -110,13 +142,19 @@
     const navPads = (typeof navigator.getGamepads === 'function')
       ? navigator.getGamepads()
       : (typeof navigator.webkitGetGamepads === 'function' ? navigator.webkitGetGamepads() : null);
-    if (!navPads) return [];
     const connectedPads = [];
-    for (let i = 0; i < navPads.length; i++) {
-      const p = navPads[i];
-      if (p && p.connected !== false) {
-        connectedPads.push(p);
+    if (navPads) {
+      for (let i = 0; i < navPads.length; i++) {
+        const p = navPads[i];
+        if (p && p.connected !== false) {
+          connectedPads.push(p);
+        }
       }
+    }
+    // If browser Gamepad API returned fewer controllers than the Windows Native XInput/DirectInput bridge,
+    // use the native Windows controllers so connected controllers are always recognized!
+    if (Array.isArray(window._nativeWinPads) && window._nativeWinPads.length > connectedPads.length) {
+      return window._nativeWinPads.filter(p => p && p.connected !== false);
     }
     // Prioritize standard gamepads ahead of raw unmapped virtual HID devices when multiple devices exist
     if (connectedPads.length > 1) {
@@ -133,22 +171,34 @@
   function shortPadName(pad, slotNum) {
     if (!pad || !pad.id) return `Controller #${slotNum}`;
     const id = String(pad.id);
-    if (/xbox/i.test(id)) return `Xbox #${slotNum}`;
+    if (/xbox|xinput/i.test(id)) return `Xbox #${slotNum}`;
     if (/dualsense|dualshock|wireless controller|054c/i.test(id)) return `PlayStation #${slotNum}`;
     if (/pro controller|nintendo/i.test(id)) return `Switch #${slotNum}`;
     return `Controller #${slotNum}`;
   }
 
+  // Decode DirectInput POV Hat Switch (axes[9]) if present
+  function readPovHatDir(pad) {
+    if (!pad || !pad.axes || pad.axes.length <= 9) return null;
+    const hat = pad.axes[9];
+    if (typeof hat !== 'number' || isNaN(hat) || hat > 1.05 || Math.abs(hat) < 0.01) return null;
+    if (hat <= -0.80 || hat >= 0.85) return 'up';
+    if (hat > -0.60 && hat < -0.25) return 'right';
+    if (hat >= -0.05 && hat <= 0.30) return 'down';
+    if (hat > 0.55 && hat < 0.85) return 'left';
+    return null;
+  }
+
   // ========================================================
   // CONTROLLER TO PLAYER (P1 / P2) MAPPER
   // Supports:
-  // 1. Clicking [🔵 P1] or [🔴 P2] to cycle any connected controller (Controller #1, #2, ..., Keyboard Only)
+  // 1. Clicking [🔵 P1] or [🔴 P2] ALWAYS cycles: Controller #1 -> Controller #2 -> Keyboard Only
   // 2. Pressing [LB] / [LT] on any physical controller to claim P1, or [RB] / [RT] to claim P2
   // 3. Clicking [⇄ Swap P1 ↔ P2] or pressing [Y] to swap P1 & P2 controllers
   // 4. Automatic active controller detection (ignores dead virtual HID devices)
   // ========================================================
   const GamepadMapper = {
-    listeningFor: null, // Only used when 0 controllers are awake in browser yet
+    listeningFor: null,
     listenTimer: 0,
     activePadsSeen: {},
     lastActivePadIndex: -1,
@@ -178,21 +228,21 @@
     },
 
     handleMapButtonClick(playerSlot) {
-      const pads = getConnectedGamepadsList();
-      if (pads.length === 0) {
-        // Browser hasn't woken up any controller yet: prompt user to press any button on their controller
-        this.listeningFor = playerSlot;
-        this.listenTimer = 6.0;
-        if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
-          AudioSys.init();
-          AudioSys.beep(580, 0.06);
-        }
-        this.updateUI();
-        return;
-      }
-      this.listeningFor = null;
-      this.listenTimer = 0;
+      // ALWAYS cycle the player's controller slot immediately (Controller #1 -> Controller #2 -> Keyboard Only)
+      // even if 0 or 1 controller is currently awake in the browser!
       this.cyclePlayerPad(playerSlot);
+      // Also listen for 5s so if the user presses any button on a physical controller right after clicking,
+      // that physical controller immediately binds to this playerSlot!
+      const map = window.gamepadPlayerMap || { p1: 0, p2: 1 };
+      const assigned = (playerSlot === 0) ? map.p1 : map.p2;
+      if (assigned >= 0) {
+        this.listeningFor = playerSlot;
+        this.listenTimer = 5.0;
+      } else {
+        this.listeningFor = null;
+        this.listenTimer = 0;
+      }
+      this.updateUI();
     },
 
     getPadForPlayer(playerSlot = 0) {
@@ -204,6 +254,12 @@
       if (mappedIdx === -1) return null; // Explicitly set to Keyboard Only
       if (mappedIdx >= 0 && mappedIdx < pads.length) {
         return pads[mappedIdx];
+      }
+      // If only 1 controller is connected (pads[0]) and the OTHER player is on Keyboard Only (-1),
+      // let this player use pads[0] even if their label says Controller #2 (index 1)
+      if (pads.length === 1 && mappedIdx >= 0) {
+        const otherIdx = (playerSlot === 0) ? map.p2 : map.p1;
+        if (otherIdx === -1) return pads[0];
       }
       return null;
     },
@@ -220,19 +276,19 @@
       if (playerSlot === 0) {
         map.p1 = padIdx;
         if (padIdx >= 0 && map.p2 === padIdx) {
-          if (pads.length <= 1) {
-            map.p2 = -1; // Single controller assigned to P1 -> P2 uses Keyboard (Arrows)
+          if (pads.length === 1) {
+            map.p2 = -1; // Single connected controller assigned to P1 -> P2 uses Keyboard (Arrows)
           } else {
-            map.p2 = (oldP1 >= 0 && oldP1 !== padIdx && oldP1 < pads.length) ? oldP1 : (padIdx === 0 ? 1 : 0);
+            map.p2 = (oldP1 >= 0 && oldP1 !== padIdx) ? oldP1 : (padIdx === 0 ? 1 : 0);
           }
         }
       } else {
         map.p2 = padIdx;
         if (padIdx >= 0 && map.p1 === padIdx) {
-          if (pads.length <= 1) {
-            map.p1 = -1; // Single controller assigned to P2 -> P1 uses Keyboard (WASD)
+          if (pads.length === 1) {
+            map.p1 = -1; // Single connected controller assigned to P2 -> P1 uses Keyboard (WASD)
           } else {
-            map.p1 = (oldP2 >= 0 && oldP2 !== padIdx && oldP2 < pads.length) ? oldP2 : (padIdx === 0 ? 1 : 0);
+            map.p1 = (oldP2 >= 0 && oldP2 !== padIdx) ? oldP2 : (padIdx === 0 ? 1 : 0);
           }
         }
       }
@@ -268,15 +324,23 @@
       }
       const map = window.gamepadPlayerMap;
       const pads = getConnectedGamepadsList();
-      const maxControllers = Math.max(1, pads.length);
-      // Cycle options: Controller #1 (0), Controller #2 (1) [if connected], ..., Keyboard Only (-1)
+      const cur = (playerSlot === 0) ? map.p1 : map.p2;
+
+      // Ergonomic 1-controller shortcut: if <= 1 controller is connected and P2 is on default slot 1 (Controller #2),
+      // clicking P2 immediately assigns Controller #1 (0) to P2!
+      if (playerSlot === 1 && pads.length <= 1 && cur === 1) {
+        this.setPlayerPad(1, 0);
+        return;
+      }
+
+      // Always allow cycling Controller #1 (0), Controller #2 (1), ..., and Keyboard Only (-1)
+      const maxControllers = Math.max(2, pads.length);
       const options = [];
       for (let i = 0; i < maxControllers; i++) options.push(i);
       options.push(-1);
 
-      const cur = (playerSlot === 0) ? map.p1 : map.p2;
       let idx = options.indexOf(cur);
-      if (idx < 0) idx = -1; // So (idx + 1) % options.length starts at options[0] (Controller #1)!
+      if (idx < 0) idx = -1;
       const nextVal = options[(idx + 1) % options.length];
       this.setPlayerPad(playerSlot, nextVal);
     },
@@ -385,9 +449,6 @@
 
     formatSlotLabel(padIdx, kbFallback, shortMode = false, playerSlot = null) {
       const pads = getConnectedGamepadsList();
-      if (playerSlot !== null && this.listeningFor === playerSlot && pads.length === 0) {
-        return `🎮 Press ANY Button on Controller...`;
-      }
       if (padIdx === -1) {
         return shortMode ? `⌨️ ${kbFallback} ONLY` : `⌨️ Keyboard Only (${kbFallback})`;
       }
@@ -485,10 +546,11 @@
 
     let throttle = (Math.abs(triggerThrottle) > 0.02) ? triggerThrottle : stickThrottle;
 
-    // Optional D-Pad fallback for throttle
-    if (Math.abs(throttle) < 0.1 && pad.buttons) {
-      if (pad.buttons[12] && (pad.buttons[12].pressed || pad.buttons[12].value > 0.5)) throttle = 1.0;
-      else if (pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) throttle = -1.0;
+    const povDir = readPovHatDir(pad);
+    // Optional D-Pad / POV Hat fallback for throttle
+    if (Math.abs(throttle) < 0.1) {
+      if ((pad.buttons && pad.buttons[12] && (pad.buttons[12].pressed || pad.buttons[12].value > 0.5)) || povDir === 'up') throttle = 1.0;
+      else if ((pad.buttons && pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) || povDir === 'down') throttle = -1.0;
     }
 
     // 3. Turn Left and Right: Supports BOTH Left Joystick (axes[0]) AND Right Joystick (axes[2])
@@ -503,10 +565,10 @@
 
     let steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
 
-    // Optional D-Pad fallback for steer
-    if (Math.abs(steer) < 0.1 && pad.buttons) {
-      if (pad.buttons[14] && (pad.buttons[14].pressed || pad.buttons[14].value > 0.5)) steer = -1.0;
-      else if (pad.buttons[15] && (pad.buttons[15].pressed || pad.buttons[15].value > 0.5)) steer = 1.0;
+    // Optional D-Pad / POV Hat fallback for steer
+    if (Math.abs(steer) < 0.1) {
+      if ((pad.buttons && pad.buttons[14] && (pad.buttons[14].pressed || pad.buttons[14].value > 0.5)) || povDir === 'left') steer = -1.0;
+      else if ((pad.buttons && pad.buttons[15] && (pad.buttons[15].pressed || pad.buttons[15].value > 0.5)) || povDir === 'right') steer = 1.0;
     }
 
     if (!prevGamepadButtons[playerIndex]) {
@@ -1200,6 +1262,8 @@
       if (b[13] && (b[13].pressed || b[13].value > 0.5)) return 'down';
       if (b[14] && (b[14].pressed || b[14].value > 0.5)) return 'left';
       if (b[15] && (b[15].pressed || b[15].value > 0.5)) return 'right';
+      const pov = readPovHatDir(pad);
+      if (pov) return pov;
       const axX = (pad.axes && pad.axes.length > 0) ? pad.axes[0] : 0;
       const axY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
       if (axY < -0.55) return 'up';
