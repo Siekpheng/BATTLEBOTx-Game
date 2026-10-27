@@ -147,6 +147,9 @@
 
     // A robot with no wheels, depleted drive health, <= 20% parts remaining, or entirely destroyed CANNOT move!
     if (totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) {
+      if (!bot.isEntirelyDestroyed && remainingParts <= threshold20 && remainingParts > 0) {
+        explodeRobot(bot, { x: 0, z: 1 });
+      }
       bot.drivePower = 0;
       bot.throttleInput = 0;
       bot.steerInput = 0;

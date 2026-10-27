@@ -136,67 +136,116 @@
     if (!bot.detachableParts || bot.detachableParts.length === 0) {
       initBotDetachableParts(bot);
     }
-    const remaining = bot.detachableParts ? bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent) : [];
-    if (remaining.length === 0) {
+
+    const botPos = new THREE.Vector3();
+    if (bot.root) bot.root.getWorldPosition(botPos);
+
+    // Collect ALL remaining parts and meshes on the robot (both from detachableParts and tiltGroup hierarchy)
+    const meshesToExplode = [];
+    const seenMeshes = new Set();
+
+    if (bot.detachableParts) {
+      bot.detachableParts.forEach(p => {
+        if (p.mesh && (p.attached || (p.mesh.parent && p.mesh.parent !== scene))) {
+          if (!seenMeshes.has(p.mesh)) {
+            seenMeshes.add(p.mesh);
+            meshesToExplode.push({
+              mesh: p.mesh,
+              name: p.name,
+              category: p.category
+            });
+          }
+          p.attached = false;
+        }
+      });
+    }
+
+    if (bot.tiltGroup) {
+      bot.tiltGroup.traverse(obj => {
+        if (obj.isMesh && obj.visible !== false && obj.name !== 'CAD_Outline') {
+          if (!seenMeshes.has(obj)) {
+            seenMeshes.add(obj);
+            meshesToExplode.push({
+              mesh: obj,
+              name: obj.name,
+              category: 'chassis'
+            });
+          }
+        }
+      });
+    }
+
+    if (meshesToExplode.length === 0) {
       bot.isEntirelyDestroyed = true;
       bot.driveHealth = 0;
       bot.drivePower = 0;
       return [];
     }
 
-    const botPos = new THREE.Vector3();
-    if (bot.root) bot.root.getWorldPosition(botPos);
-
     const explodedParts = [];
+    const totalParts = meshesToExplode.length;
 
-    // Detach all remaining parts simultaneously in a massive radial blast!
-    remaining.forEach(p => {
-      p.attached = false;
+    // Detach ALL remaining parts simultaneously in a massive 360-degree radial blast!
+    meshesToExplode.forEach((item, idx) => {
+      const mesh = item.mesh;
 
       const worldPos = new THREE.Vector3();
       const worldQuat = new THREE.Quaternion();
       const worldScale = new THREE.Vector3();
-      p.mesh.getWorldPosition(worldPos);
-      p.mesh.getWorldQuaternion(worldQuat);
-      p.mesh.getWorldScale(worldScale);
+      mesh.getWorldPosition(worldPos);
+      mesh.getWorldQuaternion(worldQuat);
+      mesh.getWorldScale(worldScale);
 
       // Remove outline children
-      if (p.mesh.children && p.mesh.children.length > 0) {
-        const toRemove = p.mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
-        toRemove.forEach(c => p.mesh.remove(c));
+      if (mesh.children && mesh.children.length > 0) {
+        const toRemove = mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
+        toRemove.forEach(c => mesh.remove(c));
       }
 
-      if (p.mesh.parent) {
-        p.mesh.parent.remove(p.mesh);
+      if (mesh.parent) {
+        mesh.parent.remove(mesh);
       }
 
-      p.mesh.position.copy(worldPos);
-      p.mesh.quaternion.copy(worldQuat);
-      p.mesh.scale.copy(worldScale);
-      p.mesh.visible = true;
-      scene.add(p.mesh);
+      mesh.position.copy(worldPos);
+      mesh.quaternion.copy(worldQuat);
+      mesh.scale.copy(worldScale);
+      mesh.visible = true;
+      scene.add(mesh);
 
-      // Radial blast outward from bot center
-      const blastDx = (worldPos.x - botPos.x) + (Math.random() - 0.5) * 0.8 + (impactDir.x || 0) * 0.5;
-      const blastDz = (worldPos.z - botPos.z) + (Math.random() - 0.5) * 0.8 + (impactDir.z || 0) * 0.5;
-      const blastDist = Math.hypot(blastDx, blastDz) || 1.0;
-      const blastSpeed = 8.5 + Math.random() * 6.5;
+      // Full 360-degree outward radial explosion burst
+      const angle = (idx / Math.max(1, totalParts)) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+      const radialDirX = Math.cos(angle);
+      const radialDirZ = Math.sin(angle);
 
-      const isWheelPart = (p.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(p.mesh)));
+      const blastSpeed = 9.0 + Math.random() * 7.5;
+      const impX = (impactDir && typeof impactDir.x === 'number') ? impactDir.x : 0;
+      const impZ = (impactDir && typeof impactDir.z === 'number') ? impactDir.z : 1;
+      const vx = (radialDirX * 0.78 + impX * 0.22) * blastSpeed + (bot.vx ? bot.vx * 0.35 : 0);
+      const vz = (radialDirZ * 0.78 + impZ * 0.22) * blastSpeed + (bot.vz ? bot.vz * 0.35 : 0);
+      const vy = 5.5 + Math.random() * 5.0;
+
+      const isWheelPart = (item.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(mesh)));
 
       detachedDebris.push({
-        mesh: p.mesh,
+        mesh: mesh,
         isWheel: isWheelPart,
-        vx: (blastDx / blastDist) * blastSpeed + (bot.vx ? bot.vx * 0.35 : 0),
-        vy: 5.5 + Math.random() * 4.5,
-        vz: (blastDz / blastDist) * blastSpeed + (bot.vz ? bot.vz * 0.35 : 0),
-        rx: (Math.random() - 0.5) * 26,
-        ry: (Math.random() - 0.5) * 26,
-        rz: (Math.random() - 0.5) * 26
+        vx: vx,
+        vy: vy,
+        vz: vz,
+        rx: (Math.random() - 0.5) * 28,
+        ry: (Math.random() - 0.5) * 28,
+        rz: (Math.random() - 0.5) * 28
       });
 
-      explodedParts.push(p);
+      explodedParts.push(item);
     });
+
+    // Cleanly remove any leftover empty groups in bot.tiltGroup so robot is 100% dismantled
+    if (bot.tiltGroup) {
+      while (bot.tiltGroup.children.length > 0) {
+        bot.tiltGroup.remove(bot.tiltGroup.children[0]);
+      }
+    }
 
     // Synchronize legacy structures
     if (bot.armorPanels) {
@@ -204,6 +253,9 @@
     }
     if (bot.wheels) {
       bot.wheels.forEach(w => { w.attached = false; });
+    }
+    if (bot.detachableParts) {
+      bot.detachableParts.forEach(p => { p.attached = false; });
     }
 
     // Robot completely dismantled
@@ -455,11 +507,10 @@
     const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
     bot.driveHealth = (remainingCount / bot.totalInitialParts) * bot.maxDriveHealth;
 
-    // If remaining parts dropped to <= 20%, kill drive power immediately so lone scraps cannot move
+    // If remaining parts dropped to <= 20%, trigger explosion immediately so ALL remaining parts fly out all at once!
     if (remainingCount <= threshold20) {
-      bot.drivePower = 0;
-      bot.throttleInput = 0;
-      bot.steerInput = 0;
+      explodeRobot(bot, impactDir, hitPoint);
+      return chosen;
     }
 
     if (remainingCount === 0) {
