@@ -1492,3 +1492,14 @@
       text-align: center;
       line-height: 1.35;
     }
+
+
+    .controller-map-btn.listening {
+      border-color: #facc15 !important;
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35), 0 0 20px rgba(250, 204, 21, 0.75) !important;
+      animation: mapPulse 0.9s infinite alternate ease-in-out;
+    }
+    @keyframes mapPulse {
+      0% { transform: scale(1.0); }
+      100% { transform: scale(1.02); }
+    }

@@ -87,31 +87,75 @@
   // ========================================================
   const prevGamepadButtons = [
     { lb: false, rb: false, start: false },
+    { lb: false, rb: false, start: false },
+    { lb: false, rb: false, start: false },
     { lb: false, rb: false, start: false }
   ];
+
+  if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
+    window.gamepadPlayerMap = { p1: 0, p2: 1 };
+  }
+
+  function isStandardGamepad(pad) {
+    if (!pad) return false;
+    if (pad.mapping === 'standard') return true;
+    const id = String(pad.id || '').toLowerCase();
+    return /xbox|xinput|standard|dualsense|dualshock|wireless controller|playstation|pro controller|gamepad/i.test(id);
+  }
 
   function getConnectedGamepadsList() {
     if (window._mockGamepads && Array.isArray(window._mockGamepads) && window._mockGamepads.length > 0) {
       return window._mockGamepads.filter(p => p && p.connected !== false);
     }
-    if (typeof navigator.getGamepads !== 'function') return [];
-    const rawGamepads = navigator.getGamepads();
-    if (!rawGamepads) return [];
+    const navPads = (typeof navigator.getGamepads === 'function')
+      ? navigator.getGamepads()
+      : (typeof navigator.webkitGetGamepads === 'function' ? navigator.webkitGetGamepads() : null);
+    if (!navPads) return [];
     const connectedPads = [];
-    for (let i = 0; i < rawGamepads.length; i++) {
-      if (rawGamepads[i] && rawGamepads[i].connected) connectedPads.push(rawGamepads[i]);
+    for (let i = 0; i < navPads.length; i++) {
+      const p = navPads[i];
+      if (p && p.connected !== false) {
+        connectedPads.push(p);
+      }
+    }
+    // Prioritize standard gamepads ahead of raw unmapped virtual HID devices when multiple devices exist
+    if (connectedPads.length > 1) {
+      connectedPads.sort((a, b) => {
+        const aStd = isStandardGamepad(a) ? 1 : 0;
+        const bStd = isStandardGamepad(b) ? 1 : 0;
+        if (aStd !== bStd) return bStd - aStd;
+        return (a.index || 0) - (b.index || 0);
+      });
     }
     return connectedPads;
   }
 
+  function shortPadName(pad, slotNum) {
+    if (!pad || !pad.id) return `Controller #${slotNum}`;
+    const id = String(pad.id);
+    if (/xbox/i.test(id)) return `Xbox #${slotNum}`;
+    if (/dualsense|dualshock|wireless controller|054c/i.test(id)) return `PlayStation #${slotNum}`;
+    if (/pro controller|nintendo/i.test(id)) return `Switch #${slotNum}`;
+    return `Controller #${slotNum}`;
+  }
+
   // ========================================================
   // CONTROLLER TO PLAYER (P1 / P2) MAPPER
-  // Allows assigning any connected controller (or Keyboard Only) to P1 or P2,
-  // swapping P1 <-> P2 with 1 click or [Y], or pressing [LB] for P1 / [RB] for P2!
+  // Supports:
+  // 1. Clicking [🔵 P1] or [🔴 P2] to cycle any connected controller (Controller #1, #2, ..., Keyboard Only)
+  // 2. Pressing [LB] / [LT] on any physical controller to claim P1, or [RB] / [RT] to claim P2
+  // 3. Clicking [⇄ Swap P1 ↔ P2] or pressing [Y] to swap P1 & P2 controllers
+  // 4. Automatic active controller detection (ignores dead virtual HID devices)
   // ========================================================
   const GamepadMapper = {
+    listeningFor: null, // Only used when 0 controllers are awake in browser yet
+    listenTimer: 0,
+    activePadsSeen: {},
+    lastActivePadIndex: -1,
+    prevRawState: {},
+
     init() {
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+      if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
         window.gamepadPlayerMap = { p1: 0, p2: 1 };
       }
       const bindClick = (id, fn) => {
@@ -124,50 +168,90 @@
           });
         }
       };
-      bindClick('btn-map-p1', () => this.cyclePlayerPad(0));
-      bindClick('btn-map-p2', () => this.cyclePlayerPad(1));
+      bindClick('btn-map-p1', () => this.handleMapButtonClick(0));
+      bindClick('btn-map-p2', () => this.handleMapButtonClick(1));
       bindClick('btn-swap-controllers', () => this.swapControllers());
-      bindClick('btn-pause-map-p1', () => this.cyclePlayerPad(0));
-      bindClick('btn-pause-map-p2', () => this.cyclePlayerPad(1));
+      bindClick('btn-pause-map-p1', () => this.handleMapButtonClick(0));
+      bindClick('btn-pause-map-p2', () => this.handleMapButtonClick(1));
       bindClick('btn-pause-swap-controllers', () => this.swapControllers());
       this.updateUI();
     },
 
+    handleMapButtonClick(playerSlot) {
+      const pads = getConnectedGamepadsList();
+      if (pads.length === 0) {
+        // Browser hasn't woken up any controller yet: prompt user to press any button on their controller
+        this.listeningFor = playerSlot;
+        this.listenTimer = 6.0;
+        if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+          AudioSys.init();
+          AudioSys.beep(580, 0.06);
+        }
+        this.updateUI();
+        return;
+      }
+      this.listeningFor = null;
+      this.listenTimer = 0;
+      this.cyclePlayerPad(playerSlot);
+    },
+
     getPadForPlayer(playerSlot = 0) {
       const pads = getConnectedGamepadsList();
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
-        window.gamepadPlayerMap = { p1: 0, p2: 1 };
-      }
-      const mappedIdx = (playerSlot === 0) ? gamepadPlayerMap.p1 : gamepadPlayerMap.p2;
+      if (pads.length === 0) return null;
+      const map = window.gamepadPlayerMap || { p1: 0, p2: 1 };
+      const mappedIdx = (playerSlot === 0) ? map.p1 : map.p2;
+
       if (mappedIdx === -1) return null; // Explicitly set to Keyboard Only
       if (mappedIdx >= 0 && mappedIdx < pads.length) {
         return pads[mappedIdx];
-      }
-      // In single-player modes (vs_bot / practice), if only 1 controller is connected at slot 0, allow P1 to use it
-      if (playerSlot === 0 && (typeof gameMode === 'undefined' || gameMode !== '1v1') && pads.length === 1 && mappedIdx >= 1) {
-        return pads[0];
       }
       return null;
     },
 
     setPlayerPad(playerSlot, padIdx) {
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+      if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
         window.gamepadPlayerMap = { p1: 0, p2: 1 };
       }
-      const oldP1 = gamepadPlayerMap.p1;
-      const oldP2 = gamepadPlayerMap.p2;
+      const map = window.gamepadPlayerMap;
+      const pads = getConnectedGamepadsList();
+      const oldP1 = map.p1;
+      const oldP2 = map.p2;
 
       if (playerSlot === 0) {
-        gamepadPlayerMap.p1 = padIdx;
-        // If P2 was using this physical controller, automatically swap P2 to P1's previous slot
-        if (padIdx >= 0 && gamepadPlayerMap.p2 === padIdx) {
-          gamepadPlayerMap.p2 = (oldP1 !== padIdx) ? oldP1 : (padIdx === 0 ? 1 : 0);
+        map.p1 = padIdx;
+        if (padIdx >= 0 && map.p2 === padIdx) {
+          if (pads.length <= 1) {
+            map.p2 = -1; // Single controller assigned to P1 -> P2 uses Keyboard (Arrows)
+          } else {
+            map.p2 = (oldP1 >= 0 && oldP1 !== padIdx && oldP1 < pads.length) ? oldP1 : (padIdx === 0 ? 1 : 0);
+          }
         }
       } else {
-        gamepadPlayerMap.p2 = padIdx;
-        // If P1 was using this physical controller, automatically swap P1 to P2's previous slot
-        if (padIdx >= 0 && gamepadPlayerMap.p1 === padIdx) {
-          gamepadPlayerMap.p1 = (oldP2 !== padIdx) ? oldP2 : (padIdx === 0 ? 1 : 0);
+        map.p2 = padIdx;
+        if (padIdx >= 0 && map.p1 === padIdx) {
+          if (pads.length <= 1) {
+            map.p1 = -1; // Single controller assigned to P2 -> P1 uses Keyboard (WASD)
+          } else {
+            map.p1 = (oldP2 >= 0 && oldP2 !== padIdx && oldP2 < pads.length) ? oldP2 : (padIdx === 0 ? 1 : 0);
+          }
+        }
+      }
+
+      this.listeningFor = null;
+      this.listenTimer = 0;
+
+      // Brief rumble feedback on the assigned controller
+      if (padIdx >= 0 && padIdx < pads.length) {
+        const assignedPad = pads[padIdx];
+        if (assignedPad && assignedPad.vibrationActuator && typeof assignedPad.vibrationActuator.playEffect === 'function') {
+          try {
+            assignedPad.vibrationActuator.playEffect('dual-rumble', {
+              startDelay: 0,
+              duration: 110,
+              weakMagnitude: 0.45,
+              strongMagnitude: 0.45
+            }).catch(() => {});
+          } catch (e) {}
         }
       }
 
@@ -179,30 +263,45 @@
     },
 
     cyclePlayerPad(playerSlot) {
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+      if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
         window.gamepadPlayerMap = { p1: 0, p2: 1 };
       }
+      const map = window.gamepadPlayerMap;
       const pads = getConnectedGamepadsList();
-      const maxControllers = Math.max(2, pads.length);
-      // Options sequence: Controller #1 (0), Controller #2 (1), ..., Keyboard Only (-1)
+      const maxControllers = Math.max(1, pads.length);
+      // Cycle options: Controller #1 (0), Controller #2 (1) [if connected], ..., Keyboard Only (-1)
       const options = [];
       for (let i = 0; i < maxControllers; i++) options.push(i);
       options.push(-1);
 
-      const cur = (playerSlot === 0) ? gamepadPlayerMap.p1 : gamepadPlayerMap.p2;
+      const cur = (playerSlot === 0) ? map.p1 : map.p2;
       let idx = options.indexOf(cur);
-      if (idx < 0) idx = 0;
+      if (idx < 0) idx = -1; // So (idx + 1) % options.length starts at options[0] (Controller #1)!
       const nextVal = options[(idx + 1) % options.length];
       this.setPlayerPad(playerSlot, nextVal);
     },
 
     swapControllers() {
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) {
+      if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
         window.gamepadPlayerMap = { p1: 0, p2: 1 };
       }
-      const tmp = gamepadPlayerMap.p1;
-      gamepadPlayerMap.p1 = gamepadPlayerMap.p2;
-      gamepadPlayerMap.p2 = tmp;
+      const map = window.gamepadPlayerMap;
+      const pads = getConnectedGamepadsList();
+      if (pads.length === 1) {
+        if (map.p1 === 0) {
+          map.p1 = -1;
+          map.p2 = 0;
+        } else {
+          map.p1 = 0;
+          map.p2 = -1;
+        }
+      } else {
+        const tmp = map.p1;
+        map.p1 = map.p2;
+        map.p2 = tmp;
+      }
+      this.listeningFor = null;
+      this.listenTimer = 0;
       if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
         AudioSys.init();
         AudioSys.beep(720, 0.07);
@@ -210,63 +309,153 @@
       this.updateUI();
     },
 
-    formatSlotLabel(padIdx, kbFallback, shortMode = false) {
+    pollActivityAndAutoMap(dt) {
       const pads = getConnectedGamepadsList();
+      if (this.listenTimer > 0) {
+        this.listenTimer = Math.max(0, this.listenTimer - (dt || 0.016));
+        if (this.listenTimer <= 0) {
+          this.listeningFor = null;
+        }
+      }
+
+      const map = window.gamepadPlayerMap;
+
+      for (let pIdx = 0; pIdx < pads.length; pIdx++) {
+        const pad = pads[pIdx];
+        if (!pad) continue;
+        const b = pad.buttons || [];
+        const ax = pad.axes || [];
+
+        if (!this.prevRawState[pIdx]) {
+          this.prevRawState[pIdx] = {
+            buttons: b.map(btn => !!(btn && (btn.pressed || btn.value > 0.5))),
+            axes: ax.slice(0, 6)
+          };
+          // If we were waiting for a controller to wake up in browser, bind it immediately upon connection!
+          if (this.listeningFor !== null) {
+            this.setPlayerPad(this.listeningFor, pIdx);
+            return;
+          }
+          continue;
+        }
+
+        const prev = this.prevRawState[pIdx];
+        let newlyPressedBtn = -1;
+        for (let k = 0; k < b.length; k++) {
+          const isNow = !!(b[k] && (b[k].pressed || b[k].value > 0.5));
+          if (isNow && !prev.buttons[k]) {
+            newlyPressedBtn = k;
+          }
+          prev.buttons[k] = isNow;
+        }
+
+        let stickMoved = false;
+        for (let k = 0; k < Math.min(4, ax.length); k++) {
+          const prevVal = typeof prev.axes[k] === 'number' ? prev.axes[k] : 0;
+          if (Math.abs(ax[k] - prevVal) > 0.25 && Math.abs(ax[k]) > 0.30) {
+            stickMoved = true;
+          }
+          prev.axes[k] = ax[k];
+        }
+
+        if (newlyPressedBtn >= 0 || stickMoved) {
+          this.activePadsSeen[pIdx] = true;
+          this.lastActivePadIndex = pIdx;
+
+          if (this.listeningFor !== null) {
+            this.setPlayerPad(this.listeningFor, pIdx);
+            return;
+          }
+
+          // Auto-heal if a virtual HID device occupied slot 0 while the user is actively using controller pIdx
+          if (map.p1 !== pIdx && map.p2 !== pIdx) {
+            const p1Active = map.p1 >= 0 && map.p1 < pads.length && this.activePadsSeen[map.p1];
+            const p2Active = map.p2 >= 0 && map.p2 < pads.length && this.activePadsSeen[map.p2];
+            if (!p1Active && map.p1 !== -1) {
+              map.p1 = pIdx;
+              this.updateUI();
+            } else if (!p2Active && map.p2 !== -1) {
+              map.p2 = pIdx;
+              this.updateUI();
+            }
+          }
+        }
+      }
+    },
+
+    formatSlotLabel(padIdx, kbFallback, shortMode = false, playerSlot = null) {
+      const pads = getConnectedGamepadsList();
+      if (playerSlot !== null && this.listeningFor === playerSlot && pads.length === 0) {
+        return `🎮 Press ANY Button on Controller...`;
+      }
       if (padIdx === -1) {
         return shortMode ? `⌨️ ${kbFallback} ONLY` : `⌨️ Keyboard Only (${kbFallback})`;
       }
       const isConnected = padIdx >= 0 && padIdx < pads.length;
       const num = padIdx + 1;
+      const devName = isConnected ? shortPadName(pads[padIdx], num) : `Controller #${num}`;
       if (shortMode) {
-        return `🎮 CONTROLLER #${num} / ${kbFallback}`;
+        return isConnected ? `🎮 ${devName.toUpperCase()} / ${kbFallback}` : `🎮 CONTROLLER #${num} / ${kbFallback}`;
       }
       return isConnected
-        ? `🎮 Controller #${num} (Ready) + ${kbFallback}`
+        ? `🎮 ${devName} (Ready) + ${kbFallback}`
         : `🎮 Controller #${num} + ${kbFallback}`;
     },
 
     updateUI() {
-      if (typeof gamepadPlayerMap === 'undefined' || !gamepadPlayerMap) return;
+      if (typeof window.gamepadPlayerMap === 'undefined' || !window.gamepadPlayerMap) {
+        window.gamepadPlayerMap = { p1: 0, p2: 1 };
+      }
+      const map = window.gamepadPlayerMap;
       const pads = getConnectedGamepadsList();
       const statusEl = document.getElementById('controller-connected-status');
       if (statusEl) {
         if (pads.length === 0) {
-          statusEl.textContent = '0 Controllers Connected (Keyboard Active)';
+          statusEl.textContent = '🎮 Press any button on controller to wake & detect';
           statusEl.classList.remove('connected');
         } else if (pads.length === 1) {
-          statusEl.textContent = '1 Controller Connected';
+          statusEl.textContent = `✓ 1 Controller Ready (${shortPadName(pads[0], 1)})`;
           statusEl.classList.add('connected');
         } else {
-          statusEl.textContent = `${pads.length} Controllers Connected`;
+          statusEl.textContent = `✓ ${pads.length} Controllers Connected`;
           statusEl.classList.add('connected');
         }
       }
 
+      const btnP1 = document.getElementById('btn-map-p1');
+      const btnP2 = document.getElementById('btn-map-p2');
+      const pauseBtnP1 = document.getElementById('btn-pause-map-p1');
+      const pauseBtnP2 = document.getElementById('btn-pause-map-p2');
+
+      if (btnP1) btnP1.classList.toggle('listening', this.listeningFor === 0 && pads.length === 0);
+      if (pauseBtnP1) pauseBtnP1.classList.toggle('listening', this.listeningFor === 0 && pads.length === 0);
+      if (btnP2) btnP2.classList.toggle('listening', this.listeningFor === 1 && pads.length === 0);
+      if (pauseBtnP2) pauseBtnP2.classList.toggle('listening', this.listeningFor === 1 && pads.length === 0);
+
       const p1Label = document.getElementById('map-p1-label');
-      if (p1Label) p1Label.textContent = this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', false);
+      if (p1Label) p1Label.textContent = this.formatSlotLabel(map.p1, 'WASD', false, 0);
       const p2Label = document.getElementById('map-p2-label');
-      if (p2Label) p2Label.textContent = this.formatSlotLabel(gamepadPlayerMap.p2, 'Arrows', false);
+      if (p2Label) p2Label.textContent = this.formatSlotLabel(map.p2, 'Arrows', false, 1);
 
       const pauseP1 = document.getElementById('pause-map-p1-label');
-      if (pauseP1) pauseP1.textContent = this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', false);
+      if (pauseP1) pauseP1.textContent = this.formatSlotLabel(map.p1, 'WASD', false, 0);
       const pauseP2 = document.getElementById('pause-map-p2-label');
-      if (pauseP2) pauseP2.textContent = this.formatSlotLabel(gamepadPlayerMap.p2, 'Arrows', false);
+      if (pauseP2) pauseP2.textContent = this.formatSlotLabel(map.p2, 'Arrows', false, 1);
 
       const p1Badge = document.querySelector('#splitscreen-overlay .p1-badge');
       if (p1Badge) {
-        p1Badge.textContent = `🔵 P1 · ${this.formatSlotLabel(gamepadPlayerMap.p1, 'WASD', true)}`;
+        p1Badge.textContent = `🔵 P1 · ${this.formatSlotLabel(map.p1, 'WASD', true)}`;
       }
       const p2Badge = document.querySelector('#splitscreen-overlay .p2-badge');
       if (p2Badge) {
-        p2Badge.textContent = `🔴 P2 · ${this.formatSlotLabel(gamepadPlayerMap.p2, 'ARROWS', true)}`;
+        p2Badge.textContent = `🔴 P2 · ${this.formatSlotLabel(map.p2, 'ARROWS', true)}`;
       }
     }
   };
   window.GamepadMapper = GamepadMapper;
-  setTimeout(() => GamepadMapper.init(), 0);
+  GamepadMapper.init();
 
-  function pollGamepadControls(playerIndex = 0) {
-    const pad = GamepadMapper.getPadForPlayer(playerIndex);
+  function readSinglePadControls(pad, playerIndex = 0) {
     if (!pad) return null;
 
     const applyDeadzone = (val, threshold = 0.16) => {
@@ -276,8 +465,6 @@
     };
 
     // 1. Trigger acceleration/reverse controls:
-    // Right Trigger (RT / R2 / buttons[7]): Forward (0 to +1.0)
-    // Left Trigger (LT / L2 / buttons[6]): Backward / Reverse (0 to -1.0)
     let rtVal = 0;
     let ltVal = 0;
     if (pad.buttons) {
@@ -290,20 +477,13 @@
     }
     const rtFiltered = applyDeadzone(rtVal, 0.08);
     const ltFiltered = applyDeadzone(ltVal, 0.08);
-    const triggerThrottle = rtFiltered - ltFiltered; // RT drives forward (+), LT drives backward (-)
+    const triggerThrottle = rtFiltered - ltFiltered;
 
     // 2. Left joystick for forward and backward (axes[1], inverted: up = forward)
     let leftY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
     let stickThrottle = -applyDeadzone(leftY, 0.16);
 
-    // Combine Trigger Throttle and Stick Throttle:
-    // If triggers are actively pulled, use trigger throttle; otherwise fall back to joystick or D-pad
-    let throttle = 0;
-    if (Math.abs(triggerThrottle) > 0.02) {
-      throttle = triggerThrottle;
-    } else {
-      throttle = stickThrottle;
-    }
+    let throttle = (Math.abs(triggerThrottle) > 0.02) ? triggerThrottle : stickThrottle;
 
     // Optional D-Pad fallback for throttle
     if (Math.abs(throttle) < 0.1 && pad.buttons) {
@@ -311,19 +491,16 @@
       else if (pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) throttle = -1.0;
     }
 
-    // 2. Turn Left and Right: Supports BOTH Left Joystick (axes[0]) AND Right Joystick (axes[2])
-    // Left Stick X (axes[0]): Allows full single-stick driving on left joystick
+    // 3. Turn Left and Right: Supports BOTH Left Joystick (axes[0]) AND Right Joystick (axes[2])
     let leftX = (pad.axes && pad.axes.length > 0) ? pad.axes[0] : 0;
     let leftStickSteer = applyDeadzone(leftX, 0.16);
 
-    // Right Stick X (axes[2] or fallback axes[5]): Also allows dual-stick steering
     let rightX = (pad.axes && pad.axes.length > 2) ? pad.axes[2] : 0;
     if (Math.abs(rightX) < 0.1 && pad.axes && pad.axes.length > 5 && Math.abs(pad.axes[5]) > 0.1) {
       rightX = pad.axes[5];
     }
     let rightStickSteer = applyDeadzone(rightX, 0.16);
 
-    // Steer with EITHER left joystick or right joystick (dominant stick deflection)
     let steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
 
     // Optional D-Pad fallback for steer
@@ -337,7 +514,7 @@
     }
     const prev = prevGamepadButtons[playerIndex];
 
-    // 3. Left button (LB / buttons[4]) for turning weapon on/off
+    // 4. Left button (LB / buttons[4]) for turning weapon on/off
     const lbPressed = !!(pad.buttons && pad.buttons[4] && (pad.buttons[4].pressed || pad.buttons[4].value > 0.5));
     if (lbPressed && !prev.lb && (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'))) {
       if (playerIndex === 0 && playerBot) {
@@ -348,7 +525,7 @@
     }
     prev.lb = lbPressed;
 
-    // 4. Right button (RB / buttons[5]) for changing camera angle (P1 cycles Cam 1, P2 cycles Cam 2 in Split Screen!)
+    // 5. Right button (RB / buttons[5]) for changing camera angle
     const rbPressed = !!(pad.buttons && pad.buttons[5] && (pad.buttons[5].pressed || pad.buttons[5].value > 0.5));
     if (rbPressed && !prev.rb) {
       if (playerIndex === 0 && (matchState === 'playing' || matchState === 'countdown')) {
@@ -359,7 +536,7 @@
     }
     prev.rb = rbPressed;
 
-    // 5. Start / Menu button (buttons[9]) for pause toggle
+    // 6. Start / Menu button (buttons[9]) for pause toggle
     const startPressed = !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
     if (startPressed && !prev.start) {
       const btnPause = document.getElementById('btn-pause');
@@ -374,6 +551,30 @@
       steer,
       hasInput: Math.abs(throttle) > 0.05 || Math.abs(steer) > 0.05
     };
+  }
+
+  function pollGamepadControls(playerIndex = 0) {
+    if (playerIndex === 0 && typeof GamepadMapper !== 'undefined') {
+      GamepadMapper.pollActivityAndAutoMap(0.016);
+    }
+    const pad = GamepadMapper.getPadForPlayer(playerIndex);
+    const primaryRes = readSinglePadControls(pad, playerIndex);
+
+    // In Single-Player modes (vs_bot / practice), if the mapped slot has no input,
+    // also check all other connected gamepads so any active controller always works!
+    if (playerIndex === 0 && (typeof gameMode === 'undefined' || gameMode !== '1v1')) {
+      if (!primaryRes || !primaryRes.hasInput) {
+        const pads = getConnectedGamepadsList();
+        for (let i = 0; i < pads.length; i++) {
+          if (pads[i] === pad) continue;
+          const altRes = readSinglePadControls(pads[i], 0);
+          if (altRes && altRes.hasInput) {
+            return altRes;
+          }
+        }
+      }
+    }
+    return primaryRes;
   }
 
   window.addEventListener('gamepadconnected', (e) => {
@@ -1050,17 +1251,22 @@
         // - Press [LB] on any controller -> Assigns that controller to PLAYER 1 (P1)
         // - Press [RB] on any controller -> Assigns that controller to PLAYER 2 (P2)
         // - Press [Y] on any controller  -> Swaps P1 <-> P2 Controllers
+        const ltPressed = !!(b[6] && (b[6].pressed || b[6].value > 0.6));
+        const rtPressed = !!(b[7] && (b[7].pressed || b[7].value > 0.6));
+
         if (isMappingModal && typeof GamepadMapper !== 'undefined') {
-          if (lbPressed && !prev.lb) {
+          if ((lbPressed && !prev.lb) || (ltPressed && !prev.lt)) {
             GamepadMapper.setPlayerPad(0, pIdx);
           }
-          if (rbPressed && !prev.rb) {
+          if ((rbPressed && !prev.rb) || (rtPressed && !prev.rt)) {
             GamepadMapper.setPlayerPad(1, pIdx);
           }
           if (yPressed && !prev.y) {
             GamepadMapper.swapControllers();
           }
         }
+        prev.lt = ltPressed;
+        prev.rt = rtPressed;
 
         const isMappedToP2 = (typeof gamepadPlayerMap !== 'undefined' && gamepadPlayerMap.p2 === pIdx && gamepadPlayerMap.p1 !== pIdx);
 
