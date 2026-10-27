@@ -650,12 +650,13 @@
             playerBot.flipped = true;
             enemyBot.flipped = true;
           } else {
-            playerBot.vy = 1.0;
-            enemyBot.vy = 1.0;
-            playerBot.airY = 0.06;
-            enemyBot.airY = 0.06;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -3.0 : 3.0);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -3.0 : 3.0);
+            // Keep both robots firmly planted on the floor during non-flip head-on clash (no jumpy hop!)
+            playerBot.vy = 0;
+            enemyBot.vy = 0;
+            playerBot.airY = 0;
+            enemyBot.airY = 0;
+            playerBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
+            enemyBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
           }
 
           spawnCollisionSparks(midPos, 65);
@@ -720,11 +721,10 @@
             triggerGamepadRumble(0.60, 200);
           }
 
-          // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
           const pRecoil = canFlipEnemy ? 3.4 : 1.8;
           playerBot.vx -= nx * pRecoil;
           playerBot.vz -= nz * pRecoil;
-          playerBot.vy = Math.max(playerBot.vy, canFlipEnemy ? 0.7 : 0.30);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canFlipEnemy ? 2.2 : 1.8, h: true });
@@ -752,17 +752,17 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
-            enemyBot.vy = isHardVerticalHitP ? 1.4 : 0.8;
-            enemyBot.airY = isHardVerticalHitP ? 0.10 : 0.05;
+            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
+            enemyBot.vy = 0;
+            enemyBot.airY = 0;
             enemyBot.vx += nx * (4.0 + impactSpeed * 0.45);
             enemyBot.vz += nz * (4.0 + impactSpeed * 0.45);
 
             if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -3.5 : 3.5);
+              enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
               enemyBot.rollVel = 0;
             } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -3.5 : 3.5);
+              enemyBot.rollVel = (eHitRight > 0 ? -1.2 : 1.2);
               enemyBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO enemyBot.flipped = true
@@ -831,11 +831,10 @@
             triggerGamepadRumble(0.60, 200);
           }
 
-          // Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
           const eRecoil = canFlipPlayer ? 3.4 : 1.8;
           enemyBot.vx += nx * eRecoil;
           enemyBot.vz += nz * eRecoil;
-          enemyBot.vy = Math.max(enemyBot.vy, canFlipPlayer ? 0.7 : 0.30);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canFlipPlayer ? 2.2 : 1.8, h: true });
@@ -863,17 +862,17 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP!
-            playerBot.vy = isHardVerticalHitE ? 1.4 : 0.8;
-            playerBot.airY = isHardVerticalHitE ? 0.10 : 0.05;
+            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
+            playerBot.vy = 0;
+            playerBot.airY = 0;
             playerBot.vx -= nx * (4.0 + impactSpeed * 0.45);
             playerBot.vz -= nz * (4.0 + impactSpeed * 0.45);
 
             if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -3.5 : 3.5);
+              playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);
               playerBot.rollVel = 0;
             } else {
-              playerBot.rollVel = (pHitRight > 0 ? -3.5 : 3.5);
+              playerBot.rollVel = (pHitRight > 0 ? -1.2 : 1.2);
               playerBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO playerBot.flipped = true
@@ -939,23 +938,23 @@
             const eIsAttacker = (eApproach > 1.2 && eApproach > pApproach * 1.15);
 
             if (pIsAttacker && playerBot.weaponActive !== false) {
-              // Player rammed Enemy with active weapon: detach part 1 by 1!
+              // Player rammed Enemy with active weapon: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
               if (impactSpeed > 4.2) {
-                enemyBot.vy = 0.8;
-                enemyBot.airY = 0.08;
-                enemyBot.rollVel = (eHitRight > 0 ? -4.5 : 4.5);
+                enemyBot.vy = 0;
+                enemyBot.airY = 0;
+                enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
                 detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
               }
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
             } else if (eIsAttacker && enemyBot.weaponActive !== false) {
-              // Enemy rammed Player with active weapon: detach part 1 by 1!
+              // Enemy rammed Player with active weapon: detach part 1 by 1 (stay planted on floor, no jumpy hop)!
               triggerDamageVignette();
               if (impactSpeed > 4.2) {
-                playerBot.vy = 0.8;
-                playerBot.airY = 0.08;
-                playerBot.rollVel = (pHitRight > 0 ? -4.5 : 4.5);
+                playerBot.vy = 0;
+                playerBot.airY = 0;
+                playerBot.rollVel = (pHitRight > 0 ? -1.5 : 1.5);
                 detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
               }
               if (playerBot.isEntirelyDestroyed) {

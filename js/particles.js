@@ -131,13 +131,230 @@
   }
   window.initBotDetachableParts = initBotDetachableParts;
 
+  // Sync bot.root world transform before querying any mesh world positions
+  function syncBotRootMatrix(bot) {
+    if (!bot || !bot.root) return;
+    if (typeof bot.x === 'number' && typeof bot.z === 'number') {
+      const effectiveRoll = (bot.roll || 0) + (bot.wheelTilt || 0);
+      const groundElev = (typeof getBotGroundElevation === 'function')
+        ? getBotGroundElevation(bot, bot.pitch || 0, effectiveRoll)
+        : (bot.groundElevation || 0);
+      bot.root.position.set(bot.x, (bot.airY || 0) + groundElev, bot.z);
+    }
+    if (typeof bot.yaw === 'number') {
+      bot.root.rotation.y = bot.yaw;
+    }
+    if (bot.tiltGroup) {
+      bot.tiltGroup.rotation.x = bot.pitch || 0;
+      bot.tiltGroup.rotation.z = (bot.roll || 0) + (bot.wheelTilt || 0);
+    }
+    bot.root.updateMatrixWorld(true);
+  }
+
+  // Center a detached mesh's geometry on its local origin (0,0,0) and place it at its exact world bounding box center
+  // so it flies off directly from its position on the robot and spins around its own center of mass!
+  function detachAndCenterMeshToScene(mesh, bot) {
+    if (!mesh) return null;
+    syncBotRootMatrix(bot);
+    mesh.updateMatrixWorld(true);
+
+    const worldQuat = new THREE.Quaternion();
+    const worldScale = new THREE.Vector3();
+    mesh.getWorldQuaternion(worldQuat);
+    mesh.getWorldScale(worldScale);
+
+    // Clone geometry and recenter vertices around (0, 0, 0)
+    let localGeoCenter = new THREE.Vector3(0, 0, 0);
+    if (mesh.geometry) {
+      mesh.geometry = mesh.geometry.clone();
+      mesh.geometry.computeBoundingBox();
+      if (mesh.geometry.boundingBox && !mesh.geometry.boundingBox.isEmpty()) {
+        mesh.geometry.boundingBox.getCenter(localGeoCenter);
+        mesh.geometry.translate(-localGeoCenter.x, -localGeoCenter.y, -localGeoCenter.z);
+        mesh.geometry.computeBoundingBox();
+      }
+    }
+
+    // Also shift any child CAD_Outline geometry by the exact same offset so outlines stay aligned on the flying part!
+    if (mesh.children && mesh.children.length > 0 && localGeoCenter.lengthSq() > 0.00001) {
+      mesh.children.forEach(c => {
+        if ((c.name === 'CAD_Outline' || c.isLineSegments) && c.geometry) {
+          c.geometry = c.geometry.clone();
+          c.geometry.translate(-localGeoCenter.x, -localGeoCenter.y, -localGeoCenter.z);
+        }
+      });
+    }
+
+    // Compute exact world position of the geometry's center on the robot BEFORE removing from parent
+    const trueWorldPos = localGeoCenter.clone().applyMatrix4(mesh.matrixWorld);
+    trueWorldPos.y = Math.max(0.18, trueWorldPos.y);
+
+    if (mesh.parent) {
+      mesh.parent.remove(mesh);
+    }
+
+    mesh.position.copy(trueWorldPos);
+    mesh.quaternion.copy(worldQuat);
+    mesh.scale.copy(worldScale);
+    mesh.visible = true;
+    scene.add(mesh);
+
+    return trueWorldPos;
+  }
+
+  // Split large multi-part CAD meshes (like Chassis_Mesh) into separate individual pieces
+  // so when the robot explodes at 20%, remaining parts separate into individual pieces instead of flying off as a clump!
+  function splitMeshIntoIndividualDebrisMeshes(mesh, bot) {
+    if (!mesh || !mesh.geometry) return [];
+    syncBotRootMatrix(bot);
+    mesh.updateMatrixWorld(true);
+
+    const worldMatrix = mesh.matrixWorld.clone();
+    const worldQuat = new THREE.Quaternion();
+    const worldScale = new THREE.Vector3();
+    mesh.getWorldQuaternion(worldQuat);
+    mesh.getWorldScale(worldScale);
+
+    const baseGeo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    const posAttr = baseGeo.attributes.position;
+    if (!posAttr || posAttr.count < 12) {
+      detachAndCenterMeshToScene(mesh, bot);
+      return [mesh];
+    }
+
+    baseGeo.computeBoundingBox();
+    const bbox = baseGeo.boundingBox;
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const triCount = Math.floor(posAttr.count / 3);
+
+    // If it's already a small individual part, just center and detach it directly
+    if (triCount < 36 || maxDim < 0.38) {
+      detachAndCenterMeshToScene(mesh, bot);
+      return [mesh];
+    }
+
+    // Partition triangles into spatial octants/quadrants around the geometry center so merged chassis/clumps separate into individual parts!
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+
+    const normAttr = baseGeo.attributes.normal;
+    const uvAttr = baseGeo.attributes.uv;
+    const colorAttr = baseGeo.attributes.color;
+
+    const buckets = new Map();
+    for (let t = 0; t < triCount; t++) {
+      const i0 = t * 3;
+      const i1 = t * 3 + 1;
+      const i2 = t * 3 + 2;
+      const cx = (posAttr.getX(i0) + posAttr.getX(i1) + posAttr.getX(i2)) / 3;
+      const cy = (posAttr.getY(i0) + posAttr.getY(i1) + posAttr.getY(i2)) / 3;
+      const cz = (posAttr.getZ(i0) + posAttr.getZ(i1) + posAttr.getZ(i2)) / 3;
+
+      // Subdivide into up to 6 individual structural sections (Front-Left, Front-Right, Mid-Left, Mid-Right, Rear-Left, Rear-Right)
+      const xSide = cx >= center.x ? 1 : 0;
+      let zBand = 1;
+      if (size.z > 0.35) {
+        const relZ = (cz - bbox.min.z) / Math.max(0.001, size.z);
+        zBand = relZ < 0.34 ? 0 : (relZ < 0.67 ? 1 : 2);
+      } else {
+        zBand = cz >= center.z ? 1 : 0;
+      }
+      const key = `${xSide}_${zBand}`;
+      if (!buckets.has(key)) {
+        buckets.set(key, { pos: [], norm: [], uv: [], color: [] });
+      }
+      const b = buckets.get(key);
+      for (const idx of [i0, i1, i2]) {
+        b.pos.push(posAttr.getX(idx), posAttr.getY(idx), posAttr.getZ(idx));
+        if (normAttr) b.norm.push(normAttr.getX(idx), normAttr.getY(idx), normAttr.getZ(idx));
+        if (uvAttr) b.uv.push(uvAttr.getX(idx), uvAttr.getY(idx));
+        if (colorAttr) b.color.push(colorAttr.getX(idx), colorAttr.getY(idx), colorAttr.getZ(idx));
+      }
+    }
+
+    if (buckets.size <= 1) {
+      detachAndCenterMeshToScene(mesh, bot);
+      return [mesh];
+    }
+
+    // Remove original clumped mesh from robot parent
+    if (mesh.children && mesh.children.length > 0) {
+      const toRemove = mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
+      toRemove.forEach(c => mesh.remove(c));
+    }
+    if (mesh.parent) {
+      mesh.parent.remove(mesh);
+    }
+
+    const resultMeshes = [];
+    let pieceIdx = 0;
+    buckets.forEach((b) => {
+      if (b.pos.length < 9) return;
+      const subGeo = new THREE.BufferGeometry();
+      subGeo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+      if (normAttr && b.norm.length === b.pos.length) {
+        subGeo.setAttribute('normal', new THREE.Float32BufferAttribute(b.norm, 3));
+      } else {
+        subGeo.computeVertexNormals();
+      }
+      if (uvAttr && b.uv.length > 0) {
+        subGeo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      }
+      if (colorAttr && b.color.length === b.pos.length) {
+        subGeo.setAttribute('color', new THREE.Float32BufferAttribute(b.color, 3));
+      }
+
+      subGeo.computeBoundingBox();
+      const subCenter = new THREE.Vector3();
+      subGeo.boundingBox.getCenter(subCenter);
+      subGeo.translate(-subCenter.x, -subCenter.y, -subCenter.z);
+      subGeo.computeBoundingBox();
+
+      const subWorldPos = subCenter.clone().applyMatrix4(worldMatrix);
+      subWorldPos.y = Math.max(0.18, subWorldPos.y);
+
+      const subMesh = new THREE.Mesh(subGeo, mesh.material);
+      subMesh.name = `${mesh.name || 'Part'}_Piece_${pieceIdx++}`;
+      subMesh.castShadow = mesh.castShadow;
+      subMesh.receiveShadow = mesh.receiveShadow;
+      subMesh.position.copy(subWorldPos);
+      subMesh.quaternion.copy(worldQuat);
+      subMesh.scale.copy(worldScale);
+      subMesh.visible = true;
+
+      // Add crisp outline to each separated individual piece so it remains clearly visible even inside bright explosion bloom
+      try {
+        const edges = new THREE.EdgesGeometry(subGeo, 28);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x050a12,
+          transparent: true,
+          opacity: 0.90,
+          depthTest: true,
+          depthWrite: false
+        });
+        const lines = new THREE.LineSegments(edges, lineMat);
+        lines.name = 'CAD_Outline';
+        subMesh.add(lines);
+      } catch (e) {}
+
+      scene.add(subMesh);
+      resultMeshes.push(subMesh);
+    });
+
+    return resultMeshes;
+  }
+
   function explodeRobot(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
     if (!bot || bot.isEntirelyDestroyed) return [];
     if (!bot.detachableParts || bot.detachableParts.length === 0) {
       initBotDetachableParts(bot);
     }
 
-    const botPos = new THREE.Vector3();
+    // Ensure bot.root matrixWorld is synced to bot.x / bot.z BEFORE computing any world positions
+    syncBotRootMatrix(bot);
+    const botPos = new THREE.Vector3(bot.x || 0, (bot.airY || 0) + 0.35, bot.z || 0);
     if (bot.root) bot.root.getWorldPosition(botPos);
 
     // Collect ALL remaining parts and meshes on the robot (both from detachableParts and tiltGroup hierarchy)
@@ -162,7 +379,7 @@
 
     if (bot.tiltGroup) {
       bot.tiltGroup.traverse(obj => {
-        if (obj.isMesh && obj.visible !== false && obj.name !== 'CAD_Outline') {
+        if (obj.isMesh && obj.visible !== false && obj.name !== 'CAD_Outline' && (!obj.material || obj.material.visible !== false)) {
           if (!seenMeshes.has(obj)) {
             seenMeshes.add(obj);
             meshesToExplode.push({
@@ -182,69 +399,95 @@
       return [];
     }
 
-    const explodedParts = [];
-    const totalParts = meshesToExplode.length;
-
-    // Detach ALL remaining parts simultaneously in a massive 360-degree radial blast!
-    meshesToExplode.forEach((item, idx) => {
+    // Separate any clumped/multi-part meshes (such as Chassis_Mesh) into individual pieces
+    // and center every piece's geometry at (0,0,0) on its exact world position on the robot!
+    const individualPieces = [];
+    meshesToExplode.forEach((item) => {
       const mesh = item.mesh;
+      const isWheelPart = (item.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(mesh)));
+      if (isWheelPart) {
+        detachAndCenterMeshToScene(mesh, bot);
+        individualPieces.push({
+          mesh: mesh,
+          name: item.name,
+          category: item.category,
+          isWheel: true
+        });
+      } else {
+        const subMeshes = splitMeshIntoIndividualDebrisMeshes(mesh, bot);
+        subMeshes.forEach(sm => {
+          individualPieces.push({
+            mesh: sm,
+            name: sm.name,
+            category: item.category,
+            isWheel: false
+          });
+        });
+      }
+    });
 
-      const worldPos = new THREE.Vector3();
-      const worldQuat = new THREE.Quaternion();
-      const worldScale = new THREE.Vector3();
-      mesh.getWorldPosition(worldPos);
-      mesh.getWorldQuaternion(worldQuat);
-      mesh.getWorldScale(worldScale);
+    const explodedParts = [];
+    const totalPieces = individualPieces.length;
 
-      // Remove outline children
-      if (mesh.children && mesh.children.length > 0) {
-        const toRemove = mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
-        toRemove.forEach(c => mesh.remove(c));
+    // Launch all separated individual pieces outward from their true positions on the robot!
+    individualPieces.forEach((piece, idx) => {
+      const mesh = piece.mesh;
+
+      // Compute outward radial direction from the robot center toward this piece's position, plus 360-degree spread
+      const dxFromBot = mesh.position.x - botPos.x;
+      const dzFromBot = mesh.position.z - botPos.z;
+      const distFromBot = Math.hypot(dxFromBot, dzFromBot);
+
+      const spreadAngle = (idx / Math.max(1, totalPieces)) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+      let radialDirX = Math.cos(spreadAngle);
+      let radialDirZ = Math.sin(spreadAngle);
+      if (distFromBot > 0.08) {
+        radialDirX = (dxFromBot / distFromBot) * 0.55 + radialDirX * 0.45;
+        radialDirZ = (dzFromBot / distFromBot) * 0.55 + radialDirZ * 0.45;
+        const rLen = Math.hypot(radialDirX, radialDirZ) || 1;
+        radialDirX /= rLen;
+        radialDirZ /= rLen;
       }
 
-      if (mesh.parent) {
-        mesh.parent.remove(mesh);
-      }
-
-      mesh.position.copy(worldPos);
-      mesh.quaternion.copy(worldQuat);
-      mesh.scale.copy(worldScale);
-      mesh.visible = true;
-      scene.add(mesh);
-
-      // Full 360-degree outward radial explosion burst
-      const angle = (idx / Math.max(1, totalParts)) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
-      const radialDirX = Math.cos(angle);
-      const radialDirZ = Math.sin(angle);
-
-      const blastSpeed = 9.0 + Math.random() * 7.5;
+      const blastSpeed = 8.5 + Math.random() * 8.0;
       const impX = (impactDir && typeof impactDir.x === 'number') ? impactDir.x : 0;
       const impZ = (impactDir && typeof impactDir.z === 'number') ? impactDir.z : 1;
-      const vx = (radialDirX * 0.78 + impX * 0.22) * blastSpeed + (bot.vx ? bot.vx * 0.35 : 0);
-      const vz = (radialDirZ * 0.78 + impZ * 0.22) * blastSpeed + (bot.vz ? bot.vz * 0.35 : 0);
-      const vy = 5.5 + Math.random() * 5.0;
-
-      const isWheelPart = (item.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(mesh)));
+      const vx = (radialDirX * 0.82 + impX * 0.18) * blastSpeed + (bot.vx ? bot.vx * 0.30 : 0);
+      const vz = (radialDirZ * 0.82 + impZ * 0.18) * blastSpeed + (bot.vz ? bot.vz * 0.30 : 0);
+      const vy = 5.0 + Math.random() * 5.5;
 
       detachedDebris.push({
         mesh: mesh,
-        isWheel: isWheelPart,
+        isWheel: piece.isWheel,
         vx: vx,
         vy: vy,
         vz: vz,
-        rx: (Math.random() - 0.5) * 28,
-        ry: (Math.random() - 0.5) * 28,
-        rz: (Math.random() - 0.5) * 28
+        rx: (Math.random() - 0.5) * 26,
+        ry: (Math.random() - 0.5) * 26,
+        rz: (Math.random() - 0.5) * 26
       });
 
-      explodedParts.push(item);
+      explodedParts.push(piece);
     });
 
-    // Cleanly remove any leftover empty groups in bot.tiltGroup so robot is 100% dismantled
+    // Cleanly remove any leftover empty groups or outline segments in bot.tiltGroup and bot.root so robot is 100% dismantled
     if (bot.tiltGroup) {
+      bot.tiltGroup.traverse(obj => {
+        if (obj !== bot.tiltGroup && (obj.isLineSegments || obj.name === 'CAD_Outline' || obj.isMesh)) {
+          obj.visible = false;
+        }
+      });
       while (bot.tiltGroup.children.length > 0) {
         bot.tiltGroup.remove(bot.tiltGroup.children[0]);
       }
+      bot.tiltGroup.visible = false;
+    }
+    if (bot.root) {
+      bot.root.traverse(obj => {
+        if (obj.isLineSegments || obj.name === 'CAD_Outline') {
+          obj.visible = false;
+        }
+      });
     }
 
     // Synchronize legacy structures
@@ -302,6 +545,9 @@
       initBotDetachableParts(bot);
     }
     if (!bot.detachableParts || bot.detachableParts.length === 0) return null;
+
+    // Ensure bot.root matrixWorld is synced to bot.x / bot.z BEFORE computing any world positions
+    syncBotRootMatrix(bot);
 
     const remaining = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent);
     if (remaining.length === 0) {
@@ -363,6 +609,11 @@
       const ap = bot.armorPanels.find(p => p.mesh === chosen.mesh || p.name === chosen.name);
       if (ap) ap.attached = false;
     }
+
+    // IMPORTANT: Detach and center `chosen.mesh` FIRST while its parent hierarchy is still intact on the robot!
+    // (Previously, removing `targetWheelMesh` first orphaned `chosen.mesh`, causing getWorldPosition to return (0,0,0)!)
+    const worldPos = detachAndCenterMeshToScene(chosen.mesh, bot) || new THREE.Vector3(bot.x || 0, 0.35, bot.z || 0);
+
     // Synchronize wheel assemblies:
     // When a wheel part detaches, detach the ENTIRE wheel assembly so no floating ghost parts remain!
     let detachedWheelObj = null;
@@ -386,7 +637,7 @@
     // If this part is a wheel (or belongs to a wheel assembly), detach all sibling sub-meshes of that wheel too
     if (detachedWheelObj || chosen.category === 'wheel') {
       const targetWheelName = detachedWheelObj ? detachedWheelObj.name : chosen.parentName;
-      const targetWheelMesh = detachedWheelObj ? detachedWheelObj.mesh : (chosen.mesh ? chosen.mesh.parent : null);
+      const targetWheelMesh = detachedWheelObj ? detachedWheelObj.mesh : null;
 
       const siblingParts = bot.detachableParts.filter(p =>
         p !== chosen && p.attached && (
@@ -397,25 +648,7 @@
 
       siblingParts.forEach(sp => {
         sp.attached = false;
-        const spWorldPos = new THREE.Vector3();
-        const spWorldQuat = new THREE.Quaternion();
-        const spWorldScale = new THREE.Vector3();
-        sp.mesh.getWorldPosition(spWorldPos);
-        sp.mesh.getWorldQuaternion(spWorldQuat);
-        sp.mesh.getWorldScale(spWorldScale);
-
-        if (sp.mesh.children && sp.mesh.children.length > 0) {
-          const toRem = sp.mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
-          toRem.forEach(c => sp.mesh.remove(c));
-        }
-        if (sp.mesh.parent) {
-          sp.mesh.parent.remove(sp.mesh);
-        }
-        sp.mesh.position.copy(spWorldPos);
-        sp.mesh.quaternion.copy(spWorldQuat);
-        sp.mesh.scale.copy(spWorldScale);
-        sp.mesh.visible = true;
-        scene.add(sp.mesh);
+        detachAndCenterMeshToScene(sp.mesh, bot);
 
         detachedDebris.push({
           mesh: sp.mesh,
@@ -429,8 +662,8 @@
         });
       });
 
-      // Remove the wheel group itself from the bot tiltGroup if it still exists
-      if (targetWheelMesh && targetWheelMesh.parent) {
+      // Remove the wheel group itself from the bot tiltGroup AFTER all its sub-meshes have captured their world positions
+      if (targetWheelMesh && targetWheelMesh.parent && targetWheelMesh !== scene) {
         targetWheelMesh.parent.remove(targetWheelMesh);
       }
     }
@@ -453,32 +686,6 @@
       bot.vx = 0;
       bot.vz = 0;
     }
-
-    // Capture exact world position, orientation, scale
-    const worldPos = new THREE.Vector3();
-    const worldQuat = new THREE.Quaternion();
-    const worldScale = new THREE.Vector3();
-    chosen.mesh.getWorldPosition(worldPos);
-    chosen.mesh.getWorldQuaternion(worldQuat);
-    chosen.mesh.getWorldScale(worldScale);
-
-    // Remove outline children from detached part
-    if (chosen.mesh.children && chosen.mesh.children.length > 0) {
-      const toRemove = chosen.mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
-      toRemove.forEach(c => chosen.mesh.remove(c));
-    }
-
-    // Remove from robot hierarchy
-    if (chosen.mesh.parent) {
-      chosen.mesh.parent.remove(chosen.mesh);
-    }
-
-    // Add directly to arena scene as physics debris
-    chosen.mesh.position.copy(worldPos);
-    chosen.mesh.quaternion.copy(worldQuat);
-    chosen.mesh.scale.copy(worldScale);
-    chosen.mesh.visible = true;
-    scene.add(chosen.mesh);
 
     const isWheelPart = (chosen.category === 'wheel' || (typeof isWheelMesh === 'function' && isWheelMesh(chosen.mesh)));
     const flySpeed = 5.4 + Math.random() * 4.6;
