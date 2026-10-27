@@ -1236,7 +1236,8 @@
 
     camObj.position.lerp(desiredPos, Math.min(1, dt * 6.0));
 
-    if (cameraTrauma > 0) {
+    // Only apply screen shake for the default follow-robot camera angle (mode 0)
+    if (mode === 0 && cameraTrauma > 0) {
       const shake = cameraTrauma * cameraTrauma;
       const maxOffset = 0.95;
       camObj.position.x += (Math.random() * 2 - 1) * maxOffset * shake;
