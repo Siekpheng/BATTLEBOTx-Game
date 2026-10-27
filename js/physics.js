@@ -1041,19 +1041,23 @@
                       (eNoWheels && eSpeed < 0.35) ||
                       (eNoDrive && eSpeed < 0.35);
 
+    const isGuestOnline = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost);
+
     if (typeof playerBot.stoppedTimer !== 'number') playerBot.stoppedTimer = 0.0;
     if (typeof enemyBot.stoppedTimer !== 'number') enemyBot.stoppedTimer = 0.0;
 
-    if (isPStopped) {
-      playerBot.stoppedTimer += dt;
-    } else {
-      playerBot.stoppedTimer = 0.0;
-    }
+    if (!isGuestOnline) {
+      if (isPStopped) {
+        playerBot.stoppedTimer += dt;
+      } else {
+        playerBot.stoppedTimer = 0.0;
+      }
 
-    if (isEStopped) {
-      enemyBot.stoppedTimer += dt;
-    } else {
-      enemyBot.stoppedTimer = 0.0;
+      if (isEStopped) {
+        enemyBot.stoppedTimer += dt;
+      } else {
+        enemyBot.stoppedTimer = 0.0;
+      }
     }
 
     let activeBot = null;
@@ -1085,33 +1089,35 @@
       const ceilSec = Math.max(1, Math.ceil(remainingTime));
       warnNum.textContent = String(ceilSec);
 
-      if (isPlayerTarget) {
-        if (pNoWheels) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 ALL WHEELS DETACHED (IMMOBILIZED)!'
-            : 'PLAYER WHEELS DETACHED — REFEREE COUNTDOWN!';
-        } else if (playerBot.flipped) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 FLIPPED OVER — REFEREE COUNTDOWN!'
-            : 'PLAYER FLIPPED OVER — REFEREE COUNTDOWN!';
+      // In Online Guest mode, playerBot is Opponent (Host) and enemyBot is Player (Guest)
+      const isMyRobotImmobilized = isGuestOnline ? !isPlayerTarget : isPlayerTarget;
+      const targetNoWheels = isPlayerTarget ? pNoWheels : eNoWheels;
+      const targetFlipped = isPlayerTarget ? playerBot.flipped : enemyBot.flipped;
+
+      if (gameMode === '1v1') {
+        const whoTag = isPlayerTarget ? 'P1' : 'P2';
+        if (targetNoWheels) {
+          warnWho.textContent = `${whoTag} ALL WHEELS DETACHED (IMMOBILIZED)!`;
+        } else if (targetFlipped) {
+          warnWho.textContent = `${whoTag} FLIPPED OVER — REFEREE COUNTDOWN!`;
         } else {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P1 MOTOR BURNOUT (IMMOBILIZED)!'
-            : 'PLAYER IMMOBILIZED — REFEREE COUNTDOWN!';
+          warnWho.textContent = `${whoTag} MOTOR BURNOUT (IMMOBILIZED)!`;
+        }
+      } else if (isMyRobotImmobilized) {
+        if (targetNoWheels) {
+          warnWho.textContent = 'PLAYER WHEELS DETACHED — REFEREE COUNTDOWN!';
+        } else if (targetFlipped) {
+          warnWho.textContent = 'PLAYER FLIPPED OVER — REFEREE COUNTDOWN!';
+        } else {
+          warnWho.textContent = 'PLAYER IMMOBILIZED — REFEREE COUNTDOWN!';
         }
       } else {
-        if (eNoWheels) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 ALL WHEELS DETACHED (IMMOBILIZED)!'
-            : 'ENEMY WHEELS DETACHED — REFEREE COUNTDOWN!';
-        } else if (enemyBot.flipped) {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 FLIPPED OVER — REFEREE COUNTDOWN!'
-            : 'ENEMY FLIPPED OVER — REFEREE COUNTDOWN!';
+        if (targetNoWheels) {
+          warnWho.textContent = 'ENEMY WHEELS DETACHED — REFEREE COUNTDOWN!';
+        } else if (targetFlipped) {
+          warnWho.textContent = 'ENEMY FLIPPED OVER — REFEREE COUNTDOWN!';
         } else {
-          warnWho.textContent = (gameMode === '1v1')
-            ? 'P2 MOTOR BURNOUT (IMMOBILIZED)!'
-            : 'ENEMY IMMOBILIZED — REFEREE COUNTDOWN!';
+          warnWho.textContent = 'ENEMY IMMOBILIZED — REFEREE COUNTDOWN!';
         }
       }
 
@@ -1123,7 +1129,7 @@
       }
 
       // 10-Second Count-Out Completed: KNOCKOUT!
-      if (activeBot.stoppedTimer >= 10.0) {
+      if (!isGuestOnline && activeBot.stoppedTimer >= 10.0) {
         warnContainer.classList.add('hidden');
         countoutHornPlayed = false;
         endMatch(!isPlayerTarget, false, true, false); // KO by Countout (isTotalDestruction = false)

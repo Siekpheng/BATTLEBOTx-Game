@@ -48,7 +48,7 @@
       }
     });
 
-    meshes.forEach(obj => {
+    meshes.forEach((obj, partIdx) => {
       const name = obj.name || '';
       const parentName = obj.parent ? (obj.parent.name || '') : '';
 
@@ -114,6 +114,7 @@
       }
 
       bot.detachableParts.push({
+        partIdx: partIdx,
         name: name,
         parentName: parentName,
         mesh: obj,
@@ -548,7 +549,7 @@
   }
   window.explodeRobot = explodeRobot;
 
-  function detachSinglePart(bot, impactDir = { x: 0, z: 1 }, hitPoint = null) {
+  function detachSinglePart(bot, impactDir = { x: 0, z: 1 }, hitPoint = null, forcedPartIdx = null) {
     if (!bot || bot.isEntirelyDestroyed) return null;
     if (!bot.detachableParts || bot.detachableParts.length === 0) {
       initBotDetachableParts(bot);
@@ -579,13 +580,23 @@
       return null;
     }
 
+    let chosen = null;
+    if (typeof forcedPartIdx === 'number') {
+      const exactPart = bot.detachableParts.find(p => p.partIdx === forcedPartIdx);
+      if (exactPart) {
+        if (!exactPart.attached || !exactPart.mesh || !exactPart.mesh.parent) {
+          return null;
+        }
+        chosen = exactPart;
+      }
+    }
+
     // Progressive demolition by layer (Outside-In):
     // (Layer 1 Armor & Wheels -> Layer 2 Exterior Cladding & Blade -> Layer 3 Mid Structure -> Layer 4 Inner Frame -> Layer 5 Core Spine)
     const minPriority = Math.min(...remaining.map(p => p.priority));
     let candidatePool = remaining.filter(p => p.priority <= minPriority + 1);
 
-    let chosen = null;
-    if (hitPoint) {
+    if (!chosen && hitPoint) {
       // Precision strike: select candidate part whose world center is closest to impact point!
       let minDistSq = Infinity;
       const partCenter = new THREE.Vector3();
@@ -733,6 +744,7 @@
       NetworkSys.queueEvent({
         t: 'detach',
         w: targetWho,
+        pi: chosen.partIdx,
         dx: impactDir ? (impactDir.x || 0) : 0,
         dz: impactDir ? (impactDir.z || 1) : 1,
         hx: hitPoint ? hitPoint.x : worldPos.x,

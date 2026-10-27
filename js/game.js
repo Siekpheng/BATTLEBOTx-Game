@@ -664,6 +664,9 @@
     // Set matchState to 'countdown' immediately so the menu loop does not respawn menu bots
     // and createBotInstance / attachCadToBot initialize weaponSpinSpeed to 0.0 during the 3s countdown!
     matchState = 'countdown';
+    if (typeof NetworkSys !== 'undefined' && NetworkSys.queuedEvents) {
+      NetworkSys.queuedEvents.length = 0;
+    }
     cleanupBots();
     smoothCameraInitialized = false;
     menuCamInitialized = false;
@@ -685,6 +688,8 @@
 
     let enemyType;
     if (NetworkSys.isOnline) {
+      // Consistent Arena Spawn Mapping on Both Host and Guest:
+      // playerBot (-7.5) is ALWAYS Host's robot, enemyBot (+7.5) is ALWAYS Guest's robot!
       botTypeChoice = NetworkSys.isHost ? NetworkSys.selectedBot : NetworkSys.opponentBot;
       enemyType = NetworkSys.isHost ? NetworkSys.opponentBot : NetworkSys.selectedBot;
     } else if (gameMode === '1v1') {
@@ -749,6 +754,11 @@
     if (enemyBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(enemyBot);
     if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
     if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
+
+    if (typeof initBotDetachableParts === 'function') {
+      if (!playerBot.detachableParts || playerBot.detachableParts.length === 0) initBotDetachableParts(playerBot);
+      if (!enemyBot.detachableParts || enemyBot.detachableParts.length === 0) initBotDetachableParts(enemyBot);
+    }
 
     // Strictly keep weapons at 0 RPM during the 3-second countdown; blades only begin winding up after the countdown finishes!
     playerBot.weaponSpinSpeed = 0.0;
@@ -1630,6 +1640,9 @@
 
         updateBotVisuals(playerBot, dt);
         updateBotVisuals(enemyBot, dt);
+        if (matchState === 'playing') {
+          updateImmobilizationAndCountout(dt);
+        }
       } else {
         // HOST OR SINGLE-PLAYER / LOCAL / PRACTICE MODE:
         if (keys['KeyW'] || (keys['ArrowUp'] && gameMode !== '1v1')) t = 1;
@@ -1670,18 +1683,19 @@
         }
       }
 
-      // Update Weapon RPM Gauge in HUD
-      const rpmPct = Math.min(100, Math.round((playerBot.weaponSpinSpeed / 95.0) * 100));
+      // Update Weapon RPM Gauge in HUD (Guest in Online 1v1 controls enemyBot!)
+      const myLocalBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
+      const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / 95.0) * 100));
       const rpmText = document.getElementById('weapon-rpm-text');
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
-        if (playerBot.weaponDestroyed || playerBot.isEntirelyDestroyed) {
+        if (myLocalBot.weaponDestroyed || myLocalBot.isEntirelyDestroyed) {
           rpmText.textContent = '0% (WEAPON DESTROYED)';
           rpmText.style.color = '#ef4444';
           rpmFill.style.width = '0%';
           rpmFill.classList.remove('ready');
           rpmFill.style.background = '#475569';
-        } else if (playerBot.weaponActive === false) {
+        } else if (myLocalBot.weaponActive === false) {
           rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
           rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
           rpmFill.style.width = `${rpmPct}%`;

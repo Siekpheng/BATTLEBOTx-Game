@@ -6,18 +6,22 @@
   // 7. INPUT HANDLING
   // ========================================================
   function togglePlayerWeapon(bot = playerBot) {
-    if (!bot || bot.weaponDestroyed || bot.isEntirelyDestroyed) return;
+    const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
+    if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
-    bot.weaponActive = (bot.weaponActive === false) ? true : false;
+    targetBot.weaponActive = (targetBot.weaponActive === false) ? true : false;
+    if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+      NetworkSys.conn.send({ type: 'guest_toggle_weapon' });
+    }
     // When turning off, do not stop abruptly: let mechanical inertia smoothly coast down in updateRobotPhysics
     if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
-      if (bot.weaponActive) {
+      if (targetBot.weaponActive) {
         AudioSys.beep(840, 0.08); // High chirp for Weapon ON
       } else {
         AudioSys.beep(320, 0.12); // Low spindown hum for Weapon OFF
       }
     }
-    console.log(`⚡ Weapon toggled: ${bot.weaponActive ? 'ON' : 'OFF'}`);
+    console.log(`⚡ Weapon toggled: ${targetBot.weaponActive ? 'ON' : 'OFF'}`);
   }
 
   const keys = {};
