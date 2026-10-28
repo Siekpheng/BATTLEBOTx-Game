@@ -495,6 +495,11 @@
       return;
     }
 
+    // In Online 1v1, enemyBot is driven exclusively by the remote player - never by local AI!
+    if ((typeof NetworkSys !== 'undefined' && NetworkSys.isOnline) || gameMode === '1v1_online') {
+      return;
+    }
+
     if (gameMode === '1v1') {
       if (enemyBot.flipped) {
         enemyBot.drivePower = 0;
@@ -1178,7 +1183,7 @@
     const eGoingForNoMercy = !isEImmobilized && (
       combatEngageTimer > 0 ||
       (distBetweenBots < 5.0 && (eSpeed > 1.0 || eThrottleActive)) ||
-      (gameMode !== '1v1' && gameMode !== 'practice' && enemyBot.aiNoMercyDecision === true)
+      (!isGuestOnline && gameMode !== '1v1' && gameMode !== '1v1_online' && gameMode !== 'practice' && enemyBot.aiNoMercyDecision === true)
     );
 
     const isPStopped = isPImmobilized && (pSpeed < 1.8) && !eGoingForNoMercy;

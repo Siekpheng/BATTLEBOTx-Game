@@ -4,6 +4,7 @@
 
   // ========================================================
   // WEBRTC ONLINE 1V1 ROOM SYSTEM (PEERJS P2P BROKER)
+  // Cross-network multi-provider STUN & synchronized CAD model loading
   // ========================================================
   const NetworkSys = {
     peer: null,
@@ -15,6 +16,24 @@
     opponentBot: 'robot2',
     queuedEvents: [],
     lastSendTime: 0,
+    lastInputSendTime: 0,
+    lastSentT: null,
+    lastSentS: null,
+    hostReady: false,
+    guestReady: false,
+
+    // Global redundant STUN servers for cross-network and mobile carrier NAT traversal
+    ICE_SERVERS: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ],
+    PEER_PREFIX: 'bbx2026-room-',
 
     queueEvent(ev) {
       // Only queue network events during active combat (never during the background menu demo fight!)
@@ -26,10 +45,12 @@
     createRoom(botType, onReady, onError) {
       this.isOnline = true;
       this.isHost = true;
+      this.hostReady = false;
+      this.guestReady = false;
       this.queuedEvents = [];
       this.selectedBot = botType;
       this.roomCode = String(Math.floor(1000 + Math.random() * 9000));
-      const peerId = 'bbx-' + this.roomCode;
+      const peerId = this.PEER_PREFIX + this.roomCode;
 
       try {
         if (this.peer) {
@@ -38,55 +59,96 @@
         this.peer = new Peer(peerId, {
           debug: 1,
           config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
-            ]
+            iceServers: this.ICE_SERVERS,
+            iceCandidatePoolSize: 10
           }
         });
 
         this.peer.on('open', (id) => {
           console.log('[Network] Host Peer ready with ID:', id);
-          onReady(this.roomCode);
+          if (typeof onReady === 'function') onReady(this.roomCode);
+        });
+
+        this.peer.on('disconnected', () => {
+          console.log('[Network] Host signaling disconnected, attempting reconnection...');
+          try {
+            if (this.peer && !this.peer.destroyed) this.peer.reconnect();
+          } catch (e) {}
         });
 
         this.peer.on('connection', (conn) => {
+          console.log('[Network] Inbound connection from Guest');
           this.conn = conn;
-          this.setupHostConnection();
+          this.setupHostConnection(onError);
         });
 
         this.peer.on('error', (err) => {
-          console.warn('[Network] Peer error:', err);
+          console.warn('[Network] Host Peer error:', err);
           if (err.type === 'unavailable-id') {
             this.createRoom(botType, onReady, onError);
           } else {
-            onError(err.message || 'Network broker error');
+            if (typeof onError === 'function') onError(err.message || 'Network broker error');
           }
         });
       } catch (e) {
-        onError(e.message);
+        if (typeof onError === 'function') onError(e.message);
       }
     },
 
-    setupHostConnection() {
+    setupHostConnection(onError) {
       const statusEl = document.getElementById('host-status');
       if (statusEl) {
-        statusEl.textContent = '✓ Opponent connected! Starting match...';
+        statusEl.textContent = '✓ Opponent connected! Synchronizing robot telemetry...';
         statusEl.style.color = '#34d399';
       }
 
-      this.conn.on('data', (data) => {
+      if (this.conn && this.conn.peerConnection) {
+        this.conn.peerConnection.oniceconnectionstatechange = () => {
+          const s = this.conn.peerConnection.iceConnectionState;
+          console.log('[Network] Host ICE state:', s);
+          if (s === 'failed') {
+            this.handleDisconnect('P2P connection failed between networks. Please retry.');
+          }
+        };
+      }
+
+      this.conn.on('error', (err) => {
+        console.warn('[Network] Host data channel error:', err);
+        if (typeof onError === 'function') onError(err.message);
+      });
+
+      this.conn.on('data', async (data) => {
         if (data.type === 'guest_join') {
           this.opponentBot = data.botType || 'robot2';
           this.queuedEvents = [];
+
+          // Instruct Guest to prepare & preload 3D CAD models
           this.conn.send({
-            type: 'start_match',
+            type: 'prepare_match',
             hostBot: this.selectedBot,
             guestBot: this.opponentBot
           });
-          document.getElementById('modal-online-host').classList.add('hidden');
+
+          const hostModal = document.getElementById('modal-online-host');
+          if (hostModal) hostModal.classList.add('hidden');
           gameMode = '1v1_online';
-          startMatchSequence();
+
+          // Preload models locally on Host
+          await this.preloadMatchModels(this.selectedBot, this.opponentBot);
+          this.hostReady = true;
+
+          if (this.guestReady) {
+            this.launchSynchronizedMatch();
+          } else {
+            const loadingStatus = document.getElementById('match-loading-status');
+            if (loadingStatus) loadingStatus.textContent = 'Waiting for opponent to finish streaming CAD telemetry...';
+          }
+        } else if (data.type === 'guest_ready') {
+          console.log('[Network] Guest model loading completed');
+          this.guestReady = true;
+          if (this.hostReady) {
+            this.launchSynchronizedMatch();
+          }
         } else if (data.type === 'guest_input') {
           if (enemyBot && !enemyBot.isEntirelyDestroyed) {
             const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
@@ -111,13 +173,29 @@
       });
     },
 
+    launchSynchronizedMatch() {
+      console.log('[Network] Both players ready! Launching synchronized match countdown...');
+      if (this.conn && this.conn.open) {
+        this.conn.send({
+          type: 'start_countdown',
+          hostBot: this.selectedBot,
+          guestBot: this.opponentBot
+        });
+      }
+      const loadingOverlay = document.getElementById('match-loading-overlay');
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
+      startMatchSequence();
+    },
+
     joinRoom(code, botType, onConnected, onError) {
       this.isOnline = true;
       this.isHost = false;
+      this.hostReady = false;
+      this.guestReady = false;
       this.queuedEvents = [];
       this.selectedBot = botType;
-      this.roomCode = code.trim().replace(/^bbx-/i, '');
-      const targetPeerId = 'bbx-' + this.roomCode;
+      this.roomCode = code.trim().replace(/^bbx2026-room-/i, '').replace(/^bbx-/i, '');
+      const targetPeerId = this.PEER_PREFIX + this.roomCode;
 
       try {
         if (this.peer) {
@@ -126,28 +204,64 @@
         this.peer = new Peer(null, {
           debug: 1,
           config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
-            ]
+            iceServers: this.ICE_SERVERS,
+            iceCandidatePoolSize: 10
           }
         });
 
+        let connectTimeout = setTimeout(() => {
+          if (!this.conn || !this.conn.open) {
+            onError('Connection timed out. Check the 4-digit code and ensure Host room is active.');
+          }
+        }, 16000);
+
         this.peer.on('open', (id) => {
-          console.log('[Network] Guest Peer ready with ID:', id);
+          console.log('[Network] Guest Peer ready with ID:', id, 'connecting to:', targetPeerId);
           const conn = this.peer.connect(targetPeerId, { reliable: true });
           this.conn = conn;
 
           conn.on('open', () => {
+            clearTimeout(connectTimeout);
+            console.log('[Network] Connected to Host data channel!');
             conn.send({ type: 'guest_join', botType: this.selectedBot });
-            onConnected();
+            if (typeof onConnected === 'function') onConnected();
           });
 
-          conn.on('data', (data) => {
-            if (data.type === 'start_match') {
+          if (conn.peerConnection) {
+            conn.peerConnection.oniceconnectionstatechange = () => {
+              const s = conn.peerConnection.iceConnectionState;
+              console.log('[Network] Guest ICE state:', s);
+              if (s === 'failed') {
+                onError('P2P connection blocked by network firewall or NAT.');
+              }
+            };
+          }
+
+          conn.on('error', (err) => {
+            clearTimeout(connectTimeout);
+            console.warn('[Network] Guest connection error:', err);
+            onError('Connection error: ' + (err.message || 'Failed to connect.'));
+          });
+
+          conn.on('data', async (data) => {
+            if (data.type === 'prepare_match') {
+              clearTimeout(connectTimeout);
               this.opponentBot = data.hostBot;
-              document.getElementById('modal-online-join').classList.add('hidden');
+              const joinModal = document.getElementById('modal-online-join');
+              if (joinModal) joinModal.classList.add('hidden');
               gameMode = '1v1_online';
+
+              // Preload CAD models on Guest
+              await this.preloadMatchModels(this.opponentBot, this.selectedBot);
+              console.log('[Network] Guest preloading finished. Signaling ready to Host...');
+              conn.send({ type: 'guest_ready' });
+
+              const loadingStatus = document.getElementById('match-loading-status');
+              if (loadingStatus) loadingStatus.textContent = '✓ Ready! Waiting for Host countdown trigger...';
+            } else if (data.type === 'start_countdown') {
+              console.log('[Network] Received start_countdown from Host!');
+              const loadingOverlay = document.getElementById('match-loading-overlay');
+              if (loadingOverlay) loadingOverlay.classList.add('hidden');
               startMatchSequence();
             } else if (data.type === 'state') {
               this.applyRemoteState(data);
@@ -163,18 +277,21 @@
           });
 
           conn.on('close', () => {
+            clearTimeout(connectTimeout);
             this.handleDisconnect('Host closed the battle room.');
           });
+        });
 
-          setTimeout(() => {
-            if (!conn.open && !this.opponentBot) {
-              onError('Connection timeout. Please verify the 4-digit Room Code.');
-            }
-          }, 9000);
+        this.peer.on('disconnected', () => {
+          console.log('[Network] Guest signaling disconnected, attempting reconnection...');
+          try {
+            if (this.peer && !this.peer.destroyed) this.peer.reconnect();
+          } catch (e) {}
         });
 
         this.peer.on('error', (err) => {
-          console.warn('[Network] Guest error:', err);
+          clearTimeout(connectTimeout);
+          console.warn('[Network] Guest peer error:', err);
           onError('Room not found or host not ready. Check the code.');
         });
       } catch (e) {
@@ -182,9 +299,43 @@
       }
     },
 
+    async preloadMatchModels(hostBot, guestBot) {
+      const loadingOverlay = document.getElementById('match-loading-overlay');
+      const loadingBar = document.getElementById('match-loading-bar-fill');
+      const loadingStatus = document.getElementById('match-loading-status');
+      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+
+      const p1Ready = typeof getBotScene === 'function' && !!getBotScene(hostBot);
+      const p2Ready = typeof getBotScene === 'function' && !!getBotScene(guestBot);
+      let prog1 = p1Ready ? 1.0 : 0;
+      let prog2 = p2Ready ? 1.0 : 0;
+
+      const updateDisplay = () => {
+        const pct = Math.round(((prog1 + prog2) / 2) * 100);
+        if (loadingBar) loadingBar.style.width = pct + '%';
+        if (loadingStatus) loadingStatus.textContent = `Streaming high-precision CAD telemetry... ${pct}%`;
+      };
+      updateDisplay();
+
+      if (typeof ensureBotModelLoaded === 'function') {
+        await Promise.all([
+          ensureBotModelLoaded(hostBot, (p) => { prog1 = p; updateDisplay(); }),
+          ensureBotModelLoaded(guestBot, (p) => { prog2 = p; updateDisplay(); })
+        ]);
+      }
+      updateDisplay();
+    },
+
     sendInput(t, s) {
       if (this.conn && this.conn.open && !this.isHost) {
-        this.conn.send({ type: 'guest_input', t, s });
+        const now = performance.now();
+        const changed = (t !== this.lastSentT || s !== this.lastSentS);
+        if (changed || (now - this.lastInputSendTime >= 33)) {
+          this.lastSentT = t;
+          this.lastSentS = s;
+          this.lastInputSendTime = now;
+          this.conn.send({ type: 'guest_input', t, s });
+        }
       }
     },
 
@@ -193,7 +344,7 @@
       if (!playerBot || !enemyBot) return;
 
       const now = performance.now();
-      if (now - this.lastSendTime < 24 && this.queuedEvents.length === 0) return; // ~40 FPS broadcast, immediate flush on damage events
+      if (now - this.lastSendTime < 28 && this.queuedEvents.length === 0) return; // ~35 FPS broadcast, immediate flush on damage events
       this.lastSendTime = now;
 
       if ((!playerBot.detachableParts || playerBot.detachableParts.length === 0) && typeof initBotDetachableParts === 'function') {
@@ -361,8 +512,6 @@
       }
 
       // Authoritative Part & Destruction Reconciliation:
-      // Even if a 'detach' or 'explode' packet arrived while Guest was still loading models or in countdown,
-      // reconcile exact detached part indices (dp), remaining count (rc), and total destruction (ed) on every tick!
       if (data.p1 && data.p1.ed && !playerBot.isEntirelyDestroyed && typeof explodeRobot === 'function') {
         explodeRobot(playerBot, { x: -1, z: 0 }, new THREE.Vector3(playerBot.x, 0.3, playerBot.z));
       } else if (data.p1 && !playerBot.isEntirelyDestroyed && playerBot.detachableParts && playerBot.detachableParts.length > 0) {
@@ -413,15 +562,27 @@
 
     handleDisconnect(msg) {
       if (!this.isOnline) return;
-      alert(msg || 'Connection lost.');
       this.isOnline = false;
       this.isHost = false;
+      this.hostReady = false;
+      this.guestReady = false;
       this.queuedEvents = [];
       if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
       if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }
       matchState = 'menu';
-      cleanupBots();
-      hud.classList.add('hidden');
-      menuScreen.classList.remove('hidden');
+      if (typeof cleanupBots === 'function') cleanupBots();
+      const loadingOverlay = document.getElementById('match-loading-overlay');
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
+      const hud = document.getElementById('hud');
+      if (hud) hud.classList.add('hidden');
+      const menuScreen = document.getElementById('menu-screen');
+      if (menuScreen) menuScreen.classList.remove('hidden');
+
+      const statusEl = document.getElementById('join-status') || document.getElementById('host-status');
+      if (statusEl && msg) {
+        statusEl.textContent = 'ℹ️ ' + msg;
+        statusEl.style.color = '#fbbf24';
+      }
+      console.warn('[Network] Disconnected:', msg);
     }
   };

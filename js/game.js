@@ -381,7 +381,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
-      const cleanCode = roomParam.trim().replace(/^bbx-/i, '');
+      const cleanCode = roomParam.trim().replace(/^bbx2026-room-/i, '').replace(/^bbx-/i, '');
       const inputEl = document.getElementById('join-room-code-input');
       if (inputEl) inputEl.value = cleanCode;
       modalOnlineJoin.classList.remove('hidden');
