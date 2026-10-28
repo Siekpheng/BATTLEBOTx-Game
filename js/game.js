@@ -682,11 +682,18 @@
   document.getElementById('btn-play-again').addEventListener('click', () => {
     modalGameover.classList.add('hidden');
     if (NetworkSys.isOnline) {
-      if (NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
-        NetworkSys.conn.send({ type: 'start_match', hostBot: NetworkSys.selectedBot, guestBot: NetworkSys.opponentBot });
-        startMatchSequence();
-      } else if (!NetworkSys.isHost) {
-        alert('Waiting for host to restart the match...');
+      NetworkSys.openRematchModal(true);
+    } else if (gameMode === '1v1') {
+      hud.classList.add('hidden');
+      cleanupBots();
+      refreshSelectModalLabels();
+      modalSelect.classList.remove('hidden');
+      if (typeof Local1v1State !== 'undefined') {
+        Local1v1State.reset();
+      }
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.activeContainerId = null;
+        GamepadUINav.ensureValidFocus();
       }
     } else {
       startMatchSequence();
@@ -727,7 +734,7 @@
     // 1. Force hide the main menu screen and every overlay/modal
     const menuEl = document.getElementById('menu-screen');
     if (menuEl) menuEl.classList.add('hidden');
-    const allModals = ['modal-1v1', 'modal-select', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover'];
+    const allModals = ['modal-1v1', 'modal-select', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover', 'modal-online-rematch'];
     allModals.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');

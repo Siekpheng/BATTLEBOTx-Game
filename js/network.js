@@ -21,6 +21,10 @@
     lastSentS: null,
     hostReady: false,
     guestReady: false,
+    isRematchActive: false,
+    myRematchReady: false,
+    peerRematchReady: false,
+    rematchLaunching: false,
 
     // Global redundant STUN servers for cross-network and mobile carrier NAT traversal
     ICE_SERVERS: [
@@ -167,6 +171,14 @@
           if (enemyBot && typeof togglePlayerWeapon === 'function') {
             togglePlayerWeapon(enemyBot);
           }
+        } else if (data.type === 'rematch_request') {
+          this.handlePeerRematchRequest(data);
+        } else if (data.type === 'rematch_bot_pick') {
+          this.handlePeerRematchBotPick(data);
+        } else if (data.type === 'rematch_ready') {
+          this.handlePeerRematchReady(data);
+        } else if (data.type === 'rematch_cancel') {
+          this.handlePeerRematchCancel(data);
         }
       });
 
@@ -249,6 +261,8 @@
             if (data.type === 'prepare_match') {
               clearTimeout(connectTimeout);
               this.opponentBot = data.hostBot;
+              if (data.guestBot) this.selectedBot = data.guestBot;
+              this.closeRematchModal();
               const joinModal = document.getElementById('modal-online-join');
               if (joinModal) joinModal.classList.add('hidden');
               gameMode = '1v1_online';
@@ -262,9 +276,26 @@
               if (loadingStatus) loadingStatus.textContent = '✓ Ready! Waiting for Host countdown trigger...';
             } else if (data.type === 'start_countdown') {
               console.log('[Network] Received start_countdown from Host!');
+              this.closeRematchModal();
               const loadingOverlay = document.getElementById('match-loading-overlay');
               if (loadingOverlay) loadingOverlay.classList.add('hidden');
               startMatchSequence();
+            } else if (data.type === 'start_match') {
+              console.log('[Network] Received start_match fallback from Host!');
+              if (data.hostBot) this.opponentBot = data.hostBot;
+              if (data.guestBot) this.selectedBot = data.guestBot;
+              this.closeRematchModal();
+              const modalGameover = document.getElementById('modal-gameover');
+              if (modalGameover) modalGameover.classList.add('hidden');
+              startMatchSequence();
+            } else if (data.type === 'rematch_request') {
+              this.handlePeerRematchRequest(data);
+            } else if (data.type === 'rematch_bot_pick') {
+              this.handlePeerRematchBotPick(data);
+            } else if (data.type === 'rematch_ready') {
+              this.handlePeerRematchReady(data);
+            } else if (data.type === 'rematch_cancel') {
+              this.handlePeerRematchCancel(data);
             } else if (data.type === 'state') {
               this.applyRemoteState(data);
             } else if (data.type === 'end_match') {
@@ -587,6 +618,10 @@
       this.isHost = false;
       this.hostReady = false;
       this.guestReady = false;
+      this.isRematchActive = false;
+      this.myRematchReady = false;
+      this.peerRematchReady = false;
+      this.rematchLaunching = false;
       this.queuedEvents = [];
       if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
       if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }
@@ -594,6 +629,10 @@
       if (typeof cleanupBots === 'function') cleanupBots();
       const loadingOverlay = document.getElementById('match-loading-overlay');
       if (loadingOverlay) loadingOverlay.classList.add('hidden');
+      const rematchModal = document.getElementById('modal-online-rematch');
+      if (rematchModal) rematchModal.classList.add('hidden');
+      const gameoverModal = document.getElementById('modal-gameover');
+      if (gameoverModal) gameoverModal.classList.add('hidden');
       const hud = document.getElementById('hud');
       if (hud) hud.classList.add('hidden');
       const menuScreen = document.getElementById('menu-screen');
@@ -605,5 +644,296 @@
         statusEl.style.color = '#fbbf24';
       }
       console.warn('[Network] Disconnected:', msg);
+    },
+
+    openRematchModal(localInitiated = false) {
+      this.isRematchActive = true;
+      this.myRematchReady = false;
+      this.peerRematchReady = false;
+      this.rematchLaunching = false;
+
+      const modalGameover = document.getElementById('modal-gameover');
+      if (modalGameover) modalGameover.classList.add('hidden');
+      const hud = document.getElementById('hud');
+      if (hud) hud.classList.add('hidden');
+      const rematchModal = document.getElementById('modal-online-rematch');
+      if (rematchModal) rematchModal.classList.remove('hidden');
+
+      if (localInitiated && this.conn && this.conn.open) {
+        try {
+          this.conn.send({
+            type: 'rematch_request',
+            bot: this.selectedBot
+          });
+        } catch (e) {
+          console.warn('[Network] Failed to send rematch_request:', e);
+        }
+      }
+
+      const statusEl = document.getElementById('rematch-status');
+      if (statusEl) {
+        if (localInitiated) {
+          statusEl.textContent = 'Rematch requested! Pick your robot & click READY.';
+          statusEl.style.color = '#fbbf24';
+        } else {
+          statusEl.textContent = 'Opponent requested a rematch! Pick your robot & ready up.';
+          statusEl.style.color = '#38bdf8';
+        }
+      }
+
+      this.updateRematchUI();
+
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.activeContainerId = null;
+        GamepadUINav.ensureValidFocus();
+      }
+    },
+
+    selectRematchBot(botId) {
+      const validBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
+      if (!validBots.includes(botId)) return;
+      this.selectedBot = botId;
+      this.myRematchReady = false;
+
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(650, 0.05);
+      }
+
+      if (this.conn && this.conn.open) {
+        try {
+          this.conn.send({
+            type: 'rematch_bot_pick',
+            bot: this.selectedBot
+          });
+        } catch (e) {
+          console.warn('[Network] Failed to send rematch_bot_pick:', e);
+        }
+      }
+
+      this.updateRematchUI();
+    },
+
+    toggleRematchReady() {
+      this.myRematchReady = !this.myRematchReady;
+
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+        AudioSys.init();
+        AudioSys.beep(this.myRematchReady ? 780 : 360, 0.08);
+      }
+
+      if (this.conn && this.conn.open) {
+        try {
+          this.conn.send({
+            type: 'rematch_ready',
+            ready: this.myRematchReady,
+            bot: this.selectedBot
+          });
+        } catch (e) {
+          console.warn('[Network] Failed to send rematch_ready:', e);
+        }
+      }
+
+      this.updateRematchUI();
+      this.checkBothRematchReady();
+    },
+
+    handlePeerRematchRequest(data) {
+      if (data && data.bot) {
+        this.opponentBot = data.bot;
+      }
+      const rematchModal = document.getElementById('modal-online-rematch');
+      if (!this.isRematchActive || (rematchModal && rematchModal.classList.contains('hidden'))) {
+        this.openRematchModal(false);
+      } else {
+        this.updateRematchUI();
+      }
+      const statusEl = document.getElementById('rematch-status');
+      if (statusEl) {
+        statusEl.textContent = 'Opponent requested a rematch! Pick your robot and ready up.';
+        statusEl.style.color = '#38bdf8';
+      }
+    },
+
+    handlePeerRematchBotPick(data) {
+      if (data && data.bot) {
+        this.opponentBot = data.bot;
+        this.peerRematchReady = false;
+        this.updateRematchUI();
+      }
+    },
+
+    handlePeerRematchReady(data) {
+      if (data) {
+        this.peerRematchReady = !!data.ready;
+        if (data.bot) this.opponentBot = data.bot;
+        this.updateRematchUI();
+        this.checkBothRematchReady();
+      }
+    },
+
+    handlePeerRematchCancel(data) {
+      this.closeRematchModal();
+      this.handleDisconnect('Opponent exited the rematch room.');
+    },
+
+    cancelRematch() {
+      if (this.conn && this.conn.open) {
+        try {
+          this.conn.send({ type: 'rematch_cancel' });
+        } catch (e) {}
+      }
+      this.closeRematchModal();
+      this.handleDisconnect('Exited online rematch.');
+    },
+
+    closeRematchModal() {
+      this.isRematchActive = false;
+      this.myRematchReady = false;
+      this.peerRematchReady = false;
+      this.rematchLaunching = false;
+      const rematchModal = document.getElementById('modal-online-rematch');
+      if (rematchModal) rematchModal.classList.add('hidden');
+    },
+
+    checkBothRematchReady() {
+      if (this.rematchLaunching) return;
+      if (this.myRematchReady && this.peerRematchReady) {
+        if (this.isHost) {
+          this.rematchLaunching = true;
+          const statusEl = document.getElementById('rematch-status');
+          if (statusEl) {
+            statusEl.textContent = '⚡ Both players ready! Deploying robots...';
+            statusEl.style.color = '#34d399';
+          }
+          setTimeout(async () => {
+            this.hostReady = false;
+            this.guestReady = false;
+            if (this.conn && this.conn.open) {
+              this.conn.send({
+                type: 'prepare_match',
+                hostBot: this.selectedBot,
+                guestBot: this.opponentBot
+              });
+            }
+            this.closeRematchModal();
+            gameMode = '1v1_online';
+            await this.preloadMatchModels(this.selectedBot, this.opponentBot);
+            this.hostReady = true;
+            if (this.guestReady) {
+              this.launchSynchronizedMatch();
+            } else {
+              const loadingStatus = document.getElementById('match-loading-status');
+              if (loadingStatus) loadingStatus.textContent = 'Waiting for opponent to finish streaming CAD telemetry...';
+            }
+          }, 350);
+        } else {
+          const statusEl = document.getElementById('rematch-status');
+          if (statusEl) {
+            statusEl.textContent = '✓ You are ready! Waiting for Host to synchronize match...';
+            statusEl.style.color = '#34d399';
+          }
+        }
+      }
+    },
+
+    getBotDisplayInfo(botKey) {
+      const map = {
+        robot1: 'Robot 1 (Overhead Blade)',
+        robot2: 'Robot 2 (Vertical Drum)',
+        robot3: 'Robot 3 (Horizontal Bar)',
+        robot4: 'Robot 4 (Twin Blade)',
+        robot5: 'Robot 5 (Drum Spinner)',
+        robot6: 'Robot 6 (Heavy Disc)'
+      };
+      return map[botKey] || botKey || 'Robot 1';
+    },
+
+    updateRematchUI() {
+      const cards = document.querySelectorAll('#rematch-bot-selector .mini-bot-card');
+      cards.forEach(card => {
+        if (card.dataset.bot === this.selectedBot) {
+          card.classList.add('selected');
+        } else {
+          card.classList.remove('selected');
+        }
+      });
+
+      const myBadge = document.getElementById('rematch-my-badge');
+      const readyBtn = document.getElementById('btn-rematch-ready');
+      if (myBadge) {
+        if (this.myRematchReady) {
+          myBadge.className = 'ready-badge ready';
+          myBadge.textContent = '✓ READY';
+        } else {
+          myBadge.className = 'ready-badge not-ready';
+          myBadge.textContent = 'NOT READY';
+        }
+      }
+      if (readyBtn) {
+        if (this.myRematchReady) {
+          readyBtn.innerHTML = 'CANCEL READY &nbsp;✕';
+          readyBtn.classList.remove('primary');
+          readyBtn.classList.add('secondary');
+        } else {
+          readyBtn.innerHTML = 'READY UP &nbsp;✓';
+          readyBtn.classList.remove('secondary');
+          readyBtn.classList.add('primary');
+        }
+      }
+
+      const oppInfo = document.getElementById('rematch-opponent-info');
+      const oppBadge = document.getElementById('rematch-opponent-badge');
+      if (oppInfo) {
+        const oppBotName = this.getBotDisplayInfo(this.opponentBot);
+        oppInfo.textContent = `${this.isHost ? 'Guest' : 'Host'}: ${oppBotName}`;
+      }
+      if (oppBadge) {
+        if (this.peerRematchReady) {
+          oppBadge.className = 'ready-badge ready';
+          oppBadge.textContent = '✓ READY';
+        } else {
+          oppBadge.className = 'ready-badge not-ready';
+          oppBadge.textContent = 'WAITING';
+        }
+      }
+    },
+
+    initRematchUI() {
+      if (this._rematchUIInitialized) return;
+      this._rematchUIInitialized = true;
+
+      document.querySelectorAll('#rematch-bot-selector .mini-bot-card').forEach(card => {
+        card.addEventListener('click', () => {
+          this.selectRematchBot(card.dataset.bot);
+        });
+      });
+
+      const readyBtn = document.getElementById('btn-rematch-ready');
+      if (readyBtn) {
+        readyBtn.addEventListener('click', () => {
+          this.toggleRematchReady();
+        });
+      }
+
+      const menuBtn = document.getElementById('btn-rematch-menu');
+      if (menuBtn) {
+        menuBtn.addEventListener('click', () => {
+          this.cancelRematch();
+        });
+      }
+
+      const closeBtn = document.getElementById('btn-rematch-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          this.cancelRematch();
+        });
+      }
     }
   };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => NetworkSys.initRematchUI());
+  } else {
+    NetworkSys.initRematchUI();
+  }

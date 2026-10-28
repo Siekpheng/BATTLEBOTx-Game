@@ -724,7 +724,7 @@
   }
 
   function isAnyModalOpen() {
-    const modalIds = ['modal-select', 'modal-1v1', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover'];
+    const modalIds = ['modal-select', 'modal-1v1', 'modal-online-host', 'modal-online-join', 'modal-pause', 'modal-gameover', 'modal-online-rematch'];
     for (const id of modalIds) {
       const el = document.getElementById(id);
       if (el && !el.classList.contains('hidden')) return true;
@@ -1171,6 +1171,7 @@
 
     getActiveContainer() {
       const modalPriority = [
+        'modal-online-rematch',
         'modal-gameover',
         'modal-pause',
         'modal-online-host',
@@ -1260,6 +1261,8 @@
           def = container.querySelector('#p1-bot-selector .bot-card.selected') || container.querySelector('#p1-bot-selector .bot-card');
         } else if (container.id === 'modal-pause') {
           def = document.getElementById('btn-resume-game');
+        } else if (container.id === 'modal-online-rematch') {
+          def = document.getElementById('btn-rematch-ready') || container.querySelector('#rematch-bot-selector .mini-bot-card.selected');
         } else if (container.id === 'modal-gameover') {
           def = document.getElementById('btn-play-again');
         } else if (container.id === 'modal-online-host') {
@@ -1385,6 +1388,7 @@
         AudioSys.beep(380, 0.06);
       }
       const backMap = {
+        'modal-online-rematch': 'btn-rematch-menu',
         'modal-select': 'btn-select-close',
         'modal-1v1': 'btn-1v1-back',
         'modal-online-host': 'btn-host-cancel',

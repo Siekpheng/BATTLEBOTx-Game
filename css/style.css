@@ -380,9 +380,14 @@
     }
     .mini-bot-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 8px;
       margin-bottom: 16px;
+    }
+    @media (max-width: 600px) {
+      .mini-bot-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
     }
     .mini-bot-card {
       background: rgba(255, 255, 255, 0.04);
