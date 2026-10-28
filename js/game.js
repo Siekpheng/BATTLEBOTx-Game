@@ -734,6 +734,15 @@
     });
     document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
 
+    try {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      if (typeof window.focus === 'function') {
+        window.focus();
+      }
+    } catch (e) {}
+
     let botTypeChoice = selectedBotType || 'robot1';
     const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
@@ -1712,8 +1721,11 @@
         s = gp1.steer;
       }
 
+      const throttleKnobEl = document.getElementById('throttle-knob');
+      const steerKnobEl = document.getElementById('steer-knob');
+
       if (NetworkSys.isOnline && !NetworkSys.isHost) {
-        // GUEST MODE: Send local controls to Host, receive remote physics
+        // GUEST MODE: Send local controls to Host, apply local client prediction
         if (keys['KeyW'] || keys['ArrowUp']) t = 1;
         if (keys['KeyS'] || keys['ArrowDown']) t = -1;
         if (keys['KeyA'] || keys['ArrowLeft']) s = -1;
@@ -1724,10 +1736,26 @@
           s = gp1.steer;
         }
 
-        throttleKnob.style.transform = `translateY(${-t * 42}px)`;
-        steerKnob.style.transform = `translateX(${s * 46}px)`;
+        if (throttleKnobEl) throttleKnobEl.style.transform = `translateY(${-t * 42}px)`;
+        if (steerKnobEl) steerKnobEl.style.transform = `translateX(${s * 46}px)`;
 
         NetworkSys.sendInput(t, s);
+
+        // Guest Controls enemyBot: apply client prediction so Guest drives immediately without waiting for round-trip!
+        if (enemyBot && !enemyBot.isEntirelyDestroyed) {
+          const eHasWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.some(w => w.attached !== false)) ||
+            (enemyBot.detachableParts && enemyBot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
+          const eNoWheels = !eHasWheels;
+          if (enemyBot.driveHealth <= 0 || enemyBot.flipped || eNoWheels) {
+            enemyBot.drivePower = 0;
+            enemyBot.throttleInput = 0;
+            enemyBot.steerInput = 0;
+          } else {
+            enemyBot.throttleInput = t;
+            enemyBot.steerInput = s;
+          }
+          updateBotPhysics(enemyBot, simDt);
+        }
 
         updateBotVisuals(playerBot, dt);
         updateBotVisuals(enemyBot, dt);
@@ -1746,7 +1774,9 @@
           s = gp1.steer;
         }
 
-        const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
+        const pHasWheels = (playerBot.wheels && playerBot.wheels.length > 0 && playerBot.wheels.some(w => w.attached !== false)) ||
+          (playerBot.detachableParts && playerBot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
+        const pNoWheels = !pHasWheels;
         if (playerBot.driveHealth <= 0 || playerBot.flipped || playerBot.isEntirelyDestroyed || pNoWheels) {
           playerBot.drivePower = 0;
           playerBot.throttleInput = 0;
@@ -1756,8 +1786,8 @@
           playerBot.steerInput = s;
         }
 
-        throttleKnob.style.transform = `translateY(${-t * 42}px)`;
-        steerKnob.style.transform = `translateX(${s * 46}px)`;
+        if (throttleKnobEl) throttleKnobEl.style.transform = `translateY(${-t * 42}px)`;
+        if (steerKnobEl) steerKnobEl.style.transform = `translateX(${s * 46}px)`;
 
         if (!NetworkSys.isOnline) {
           updateEnemyAI(simDt);

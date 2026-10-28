@@ -1151,6 +1151,7 @@
     // - Flipped onto back/side (cannot drive)
     // - All drive wheels detached (cannot translate)
     // - Drive burnout / power lost (drivePower <= 0 or driveHealth <= 0)
+    const isGuestOnline = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost);
     if (typeof combatEngageTimer !== 'number') combatEngageTimer = 0.0;
     if (combatEngageTimer > 0) {
       combatEngageTimer = Math.max(0.0, combatEngageTimer - dt);
@@ -1160,8 +1161,14 @@
     const eSpeed = Math.hypot(enemyBot.vx || 0, enemyBot.vz || 0);
     const distBetweenBots = Math.hypot((playerBot.x || 0) - (enemyBot.x || 0), (playerBot.z || 0) - (enemyBot.z || 0));
 
-    const pNoWheels = (!playerBot.wheels || playerBot.wheels.length === 0 || playerBot.wheels.filter(w => w.attached).length === 0);
-    const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
+    const botHasDriveWheels = (b) => {
+      if (!b) return false;
+      if (b.wheels && b.wheels.length > 0 && b.wheels.some(w => w.attached !== false)) return true;
+      if (b.detachableParts && b.detachableParts.length > 0 && b.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent)) return true;
+      return false;
+    };
+    const pNoWheels = !botHasDriveWheels(playerBot);
+    const eNoWheels = !botHasDriveWheels(enemyBot);
 
     const pNoDrive = (playerBot.driveHealth <= 0) || (playerBot.drivePower <= 0);
     const eNoDrive = (enemyBot.driveHealth <= 0) || (enemyBot.drivePower <= 0);
@@ -1188,8 +1195,6 @@
 
     const isPStopped = isPImmobilized && (pSpeed < 1.8) && !eGoingForNoMercy;
     const isEStopped = isEImmobilized && (eSpeed < 1.8) && !pGoingForNoMercy;
-
-    const isGuestOnline = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost);
 
     // Check if BOTH robots cannot fight:
     // (a) Both robots are immobilized and not colliding/moving, OR

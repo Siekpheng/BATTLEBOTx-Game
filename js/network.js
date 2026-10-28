@@ -151,7 +151,9 @@
           }
         } else if (data.type === 'guest_input') {
           if (enemyBot && !enemyBot.isEntirelyDestroyed) {
-            const eNoWheels = (!enemyBot.wheels || enemyBot.wheels.length === 0 || enemyBot.wheels.filter(w => w.attached).length === 0);
+            const eHasWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.some(w => w.attached !== false)) ||
+              (enemyBot.detachableParts && enemyBot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
+            const eNoWheels = !eHasWheels;
             if (enemyBot.driveHealth <= 0 || enemyBot.flipped || eNoWheels) {
               enemyBot.drivePower = 0;
               enemyBot.throttleInput = 0;
@@ -328,13 +330,17 @@
 
     sendInput(t, s) {
       if (this.conn && this.conn.open && !this.isHost) {
-        const now = performance.now();
-        const changed = (t !== this.lastSentT || s !== this.lastSentS);
-        if (changed || (now - this.lastInputSendTime >= 33)) {
-          this.lastSentT = t;
-          this.lastSentS = s;
-          this.lastInputSendTime = now;
-          this.conn.send({ type: 'guest_input', t, s });
+        try {
+          const now = performance.now();
+          const changed = (t !== this.lastSentT || s !== this.lastSentS);
+          if (changed || (now - this.lastInputSendTime >= 33)) {
+            this.lastSentT = t;
+            this.lastSentS = s;
+            this.lastInputSendTime = now;
+            this.conn.send({ type: 'guest_input', t, s });
+          }
+        } catch (e) {
+          console.warn('[Network] sendInput error:', e);
         }
       }
     },
@@ -371,33 +377,37 @@
         ? enemyBot.detachableParts.filter(p => !p.attached).map(p => p.partIdx)
         : [];
 
-      this.conn.send({
-        type: 'state',
-        ms: typeof matchState !== 'undefined' ? matchState : 'playing',
-        tm: typeof matchTimeRemaining === 'number' ? matchTimeRemaining : 180,
-        bt: typeof bothCantFightTimer === 'number' ? bothCantFightTimer : 0,
-        p1: {
-          x: playerBot.x, z: playerBot.z, y: playerBot.root.position.y,
-          ay: playerBot.airY || 0, wt: playerBot.wheelTilt || 0,
-          vx: playerBot.vx || 0, vz: playerBot.vz || 0,
-          yaw: playerBot.yaw, pitch: playerBot.pitch, roll: playerBot.roll,
-          spin: playerBot.weaponSpinSpeed, hp: playerBot.driveHealth, fp: playerBot.flipped,
-          wa: playerBot.weaponActive !== false, wd: !!playerBot.weaponDestroyed,
-          ed: !!playerBot.isEntirelyDestroyed, st: playerBot.stoppedTimer || 0,
-          rc: p1Parts, dp: p1Detached
-        },
-        p2: {
-          x: enemyBot.x, z: enemyBot.z, y: enemyBot.root.position.y,
-          ay: enemyBot.airY || 0, wt: enemyBot.wheelTilt || 0,
-          vx: enemyBot.vx || 0, vz: enemyBot.vz || 0,
-          yaw: enemyBot.yaw, pitch: enemyBot.pitch, roll: enemyBot.roll,
-          spin: enemyBot.weaponSpinSpeed, hp: enemyBot.driveHealth, fp: enemyBot.flipped,
-          wa: enemyBot.weaponActive !== false, wd: !!enemyBot.weaponDestroyed,
-          ed: !!enemyBot.isEntirelyDestroyed, st: enemyBot.stoppedTimer || 0,
-          rc: p2Parts, dp: p2Detached
-        },
-        events: evs
-      });
+      try {
+        this.conn.send({
+          type: 'state',
+          ms: typeof matchState !== 'undefined' ? matchState : 'playing',
+          tm: typeof matchTimeRemaining === 'number' ? matchTimeRemaining : 180,
+          bt: typeof bothCantFightTimer === 'number' ? bothCantFightTimer : 0,
+          p1: {
+            x: playerBot.x, z: playerBot.z, y: playerBot.root.position.y,
+            ay: playerBot.airY || 0, wt: playerBot.wheelTilt || 0,
+            vx: playerBot.vx || 0, vz: playerBot.vz || 0,
+            yaw: playerBot.yaw, pitch: playerBot.pitch, roll: playerBot.roll,
+            spin: playerBot.weaponSpinSpeed, hp: playerBot.driveHealth, fp: playerBot.flipped,
+            wa: playerBot.weaponActive !== false, wd: !!playerBot.weaponDestroyed,
+            ed: !!playerBot.isEntirelyDestroyed, st: playerBot.stoppedTimer || 0,
+            rc: p1Parts, dp: p1Detached
+          },
+          p2: {
+            x: enemyBot.x, z: enemyBot.z, y: enemyBot.root.position.y,
+            ay: enemyBot.airY || 0, wt: enemyBot.wheelTilt || 0,
+            vx: enemyBot.vx || 0, vz: enemyBot.vz || 0,
+            yaw: enemyBot.yaw, pitch: enemyBot.pitch, roll: enemyBot.roll,
+            spin: enemyBot.weaponSpinSpeed, hp: enemyBot.driveHealth, fp: enemyBot.flipped,
+            wa: enemyBot.weaponActive !== false, wd: !!enemyBot.weaponDestroyed,
+            ed: !!enemyBot.isEntirelyDestroyed, st: enemyBot.stoppedTimer || 0,
+            rc: p2Parts, dp: p2Detached
+          },
+          events: evs
+        });
+      } catch (err) {
+        console.warn('[Network] broadcastState error:', err);
+      }
     },
 
     applyRemoteState(data) {
@@ -453,14 +463,25 @@
       playerBot.stoppedTimer = data.p1.st || 0;
 
       // Guest robot (p2 -> enemyBot at +7.5 on both Host and Guest)
-      enemyBot.x = data.p2.x;
-      enemyBot.z = data.p2.z;
+      // Smooth reconciliation with Client-Side Prediction:
+      if (!enemyBot.isEntirelyDestroyed) {
+        const dx = data.p2.x - enemyBot.x;
+        const dz = data.p2.z - enemyBot.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > 1.2) {
+          enemyBot.x = data.p2.x;
+          enemyBot.z = data.p2.z;
+        } else {
+          enemyBot.x += dx * 0.65;
+          enemyBot.z += dz * 0.65;
+        }
+        enemyBot.root.position.x = enemyBot.x;
+        enemyBot.root.position.z = enemyBot.z;
+      }
       enemyBot.airY = data.p2.ay || 0;
       enemyBot.wheelTilt = data.p2.wt || 0;
       enemyBot.vx = data.p2.vx || 0;
       enemyBot.vz = data.p2.vz || 0;
-      enemyBot.root.position.x = data.p2.x;
-      enemyBot.root.position.z = data.p2.z;
       enemyBot.root.position.y = (data.p2.y || 0);
       enemyBot.yaw = data.p2.yaw;
       enemyBot.pitch = data.p2.pitch;
@@ -525,7 +546,7 @@
             }
           }
         }
-        if (typeof data.p1.rc === 'number' && !playerBot.isEntirelyDestroyed) {
+        if (typeof data.p1.rc === 'number' && !playerBot.isEntirelyDestroyed && Array.isArray(data.p1.dp) && data.p1.dp.length > 0) {
           let safety = 0;
           while (playerBot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length > data.p1.rc && !playerBot.isEntirelyDestroyed && safety < 60) {
             safety++;
@@ -549,7 +570,7 @@
             }
           }
         }
-        if (typeof data.p2.rc === 'number' && !enemyBot.isEntirelyDestroyed) {
+        if (typeof data.p2.rc === 'number' && !enemyBot.isEntirelyDestroyed && Array.isArray(data.p2.dp) && data.p2.dp.length > 0) {
           let safety = 0;
           while (enemyBot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length > data.p2.rc && !enemyBot.isEntirelyDestroyed && safety < 60) {
             safety++;
