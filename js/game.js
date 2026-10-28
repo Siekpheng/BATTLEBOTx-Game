@@ -719,6 +719,8 @@
 
 
   async function startMatchSequence() {
+    window.startMatchSequence = startMatchSequence;
+    window.startMatch = startMatchSequence;
     AudioSys.init();
     // Set matchState to 'countdown' immediately so the menu loop does not respawn menu bots
     // and createBotInstance / attachCadToBot initialize weaponSpinSpeed to 0.0 during the 3s countdown!
@@ -886,6 +888,8 @@
       }
     }, 850);
   }
+  window.startMatchSequence = startMatchSequence;
+  window.startMatch = startMatchSequence;
 
   function endMatch(playerWon, isDraw = false, isKO = true, isTotalDestruction = false) {
     if (matchState === 'gameover' || matchState === 'celebrating') return;
@@ -953,6 +957,7 @@
 
     finalizeGameOver(playerWon, isDraw, isKO, false);
   }
+  window.endMatch = endMatch;
 
   function finalizeGameOver(playerWon, isDraw = false, isKO = true, isTotalDestruction = false) {
     if (matchState === 'gameover') return;

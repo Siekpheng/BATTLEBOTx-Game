@@ -21,4 +21,6 @@ var playerBot = null;
 var enemyBot = null;
 var MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
 
-window.startMatch = () => (typeof startMatchSequence === 'function' ? startMatchSequence() : null);
+window.startMatchSequence = null;
+window.startMatch = () => (typeof window.startMatchSequence === 'function' ? window.startMatchSequence() : null);
+window.endMatch = null;

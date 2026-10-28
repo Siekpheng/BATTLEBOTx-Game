@@ -198,7 +198,7 @@
       }
       const loadingOverlay = document.getElementById('match-loading-overlay');
       if (loadingOverlay) loadingOverlay.classList.add('hidden');
-      startMatchSequence();
+      if (typeof window.startMatchSequence === 'function') window.startMatchSequence(); else if (typeof startMatchSequence === 'function') startMatchSequence();
     },
 
     joinRoom(code, botType, onConnected, onError) {
@@ -279,7 +279,7 @@
               this.closeRematchModal();
               const loadingOverlay = document.getElementById('match-loading-overlay');
               if (loadingOverlay) loadingOverlay.classList.add('hidden');
-              startMatchSequence();
+              if (typeof window.startMatchSequence === 'function') window.startMatchSequence(); else if (typeof startMatchSequence === 'function') startMatchSequence();
             } else if (data.type === 'start_match') {
               console.log('[Network] Received start_match fallback from Host!');
               if (data.hostBot) this.opponentBot = data.hostBot;
@@ -287,7 +287,7 @@
               this.closeRematchModal();
               const modalGameover = document.getElementById('modal-gameover');
               if (modalGameover) modalGameover.classList.add('hidden');
-              startMatchSequence();
+              if (typeof window.startMatchSequence === 'function') window.startMatchSequence(); else if (typeof startMatchSequence === 'function') startMatchSequence();
             } else if (data.type === 'rematch_request') {
               this.handlePeerRematchRequest(data);
             } else if (data.type === 'rematch_bot_pick') {
@@ -305,7 +305,7 @@
                   explodeRobot(defeatedBot, { x: data.playerWon ? 1 : -1, z: 0 }, new THREE.Vector3(defeatedBot.x, 0.3, defeatedBot.z));
                 }
               }
-              endMatch(data.playerWon, data.isDraw, data.isKO, data.isTotalDestruction);
+              if (typeof window.endMatch === 'function') window.endMatch(data.playerWon, data.isDraw, data.isKO, data.isTotalDestruction); else if (typeof endMatch === 'function') endMatch(data.playerWon, data.isDraw, data.isKO, data.isTotalDestruction);
             }
           });
 
@@ -648,6 +648,7 @@
 
     openRematchModal(localInitiated = false) {
       this.isRematchActive = true;
+      if (typeof cleanupBots === 'function') cleanupBots();
       this.myRematchReady = false;
       this.peerRematchReady = false;
       this.rematchLaunching = false;
@@ -931,6 +932,7 @@
       }
     }
   };
+  window.NetworkSys = NetworkSys;
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', () => NetworkSys.initRematchUI());
