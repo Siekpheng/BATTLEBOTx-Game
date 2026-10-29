@@ -30,8 +30,8 @@
       halfLength: 1.25,
       height: 0.78,
       flipped: false,
-      driveHealth: (type === 'robot3') ? 380 : 220, // Reinforced durability for Robot 3 KineticBar
-      maxDriveHealth: (type === 'robot3') ? 380 : 220,
+      driveHealth: (type === 'robot3' || type === 'robot5') ? 380 : 220, // Reinforced durability for Robot 3 KineticBar & Robot 5 BlueThunder
+      maxDriveHealth: (type === 'robot3' || type === 'robot5') ? 380 : 220,
       isEntirelyDestroyed: false,
       drivePower: 1.0,
       stoppedTimer: 0.0,

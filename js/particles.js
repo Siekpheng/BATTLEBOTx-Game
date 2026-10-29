@@ -128,8 +128,8 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    // Buffed reinforced chassis for Robot 3 (380 HP base instead of 290 HP)
-    bot.maxDriveHealth = (bot.type === 'robot3') ? 380 : bot.totalInitialParts * 10;
+    // Buffed reinforced chassis for Robot 3 and Robot 5 (380 HP base instead of 240 HP)
+    bot.maxDriveHealth = (bot.type === 'robot3' || bot.type === 'robot5') ? 380 : bot.totalInitialParts * 10;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
