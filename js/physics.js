@@ -168,10 +168,12 @@
       bot.drivePower = (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor);
     }
 
-    const maxSpeed = 15.0 * (0.35 + 0.65 * bot.drivePower);
     const isR3 = (bot.type === 'robot3');
-    const turnRate = (isR3 ? 3.85 : 3.4) * (0.35 + 0.65 * bot.drivePower);
-    const accel = (isR3 ? 52.0 : 46.0) * bot.drivePower;
+    const isR6 = (bot.type === 'robot6');
+    // Robot 6 moves faster than the other robots due to its smaller, lighter chassis:
+    const maxSpeed = (isR6 ? 18.5 : 15.0) * (0.35 + 0.65 * bot.drivePower);
+    const turnRate = (isR6 ? 4.2 : (isR3 ? 3.75 : 3.4)) * (0.35 + 0.65 * bot.drivePower);
+    const accel = (isR6 ? 62.0 : (isR3 ? 48.0 : 46.0)) * bot.drivePower;
 
     // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
     if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
@@ -414,7 +416,8 @@
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s, buffed 102.0 for Robot 3)
         const isR3Bot = (bot.type === 'robot3');
         const targetSpin = isR3Bot ? 102.0 : 95.0;
-        const windUpRate = isMenu ? 190.0 : (isR3Bot ? 48.0 : 38.0); // Faster brushless recovery for Robot 3 KineticBar
+        // Robot 3 massive horizontal bar takes longer to fully wind up (~5.6s vs ~2.5s for other robots):
+        const windUpRate = isMenu ? 190.0 : (isR3Bot ? 18.0 : 38.0);
         if (bot.weaponSpinSpeed < targetSpin) {
           bot.weaponSpinSpeed = Math.min(targetSpin, bot.weaponSpinSpeed + windUpRate * dt);
         }
@@ -884,7 +887,7 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
-            const pFling = (playerBot.type === 'robot3') ? (5.8 + impactSpeed * 0.52) : (4.0 + impactSpeed * 0.45);
+            const pFling = (playerBot.type === 'robot3') ? (6.5 + impactSpeed * 0.60) : (4.0 + impactSpeed * 0.45);
             enemyBot.vx += nx * pFling;
             enemyBot.vz += nz * pFling;
 
@@ -915,9 +918,17 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          // Parts fly off with each solid hit until NOTHING left!
           detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          if (canFlipEnemy || impactSpeed > 6.0 || (playerBot.type === 'robot3' && wasPSpinFast)) {
+          if (playerBot.type === 'robot3' && wasPSpinFast) {
+            // Robot 3 deals a lot of damage when wound up: rips off 2 parts directly!
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            if (impactSpeed > 5.5 || canFlipEnemy) {
+              // High speed collision shreds a 3rd part!
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            }
+          } else if (canFlipEnemy || impactSpeed > 6.0) {
+            // Other robots deal standard/similar damage
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
           }
 
@@ -998,7 +1009,7 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
-            const eFling = (enemyBot.type === 'robot3') ? (5.8 + impactSpeed * 0.52) : (4.0 + impactSpeed * 0.45);
+            const eFling = (enemyBot.type === 'robot3') ? (6.5 + impactSpeed * 0.60) : (4.0 + impactSpeed * 0.45);
             playerBot.vx -= nx * eFling;
             playerBot.vz -= nz * eFling;
 
@@ -1031,9 +1042,17 @@
 
           triggerDamageVignette();
 
-          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          // Parts fly off with each solid hit until NOTHING left!
           detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-          if (canFlipPlayer || impactSpeed > 6.0 || (enemyBot.type === 'robot3' && wasESpinFast)) {
+          if (enemyBot.type === 'robot3' && wasESpinFast) {
+            // Robot 3 deals a lot of damage when wound up: rips off 2 parts directly!
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            if (impactSpeed > 5.5 || canFlipPlayer) {
+              // High speed collision shreds a 3rd part!
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            }
+          } else if (canFlipPlayer || impactSpeed > 6.0) {
+            // Other robots deal standard/similar damage
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
           }
 

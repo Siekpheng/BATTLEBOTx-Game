@@ -129,8 +129,10 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    // Reinforced chassis for Robot 3 (380 HP) and Robot 5 (260 HP with weapon retention)
-    bot.maxDriveHealth = (bot.type === 'robot3') ? 380 : ((bot.type === 'robot5') ? 260 : bot.totalInitialParts * 10);
+    // Health hierarchy: Robot 2 most HP (450), Robot 3 & 6 least HP (200), Others similar HP (300)
+    bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
+      ? getBotMaxHealth(bot.type)
+      : ((bot.type === 'robot2') ? 450 : ((bot.type === 'robot3' || bot.type === 'robot6') ? 200 : 300));
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;

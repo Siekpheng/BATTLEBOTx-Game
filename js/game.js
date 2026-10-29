@@ -2,6 +2,13 @@
 // BATTLEBOTx - GAME MANAGER, UI NAVIGATION & ANIMATION LOOP
 // ========================================================
 
+  function getBotMaxHealth(type) {
+    if (type === 'robot2') return 450; // Most HP: Heavily armored drum tank
+    if (type === 'robot3' || type === 'robot6') return 200; // Least HP: Glass cannon & lightweight speedster
+    return 300; // Similar HP for other robots (robot1, robot4, robot5)
+  }
+  window.getBotMaxHealth = getBotMaxHealth;
+
   function createBotInstance(type, x, z, yaw) {
     const built = createRobotMesh(type);
     built.root.position.set(x, 0, z);
@@ -30,8 +37,8 @@
       halfLength: 1.25,
       height: 0.78,
       flipped: false,
-      driveHealth: (type === 'robot3') ? 380 : ((type === 'robot5') ? 260 : 220), // Balanced authentic durability
-      maxDriveHealth: (type === 'robot3') ? 380 : ((type === 'robot5') ? 260 : 220),
+      driveHealth: getBotMaxHealth(type),
+      maxDriveHealth: getBotMaxHealth(type),
       isEntirelyDestroyed: false,
       drivePower: 1.0,
       stoppedTimer: 0.0,
