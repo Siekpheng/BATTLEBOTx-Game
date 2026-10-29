@@ -54,7 +54,7 @@
   </script>
 
   <!-- Custom Game Styles & Keyframe Animations -->
-  <link rel="stylesheet" href="css/style.css?v=20261029f" />
+  <link rel="stylesheet" href="css/style.css?v=20261029g" />
 </head>
 <body class="hide-touch-controls">
 <div id="app">
@@ -68,6 +68,7 @@
       <button id="btn-menu-camera" class="menu-nav-btn" type="button" title="Cycle Camera Angle">🎥 Angle: <strong>Dynamic Tour</strong></button>
     </div>
     <div class="menu-top-right-bar">
+      <button id="btn-menu-perf" class="menu-nav-btn perf-mode-btn" type="button" title="Toggle Graphics Performance & Battery Saver">⚡ 60 FPS</button>
       <button id="btn-menu-music" class="menu-music-btn" type="button" title="Toggle Background Music">🎵 Music: ON</button>
       <button id="btn-menu-fullscreen" class="menu-fullscreen-btn" type="button" title="Enter Fullscreen Landscape">⛶ Fullscreen</button>
     </div>
@@ -690,6 +691,10 @@
           Press <kbd>LB</kbd> on controller = P1 · Press <kbd>RB</kbd> = P2 · Click to Cycle
         </div>
       </div>
+      <div style="margin: 10px 0 12px 0; display: flex; align-items: center; justify-content: space-between; background: rgba(15,23,42,0.65); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+        <span style="font-size: 0.82rem; font-weight: 600; color: #94a3b8;">Graphics &amp; Battery:</span>
+        <button type="button" id="btn-pause-perf" class="perf-mode-btn" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">⚡ 60 FPS</button>
+      </div>
       <button class="action-btn" id="btn-resume-game" type="button">RESUME MATCH</button>
       <button class="action-btn secondary" id="btn-restart-game" type="button">RESTART MATCH</button>
       <button class="action-btn secondary" id="btn-pause-menu" type="button">MAIN MENU</button>
@@ -715,14 +720,14 @@
 
 
   <!-- Modular Game Engine Scripts -->
-  <script src="js/state.js?v=20261029f"></script>
-  <script src="js/audio.js?v=20261029f"></script>
-  <script src="js/arena.js?v=20261029f"></script>
-  <script src="js/particles.js?v=20261029f"></script>
-  <script src="js/robots.js?v=20261029f"></script>
-  <script src="js/physics.js?v=20261029f"></script>
-  <script src="js/input.js?v=20261029f"></script>
-  <script src="js/network.js?v=20261029f"></script>
-  <script src="js/game.js?v=20261029f"></script>
+  <script src="js/state.js?v=20261029g"></script>
+  <script src="js/audio.js?v=20261029g"></script>
+  <script src="js/arena.js?v=20261029g"></script>
+  <script src="js/particles.js?v=20261029g"></script>
+  <script src="js/robots.js?v=20261029g"></script>
+  <script src="js/physics.js?v=20261029g"></script>
+  <script src="js/input.js?v=20261029g"></script>
+  <script src="js/network.js?v=20261029g"></script>
+  <script src="js/game.js?v=20261029g"></script>
 </body>
 </html>

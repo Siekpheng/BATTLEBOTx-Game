@@ -1560,6 +1560,12 @@
 
   function animate(now) {
     requestAnimationFrame(animate);
+
+    // Thermal & Battery Saver: Throttles unneeded rendering on 120Hz/144Hz/240Hz screens and hidden tabs
+    if (typeof PerfSys !== 'undefined' && !PerfSys.shouldRenderFrame(now)) {
+      return;
+    }
+
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
@@ -2105,6 +2111,11 @@
         camera.updateProjectionMatrix();
       }
       updateArenaWallTransparency(dt, camera, playerBot);
+      if (typeof PerfSys !== 'undefined' && renderer && renderer.shadowMap) {
+        if (PerfSys.shouldUpdateShadow()) {
+          renderer.shadowMap.needsUpdate = true;
+        }
+      }
       renderer.render(scene, camera);
     }
   }
@@ -2113,6 +2124,25 @@
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (typeof PerfSys !== 'undefined') {
+      PerfSys.applySettings();
+    }
+  });
+
+  // Wire up Performance Toggle buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    const perfBtns = document.querySelectorAll('.perf-mode-btn');
+    perfBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof PerfSys !== 'undefined') {
+          PerfSys.cycleMode();
+        }
+      });
+    });
+    if (typeof PerfSys !== 'undefined') {
+      PerfSys.updateUI();
+    }
   });
 
     // Launch initial Menu Exhibition Fight

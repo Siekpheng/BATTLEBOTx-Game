@@ -11,13 +11,143 @@
   scene.background = new THREE.Color(0x02050e);
   scene.fog = new THREE.FogExp2(0x0a0507, 0.010);
 
+  // ========================================================
+  // PERFORMANCE & THERMAL MANAGEMENT SYSTEM (PERFSYS)
+  // Prevents overheating on phones and suppresses fan noise on laptops:
+  // - Smooth 60 FPS cap (stops 120Hz/144Hz/240Hz screens from running at 100% GPU)
+  // - Dynamic pixel ratio scaling (reduces mobile retina fillrate by 60%+)
+  // - 1024x1024 PCF shadow map with 30Hz interleaved updates
+  // - Auto-pause on background/inactive tabs
+  // ========================================================
+  const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+    (window.innerWidth <= 840);
+
+  const PerfSys = {
+    isMobile: isMobileDevice,
+    mode: (function() {
+      try { return localStorage.getItem('battlebotx_perf_mode') || 'balanced'; } catch(e) { return 'balanced'; }
+    })(),
+    lastRenderTime: 0,
+    perfFrameCount: 0,
+    isTabVisible: true,
+
+    getSettings() {
+      if (this.mode === 'saver') {
+        return {
+          targetFPS: this.isMobile ? 30 : 45,
+          dpr: this.isMobile ? 1.0 : 1.15,
+          shadowMapSize: 512,
+          shadowSkip: 3,
+          label: '🔋 Eco Mode'
+        };
+      }
+      if (this.mode === 'high') {
+        return {
+          targetFPS: 0, // Uncapped (120/144/240Hz)
+          dpr: Math.min(window.devicePixelRatio || 1, 2.0),
+          shadowMapSize: 1536,
+          shadowSkip: 1,
+          label: '🚀 Ultra (Uncapped)'
+        };
+      }
+      // 'balanced' (Default - Smooth 60 FPS, Cool thermals)
+      return {
+        targetFPS: 60,
+        dpr: this.isMobile ? Math.min(window.devicePixelRatio || 1, 1.25) : Math.min(window.devicePixelRatio || 1, 1.5),
+        shadowMapSize: 1024,
+        shadowSkip: 2,
+        label: '⚡ 60 FPS'
+      };
+    },
+
+    setMode(newMode) {
+      this.mode = newMode;
+      try { localStorage.setItem('battlebotx_perf_mode', newMode); } catch (e) {}
+      this.applySettings();
+      this.updateUI();
+    },
+
+    cycleMode() {
+      const modes = ['balanced', 'saver', 'high'];
+      const nextIdx = (modes.indexOf(this.mode) + 1) % modes.length;
+      this.setMode(modes[nextIdx]);
+    },
+
+    applySettings() {
+      if (typeof renderer === 'undefined' || !renderer) return;
+      const s = this.getSettings();
+      renderer.setPixelRatio(s.dpr);
+      if (typeof topCenterLight !== 'undefined' && topCenterLight && topCenterLight.shadow) {
+        if (topCenterLight.shadow.mapSize.width !== s.shadowMapSize) {
+          topCenterLight.shadow.mapSize.width = s.shadowMapSize;
+          topCenterLight.shadow.mapSize.height = s.shadowMapSize;
+          if (topCenterLight.shadow.map) {
+            topCenterLight.shadow.map.dispose();
+            topCenterLight.shadow.map = null;
+          }
+        }
+      }
+      if (renderer.shadowMap) {
+        renderer.shadowMap.needsUpdate = true;
+      }
+    },
+
+    updateUI() {
+      const s = this.getSettings();
+      const btns = document.querySelectorAll('.perf-mode-btn');
+      btns.forEach(b => {
+        b.innerHTML = s.label;
+      });
+    },
+
+    shouldRenderFrame(now) {
+      if (!this.isTabVisible) return false;
+      const s = this.getSettings();
+      if (s.targetFPS <= 0) {
+        this.lastRenderTime = now;
+        return true;
+      }
+      const minInterval = (1000 / s.targetFPS) - 1.5; // 1.5ms margin for rock-solid 60Hz lock
+      if (now - this.lastRenderTime < minInterval) {
+        return false;
+      }
+      this.lastRenderTime = now;
+      return true;
+    },
+
+    shouldUpdateShadow() {
+      this.perfFrameCount++;
+      const s = this.getSettings();
+      return (this.perfFrameCount % s.shadowSkip === 0);
+    }
+  };
+  window.PerfSys = PerfSys;
+
+  document.addEventListener('visibilitychange', () => {
+    PerfSys.isTabVisible = !document.hidden;
+    if (PerfSys.isTabVisible) {
+      if (typeof lastTime !== 'undefined') lastTime = performance.now();
+      PerfSys.lastRenderTime = performance.now();
+      if (typeof renderer !== 'undefined' && renderer && renderer.shadowMap) {
+        renderer.shadowMap.needsUpdate = true;
+      }
+    } else {
+      if (typeof AudioSys !== 'undefined' && AudioSys.stopCombatAudio) {
+        AudioSys.stopCombatAudio();
+      }
+    }
+  });
+
   const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 240);
   const cameraP2 = new THREE.PerspectiveCamera(46, (window.innerWidth * 0.5) / window.innerHeight, 0.1, 240);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(PerfSys.getSettings().dpr);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false; // Managed by PerfSys: updates every 2nd frame for 50% shadow cost reduction!
+  renderer.shadowMap.needsUpdate = true;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.80; // Dark, moody, high-contrast atmospheric arena exposure
@@ -33,8 +163,8 @@
   topCenterLight.position.set(0, 32, 1);
   topCenterLight.target.position.set(0, 0, 0);
   topCenterLight.castShadow = true;
-  topCenterLight.shadow.mapSize.width = 2048;
-  topCenterLight.shadow.mapSize.height = 2048;
+  topCenterLight.shadow.mapSize.width = PerfSys.getSettings().shadowMapSize;
+  topCenterLight.shadow.mapSize.height = PerfSys.getSettings().shadowMapSize;
   topCenterLight.shadow.camera.near = 5;
   topCenterLight.shadow.camera.far = 55;
   const shadowRange = 16;
