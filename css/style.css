@@ -1311,9 +1311,22 @@
       position: relative;
     }
     .bot-card.gamepad-focus, .mini-bot-card.gamepad-focus {
-      border-color: #facc15 !important;
-      outline: 3px solid #facc15 !important;
-      box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.35), 0 0 24px rgba(250, 204, 21, 0.8) !important;
+      outline: none !important;
+    }
+    #modal-select .bot-card,
+    #modal-select .bot-card.gamepad-focus,
+    #modal-select .bot-card.selected {
+      outline: none !important;
+    }
+    #p1-bot-selector .bot-card.gamepad-focus {
+      border-color: #38bdf8 !important;
+      outline: none !important;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.45) !important;
+    }
+    #p2-bot-selector .bot-card.gamepad-focus {
+      border-color: #f87171 !important;
+      outline: none !important;
+      box-shadow: 0 0 18px rgba(248, 113, 113, 0.45) !important;
     }
 
     #splitscreen-overlay {
@@ -1465,9 +1478,13 @@
       flex: 0 0 auto;
       min-width: 110px;
       justify-content: center;
-      border-color: rgba(250, 204, 21, 0.55);
-      color: #fde047;
-      background: rgba(66, 32, 6, 0.45);
+      border-color: rgba(168, 85, 247, 0.55);
+      color: #c084fc;
+      background: rgba(88, 28, 135, 0.35);
+    }
+    .controller-map-btn.swap-map-btn:hover {
+      border-color: #c084fc;
+      background: rgba(88, 28, 135, 0.55);
     }
     .map-role-tag {
       font-family: 'Orbitron', sans-serif;
@@ -1575,11 +1592,11 @@
 
 
 
-    /* Random Bot Quick-Pick Buttons */
+    /* Random Bot Quick-Pick Buttons (Themed to P1 Blue and P2 Red) */
     .random-bot-btn {
-      background: rgba(251, 191, 36, 0.12);
-      border: 1px solid rgba(251, 191, 36, 0.42);
-      color: #fbbf24;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #cbd5e1;
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.05em;
@@ -1591,11 +1608,27 @@
       align-items: center;
       gap: 4px;
     }
-    .random-bot-btn:hover {
-      background: rgba(251, 191, 36, 0.25);
-      border-color: #fbbf24;
+    .random-bot-btn.p1-random-btn, #btn-p1-random {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #38bdf8;
+    }
+    .random-bot-btn.p1-random-btn:hover, #btn-p1-random:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
       transform: translateY(-1px);
-      box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
+    }
+    #btn-p2-random {
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      color: #f87171;
+    }
+    #btn-p2-random:hover {
+      background: rgba(248, 113, 113, 0.22);
+      border-color: #f87171;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.35);
+      transform: translateY(-1px);
     }
     .random-bot-btn:active {
       transform: translateY(0);
