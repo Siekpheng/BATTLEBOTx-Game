@@ -440,6 +440,38 @@
     });
   });
 
+
+  // Random Robot Selection Buttons (P1 & P2)
+  const btnP1Random = document.getElementById('btn-p1-random');
+  if (btnP1Random) {
+    btnP1Random.addEventListener('click', (e) => {
+      e.stopPropagation();
+      AudioSys.init();
+      AudioSys.beep(600, 0.05);
+      const p1Cards = Array.from(document.querySelectorAll('#p1-bot-selector .bot-card'));
+      if (p1Cards.length === 0) return;
+      const currentSelected = document.querySelector('#p1-bot-selector .bot-card.selected');
+      const filtered = p1Cards.filter(c => c !== currentSelected);
+      const choice = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : p1Cards[0];
+      choice.click();
+    });
+  }
+
+  const btnP2Random = document.getElementById('btn-p2-random');
+  if (btnP2Random) {
+    btnP2Random.addEventListener('click', (e) => {
+      e.stopPropagation();
+      AudioSys.init();
+      AudioSys.beep(600, 0.05);
+      const p2Cards = Array.from(document.querySelectorAll('#p2-bot-selector .bot-card'));
+      if (p2Cards.length === 0) return;
+      const currentSelected = document.querySelector('#p2-bot-selector .bot-card.selected');
+      const filtered = p2Cards.filter(c => c !== currentSelected);
+      const choice = filtered.length > 0 ? filtered[Math.floor(Math.random() * filtered.length)] : p2Cards[0];
+      choice.click();
+    });
+  }
+
   // P2 / Opponent selection cards (Allows picking the exact same robot!)
   document.querySelectorAll('#p2-bot-selector .bot-card').forEach(card => {
     card.addEventListener('click', () => {

@@ -417,7 +417,7 @@
 
     .modal-box {
       width: 100%;
-      max-width: 840px;
+      max-width: 890px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 20px;
@@ -468,7 +468,7 @@
 
     .bot-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 10px;
     }
 
@@ -1573,3 +1573,52 @@
       100% { transform: scale(1.02); }
     }
 
+
+
+    /* Random Bot Quick-Pick Buttons */
+    .random-bot-btn {
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.42);
+      color: #fbbf24;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .random-bot-btn:hover {
+      background: rgba(251, 191, 36, 0.25);
+      border-color: #fbbf24;
+      transform: translateY(-1px);
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
+    }
+    .random-bot-btn:active {
+      transform: translateY(0);
+    }
+
+    /* P1 Robot Selection Theme (Blue) */
+    #p1-bot-selector .bot-card.selected {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.16);
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.38);
+    }
+    #p1-bot-selector .bot-card.selected .bot-check {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    /* P2 Robot Selection Theme (Red / Coral) */
+    #p2-bot-selector .bot-card.selected {
+      border-color: #f87171;
+      background: rgba(239, 68, 68, 0.16);
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.38);
+    }
+    #p2-bot-selector .bot-card.selected .bot-check {
+      background: #ef4444;
+      color: #ffffff;
+    }
