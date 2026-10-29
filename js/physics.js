@@ -918,18 +918,21 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          // Parts fly off with each solid hit until NOTHING left!
-          detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          // Parts detachment: Robot 3 deals massive kinetic shredding (3-4 shot KO) when fully wound up!
           if (playerBot.type === 'robot3' && wasPSpinFast) {
-            // Robot 3 deals a lot of damage when wound up: rips off 2 parts directly!
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            if (impactSpeed > 5.5 || canFlipEnemy) {
-              // High speed collision shreds a 3rd part!
+            const isHighImpact = (impactSpeed > 5.5 || canFlipEnemy);
+            const shredRatio = isHighImpact ? 0.28 : 0.24;
+            const shredCount = Math.max(5, Math.ceil((enemyBot.totalInitialParts || 30) * shredRatio));
+            for (let s = 0; s < shredCount; s++) {
+              if (enemyBot.isEntirelyDestroyed) break;
               detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
             }
-          } else if (canFlipEnemy || impactSpeed > 6.0) {
-            // Other robots deal standard/similar damage
+          } else {
+            // Other robots deal standard/similar damage: 1 part per hit
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            if (canFlipEnemy || impactSpeed > 6.0) {
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            }
           }
 
           if (enemyBot.isEntirelyDestroyed) {
@@ -1042,18 +1045,21 @@
 
           triggerDamageVignette();
 
-          // Parts fly off with each solid hit until NOTHING left!
-          detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+          // Parts detachment: Robot 3 deals massive kinetic shredding (3-4 shot KO) when fully wound up!
           if (enemyBot.type === 'robot3' && wasESpinFast) {
-            // Robot 3 deals a lot of damage when wound up: rips off 2 parts directly!
-            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            if (impactSpeed > 5.5 || canFlipPlayer) {
-              // High speed collision shreds a 3rd part!
+            const isHighImpact = (impactSpeed > 5.5 || canFlipPlayer);
+            const shredRatio = isHighImpact ? 0.28 : 0.24;
+            const shredCount = Math.max(5, Math.ceil((playerBot.totalInitialParts || 30) * shredRatio));
+            for (let s = 0; s < shredCount; s++) {
+              if (playerBot.isEntirelyDestroyed) break;
               detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
             }
-          } else if (canFlipPlayer || impactSpeed > 6.0) {
-            // Other robots deal standard/similar damage
+          } else {
+            // Other robots deal standard/similar damage: 1 part per hit
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            if (canFlipPlayer || impactSpeed > 6.0) {
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            }
           }
 
           if (playerBot.isEntirelyDestroyed) {

@@ -635,12 +635,6 @@
         // Divert impact shockwave to rip off exterior armor or wheels instead of breaking the primary weapon
         nonWeaponPool.sort((a, b) => a.priority - b.priority);
         chosen = nonWeaponPool[0];
-      } else if (bot.type === 'robot5') {
-        // Even when down to the bare chassis, Robot 5's drum is integral to its spine
-        if (remaining.length > threshold20) {
-          spawnCollisionSparks(new THREE.Vector3(bot.x, 0.35, bot.z), 35);
-          return null;
-        }
       }
     }
 
