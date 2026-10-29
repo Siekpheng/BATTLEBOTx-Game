@@ -1312,21 +1312,23 @@
     }
     .bot-card.gamepad-focus, .mini-bot-card.gamepad-focus {
       outline: none !important;
+      box-shadow: none !important;
+      transform: none !important;
     }
     #modal-select .bot-card,
-    #modal-select .bot-card.gamepad-focus,
-    #modal-select .bot-card.selected {
+    #modal-select .bot-card.gamepad-focus {
+      outline: none !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    /* Strictly only .selected cards get border and glow in modal-select; unselected cards never get outline or border */
+    #modal-select .bot-card:not(.selected) {
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      box-shadow: none !important;
       outline: none !important;
     }
-    #p1-bot-selector .bot-card.gamepad-focus {
-      border-color: #38bdf8 !important;
-      outline: none !important;
-      box-shadow: 0 0 18px rgba(56, 189, 248, 0.45) !important;
-    }
-    #p2-bot-selector .bot-card.gamepad-focus {
-      border-color: #f87171 !important;
-      outline: none !important;
-      box-shadow: 0 0 18px rgba(248, 113, 113, 0.45) !important;
+    #modal-select .bot-card:not(.selected):hover {
+      border-color: rgba(255, 255, 255, 0.35) !important;
     }
 
     #splitscreen-overlay {
@@ -1636,9 +1638,10 @@
 
     /* P1 Robot Selection Theme (Blue) */
     #p1-bot-selector .bot-card.selected {
-      border-color: #38bdf8;
-      background: rgba(56, 189, 248, 0.16);
-      box-shadow: 0 0 18px rgba(56, 189, 248, 0.38);
+      border-color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.16) !important;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.38) !important;
+      outline: none !important;
     }
     #p1-bot-selector .bot-card.selected .bot-check {
       background: #38bdf8;
@@ -1647,9 +1650,10 @@
 
     /* P2 Robot Selection Theme (Red / Coral) */
     #p2-bot-selector .bot-card.selected {
-      border-color: #f87171;
-      background: rgba(239, 68, 68, 0.16);
-      box-shadow: 0 0 18px rgba(239, 68, 68, 0.38);
+      border-color: #f87171 !important;
+      background: rgba(239, 68, 68, 0.16) !important;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.38) !important;
+      outline: none !important;
     }
     #p2-bot-selector .bot-card.selected .bot-check {
       background: #ef4444;

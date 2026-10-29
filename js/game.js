@@ -428,8 +428,14 @@
     card.addEventListener('click', () => {
       AudioSys.init();
       AudioSys.beep(540, 0.06);
-      document.querySelectorAll('#p1-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#p1-bot-selector .bot-card').forEach(c => {
+        c.classList.remove('selected');
+        c.classList.remove('gamepad-focus');
+      });
       card.classList.add('selected');
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.setFocus(card);
+      }
       selectedBotType = card.dataset.bot;
       if (selectedBotType && typeof ensureBotModelLoaded === 'function') {
         ensureBotModelLoaded(selectedBotType);
@@ -477,8 +483,14 @@
     card.addEventListener('click', () => {
       AudioSys.init();
       AudioSys.beep(540, 0.06);
-      document.querySelectorAll('#p2-bot-selector .bot-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#p2-bot-selector .bot-card').forEach(c => {
+        c.classList.remove('selected');
+        c.classList.remove('gamepad-focus');
+      });
       card.classList.add('selected');
+      if (typeof GamepadUINav !== 'undefined') {
+        GamepadUINav.setFocus(card);
+      }
       selectedP2BotType = card.dataset.p2bot;
       if (selectedP2BotType && selectedP2BotType !== 'random' && typeof ensureBotModelLoaded === 'function') {
         ensureBotModelLoaded(selectedP2BotType);
