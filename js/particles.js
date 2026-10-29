@@ -100,7 +100,8 @@
         priority = 1; // Outermost armor panels, wedges & bumpers take initial exterior impacts
       } else if (isWeapon) {
         category = 'weapon';
-        priority = (radialDist > 0.70) ? 2 : 3;
+        // Hardened combat spinner mount: Robot 5 drum spinner and Robot 3 bar are built into core structure
+        priority = (bot.type === 'robot5' || bot.type === 'robot3') ? 4 : ((radialDist > 0.70) ? 2 : 3);
       } else {
         if (radialDist > 0.75) {
           category = 'chassis_exterior';
@@ -624,6 +625,23 @@
       chosen = pool[0];
     }
 
+    // Weapon Retention Protection for combat robots:
+    // Robot 5 (BlueThunder) and Robot 3 primary weapons NEVER detach while exterior armor, wheels, or chassis remain!
+    if (chosen && chosen.category === 'weapon' && (bot.type === 'robot5' || bot.type === 'robot3')) {
+      const nonWeaponPool = remaining.filter(p => p.category !== 'weapon' && p.category !== 'chassis_core');
+      if (nonWeaponPool.length > 0) {
+        // Divert impact shockwave to rip off exterior armor or wheels instead of breaking the primary weapon
+        nonWeaponPool.sort((a, b) => a.priority - b.priority);
+        chosen = nonWeaponPool[0];
+      } else if (bot.type === 'robot5') {
+        // Even when down to the bare chassis, Robot 5's drum is integral to its spine
+        if (remaining.length > threshold20) {
+          spawnCollisionSparks(new THREE.Vector3(bot.x, 0.35, bot.z), 35);
+          return null;
+        }
+      }
+    }
+
     chosen.attached = false;
 
     // Synchronize legacy armor and wheel arrays
@@ -757,7 +775,13 @@
 
     // Update remaining count & driveHealth
     const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
-    bot.driveHealth = (remainingCount / bot.totalInitialParts) * bot.maxDriveHealth;
+    // Balanced progressive health depletion:
+    // Normalize effective part divisor so robots with fewer discrete CAD meshes (e.g. Robot 5 with 7 components)
+    // do not suffer massive chunk health losses (54 HP per hit). Each component absorbs ~18-20 HP.
+    const effectivePartDivisor = Math.max(18, bot.totalInitialParts);
+    const detachedCount = (bot.totalInitialParts - remainingCount);
+    const healthLoss = (detachedCount / effectivePartDivisor) * bot.maxDriveHealth;
+    bot.driveHealth = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
 
     // If remaining parts dropped to <= 20%, trigger explosion immediately so ALL remaining parts fly out all at once!
     if (remainingCount <= threshold20) {

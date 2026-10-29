@@ -168,11 +168,11 @@
       bot.drivePower = (bot.driveHealth / (bot.maxDriveHealth || 220)) * (0.25 + 0.75 * wheelFactor);
     }
 
-    const maxSpeed = 15.0 * (0.35 + 0.65 * bot.drivePower);
     const isR3 = (bot.type === 'robot3');
     const isR5 = (bot.type === 'robot5');
-    const turnRate = (isR5 ? 4.0 : (isR3 ? 3.85 : 3.4)) * (0.35 + 0.65 * bot.drivePower);
-    const accel = (isR5 ? 56.0 : (isR3 ? 52.0 : 46.0)) * bot.drivePower;
+    const maxSpeed = (isR5 ? 16.5 : (isR3 ? 15.8 : 15.0)) * (0.35 + 0.65 * bot.drivePower);
+    const turnRate = (isR5 ? 4.25 : (isR3 ? 3.85 : 3.4)) * (0.35 + 0.65 * bot.drivePower);
+    const accel = (isR5 ? 60.0 : (isR3 ? 52.0 : 46.0)) * bot.drivePower;
 
     // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
     if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
@@ -646,8 +646,8 @@
       const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
       const minWpSpin = 40.0;
       const isPrac = (gameMode === 'practice');
-      const pReach = (playerBot.type === 'robot3') ? 0.15 : (playerBot.type === 'robot5' ? 0.20 : 0.35); // Broad biting arc for Robot 3 bar & Robot 5 drum
-      const eReach = (enemyBot.type === 'robot3') ? 0.15 : (enemyBot.type === 'robot5' ? 0.20 : 0.35);
+      const pReach = (playerBot.type === 'robot3') ? 0.15 : (playerBot.type === 'robot5' ? 0.08 : 0.35); // Sweeping biting arc for Robot 3 bar & Robot 5 drum (~171 deg coverage)
+      const eReach = (enemyBot.type === 'robot3') ? 0.15 : (enemyBot.type === 'robot5' ? 0.08 : 0.35);
       const isPWeaponImpact = (playerBot.weaponActive !== false && pFwdDot > pReach && playerBot.weaponSpinSpeed >= minWpSpin);
       const isEWeaponImpact = (!isPrac && enemyBot.weaponActive !== false && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= minWpSpin);
       const isKineticStrike = (impactSpeed > 1.8) && (isPWeaponImpact || isEWeaponImpact);
@@ -689,8 +689,8 @@
         // the robot with more drive power and intact drive wheels pushes the opponent backward!
         const pWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.filter(w => w.attached).length : 2;
         const eWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.filter(w => w.attached).length : 2;
-        const pTraction = (playerBot.type === 'robot3' || playerBot.type === 'robot5') ? Math.min(2.0, pWheels) : (pWheels / 2);
-        const eTraction = (enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? Math.min(2.0, eWheels) : (eWheels / 2);
+        const pTraction = (playerBot.type === 'robot5') ? 2.5 : ((playerBot.type === 'robot3') ? Math.min(2.0, pWheels) : (pWheels / 2));
+        const eTraction = (enemyBot.type === 'robot5') ? 2.5 : ((enemyBot.type === 'robot3') ? Math.min(2.0, eWheels) : (eWheels / 2));
         const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * pTraction;
         const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * eTraction;
         const netPushTraction = (pDriveForce - eDriveForce) * 2.4 * 0.016;
@@ -724,8 +724,8 @@
       const isPractice = (gameMode === 'practice');
 
       if (impactSpeed > 1.8) {
-        const pReachHit = (playerBot.type === 'robot3') ? 0.15 : (playerBot.type === 'robot5' ? 0.20 : 0.35);
-        const eReachHit = (enemyBot.type === 'robot3') ? 0.15 : (enemyBot.type === 'robot5' ? 0.20 : 0.35);
+        const pReachHit = (playerBot.type === 'robot3') ? 0.15 : (playerBot.type === 'robot5' ? 0.08 : 0.35);
+        const eReachHit = (enemyBot.type === 'robot3') ? 0.15 : (enemyBot.type === 'robot5' ? 0.08 : 0.35);
         const isPWeaponHit = (playerBot.weaponActive !== false && pForwardDot > pReachHit && playerBot.weaponSpinSpeed >= minWeaponSpin);
         const isEWeaponHit = (!isPractice && enemyBot.weaponActive !== false && eForwardDot > eReachHit && enemyBot.weaponSpinSpeed >= minWeaponSpin);
         const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
@@ -753,8 +753,8 @@
           const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
 
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponSpinSpeed = 0;
+            playerBot.weaponSpinSpeed = (playerBot.type === 'robot5') ? Math.max(48.0, playerBot.weaponSpinSpeed * 0.48) : 0;
+            enemyBot.weaponSpinSpeed = (enemyBot.type === 'robot5') ? Math.max(48.0, enemyBot.weaponSpinSpeed * 0.48) : 0;
           } else {
             playerBot.weaponSpinSpeed = 95.0;
             enemyBot.weaponSpinSpeed = 95.0;
@@ -829,12 +829,12 @@
           // 2. "Not every hit is a flip ... only sometime flip":
           //    - Even on hard vertical hits, only a ~24% probability to flip;
           //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
-          const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= (playerBot.type === 'robot5' ? 84.0 : 88.0));
-          const wasPSpinFast = (playerBot.weaponSpinSpeed >= (playerBot.type === 'robot5' ? 70.0 : 75.0));
-          const isPTravelFast = (pSpeedBefore >= (playerBot.type === 'robot5' ? 5.2 : 6.5) && (pApproach >= (playerBot.type === 'robot5' ? 3.6 : 4.5) || impactSpeed >= (playerBot.type === 'robot5' ? 6.8 : 8.0)));
+          const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= (playerBot.type === 'robot5' ? 78.0 : 88.0));
+          const wasPSpinFast = (playerBot.weaponSpinSpeed >= (playerBot.type === 'robot5' ? 62.0 : 75.0));
+          const isPTravelFast = (pSpeedBefore >= (playerBot.type === 'robot5' ? 4.5 : 6.5) && (pApproach >= (playerBot.type === 'robot5' ? 3.0 : 4.5) || impactSpeed >= (playerBot.type === 'robot5' ? 5.8 : 8.0)));
           const isVerticalBiteP = isFrontalOrRear || (playerBot.vy > 0.35);
           const isHardVerticalHitP = isPWeaponMax && isPTravelFast && isVerticalBiteP;
-          const canFlipEnemy = isHardVerticalHitP && (Math.random() < (playerBot.type === 'robot5' ? 0.35 : 0.24));
+          const canFlipEnemy = isHardVerticalHitP && (Math.random() < (playerBot.type === 'robot5' ? 0.45 : 0.24));
           const wasEnemyFlipped = enemyBot.flipped;
 
           AudioSys.metalClashSound(canFlipEnemy ? 2.2 : 1.8, true);
@@ -863,10 +863,11 @@
 
           if (canFlipEnemy) {
             // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
-            enemyBot.vy = (playerBot.type === 'robot5' ? 2.45 : 2.1) + Math.random() * 0.35;
+            enemyBot.vy = (playerBot.type === 'robot5' ? 2.85 : 2.1) + Math.random() * 0.35;
             enemyBot.airY = 0.15;
-            enemyBot.vx += nx * (5.5 + impactSpeed * 0.40);
-            enemyBot.vz += nz * (5.5 + impactSpeed * 0.40);
+            const pFlipFling = (playerBot.type === 'robot5') ? (7.2 + impactSpeed * 0.48) : (5.5 + impactSpeed * 0.40);
+            enemyBot.vx += nx * pFlipFling;
+            enemyBot.vz += nz * pFlipFling;
 
             if (isFrontalOrRear) {
               enemyBot.pitchVel = (eHitForward > 0 ? -8.5 : 8.5);
@@ -885,7 +886,7 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
-            const pFling = (playerBot.type === 'robot3' || playerBot.type === 'robot5') ? (6.0 + impactSpeed * 0.55) : (4.0 + impactSpeed * 0.45);
+            const pFling = (playerBot.type === 'robot5') ? (7.0 + impactSpeed * 0.60) : ((playerBot.type === 'robot3') ? (6.0 + impactSpeed * 0.55) : (4.0 + impactSpeed * 0.45));
             enemyBot.vx += nx * pFling;
             enemyBot.vz += nz * pFling;
 
@@ -905,7 +906,12 @@
           }
 
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            playerBot.weaponSpinSpeed = 0;
+            if (playerBot.type === 'robot5') {
+              // High-inertia heavy flywheel drum maintains rotational momentum through strikes:
+              playerBot.weaponSpinSpeed = Math.max(52.0, playerBot.weaponSpinSpeed * 0.55);
+            } else {
+              playerBot.weaponSpinSpeed = 0;
+            }
             enemyBot.weaponSpinSpeed = 0;
             AudioSys.weaponStallSound();
           } else {
@@ -916,10 +922,13 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          // Parts fly off with each solid hit until NOTHING left!
           detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          if (canFlipEnemy || impactSpeed > 6.0 || ((playerBot.type === 'robot3' || playerBot.type === 'robot5') && wasPSpinFast)) {
+          if (canFlipEnemy || impactSpeed > 5.2 || ((playerBot.type === 'robot3' || playerBot.type === 'robot5') && wasPSpinFast)) {
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          }
+          if (playerBot.type === 'robot5' && wasPSpinFast && (impactSpeed > 5.8 || canFlipEnemy)) {
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos); // Triple part shred on fast drum strike!
           }
 
           if (enemyBot.isEntirelyDestroyed) {
@@ -943,12 +952,12 @@
           // 2. "Not every hit is a flip ... only sometime flip":
           //    - Even on hard vertical hits, only a ~24% probability to flip;
           //    - The other ~76% of hard hits cause heavy knockback, sparks, pop on wheels (NO flip).
-          const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= (enemyBot.type === 'robot5' ? 84.0 : 88.0));
-          const wasESpinFast = (enemyBot.weaponSpinSpeed >= (enemyBot.type === 'robot5' ? 70.0 : 75.0));
-          const isETravelFast = (eSpeedBefore >= (enemyBot.type === 'robot5' ? 5.2 : 6.5) && (eApproach >= (enemyBot.type === 'robot5' ? 3.6 : 4.5) || impactSpeed >= (enemyBot.type === 'robot5' ? 6.8 : 8.0)));
+          const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= (enemyBot.type === 'robot5' ? 78.0 : 88.0));
+          const wasESpinFast = (enemyBot.weaponSpinSpeed >= (enemyBot.type === 'robot5' ? 62.0 : 75.0));
+          const isETravelFast = (eSpeedBefore >= (enemyBot.type === 'robot5' ? 4.5 : 6.5) && (eApproach >= (enemyBot.type === 'robot5' ? 3.0 : 4.5) || impactSpeed >= (enemyBot.type === 'robot5' ? 5.8 : 8.0)));
           const isVerticalBiteE = isFrontalOrRear || (enemyBot.vy > 0.35);
           const isHardVerticalHitE = isEWeaponMax && isETravelFast && isVerticalBiteE;
-          const canFlipPlayer = isHardVerticalHitE && (Math.random() < (enemyBot.type === 'robot5' ? 0.35 : 0.24));
+          const canFlipPlayer = isHardVerticalHitE && (Math.random() < (enemyBot.type === 'robot5' ? 0.45 : 0.24));
           const wasPlayerFlipped = playerBot.flipped;
 
           AudioSys.metalClashSound(canFlipPlayer ? 2.2 : 1.8, true);
@@ -977,10 +986,11 @@
 
           if (canFlipPlayer) {
             // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
-            playerBot.vy = (enemyBot.type === 'robot5' ? 2.45 : 2.1) + Math.random() * 0.35;
+            playerBot.vy = (enemyBot.type === 'robot5' ? 2.85 : 2.1) + Math.random() * 0.35;
             playerBot.airY = 0.15;
-            playerBot.vx -= nx * (5.5 + impactSpeed * 0.40);
-            playerBot.vz -= nz * (5.5 + impactSpeed * 0.40);
+            const eFlipFling = (enemyBot.type === 'robot5') ? (7.2 + impactSpeed * 0.48) : (5.5 + impactSpeed * 0.40);
+            playerBot.vx -= nx * eFlipFling;
+            playerBot.vz -= nz * eFlipFling;
 
             if (isFrontalOrRear) {
               playerBot.pitchVel = (pHitForward > 0 ? -8.5 : 8.5);
@@ -999,7 +1009,7 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
-            const eFling = (enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? (6.0 + impactSpeed * 0.55) : (4.0 + impactSpeed * 0.45);
+            const eFling = (enemyBot.type === 'robot5') ? (7.0 + impactSpeed * 0.60) : ((enemyBot.type === 'robot3') ? (6.0 + impactSpeed * 0.55) : (4.0 + impactSpeed * 0.45));
             playerBot.vx -= nx * eFling;
             playerBot.vz -= nz * eFling;
 
@@ -1019,7 +1029,12 @@
           }
 
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            enemyBot.weaponSpinSpeed = 0;
+            if (enemyBot.type === 'robot5') {
+              // High-inertia heavy flywheel drum maintains rotational momentum through strikes:
+              enemyBot.weaponSpinSpeed = Math.max(52.0, enemyBot.weaponSpinSpeed * 0.55);
+            } else {
+              enemyBot.weaponSpinSpeed = 0;
+            }
             playerBot.weaponSpinSpeed = 0;
             AudioSys.weaponStallSound();
           } else {
@@ -1032,10 +1047,13 @@
 
           triggerDamageVignette();
 
-          // Parts fly off 1 by 1 with each solid hit until NOTHING left!
+          // Parts fly off with each solid hit until NOTHING left!
           detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-          if (canFlipPlayer || impactSpeed > 6.0 || ((enemyBot.type === 'robot3' || enemyBot.type === 'robot5') && wasESpinFast)) {
+          if (canFlipPlayer || impactSpeed > 5.2 || ((enemyBot.type === 'robot3' || enemyBot.type === 'robot5') && wasESpinFast)) {
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+          }
+          if (enemyBot.type === 'robot5' && wasESpinFast && (impactSpeed > 5.8 || canFlipPlayer)) {
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos); // Triple part shred on fast drum strike!
           }
 
           if (playerBot.isEntirelyDestroyed) {
