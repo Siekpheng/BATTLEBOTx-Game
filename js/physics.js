@@ -416,8 +416,8 @@
         // Continuous electric brushless motor wind-up towards full speed (95.0 rad/s, buffed 102.0 for Robot 3)
         const isR3Bot = (bot.type === 'robot3');
         const targetSpin = isR3Bot ? 102.0 : 95.0;
-        // Robot 3 massive horizontal bar takes longer to fully wind up (~5.6s vs ~2.5s for other robots):
-        const windUpRate = isMenu ? 190.0 : (isR3Bot ? 18.0 : 38.0);
+        // Robot 3 massive horizontal bar takes exactly 4.0s to fully wind up (102.0 / 4.0 = 25.5 rad/s²):
+        const windUpRate = isMenu ? 190.0 : (isR3Bot ? 25.5 : 38.0);
         if (bot.weaponSpinSpeed < targetSpin) {
           bot.weaponSpinSpeed = Math.min(targetSpin, bot.weaponSpinSpeed + windUpRate * dt);
         }

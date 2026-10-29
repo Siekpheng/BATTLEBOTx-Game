@@ -1825,7 +1825,8 @@
 
       // Update Weapon RPM Gauge in HUD (Guest in Online 1v1 controls enemyBot!)
       const myLocalBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
-      const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / 95.0) * 100));
+      const botMaxRpm = (myLocalBot.type === 'robot3') ? 102.0 : 95.0;
+      const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / botMaxRpm) * 100));
       const rpmText = document.getElementById('weapon-rpm-text');
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
@@ -2024,7 +2025,8 @@
       if (splitActive) {
         splitOverlay.classList.remove('hidden');
         if (enemyBot) {
-          const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / 95.0) * 100));
+          const p2MaxRpm = (enemyBot.type === 'robot3') ? 102.0 : 95.0;
+          const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / p2MaxRpm) * 100));
           const p2RpmText = document.getElementById('p2-weapon-rpm-text');
           const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');
           if (p2RpmText && p2RpmFill) {
