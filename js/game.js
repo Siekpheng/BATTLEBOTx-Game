@@ -218,7 +218,20 @@
     const oppLabel = document.getElementById('opponent-select-label');
     if (!titleEl || !p1Label || !oppLabel) return;
 
+    // Reset P1 controller assignment in single-player modes so controller is never locked out
+    if (gameMode !== '1v1') {
+      if (typeof window.gamepadPlayerMap !== 'undefined' && window.gamepadPlayerMap && window.gamepadPlayerMap.p1 < 0) {
+        window.gamepadPlayerMap.p1 = 0;
+      }
+    }
     if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
+
+    // Only show dual-controller mapping bar in 1v1 local mode
+    const mappingBar = document.getElementById('controller-mapping-bar');
+    if (mappingBar) {
+      mappingBar.style.display = (gameMode === '1v1') ? 'block' : 'none';
+    }
+
     if (gameMode === '1v1') {
       titleEl.textContent = '1V1 LOCAL BATTLE · SELECT ROBOTS & READY UP';
       p1Label.textContent = 'PLAYER 1 ROBOT';
@@ -234,6 +247,11 @@
     }
     if (typeof Local1v1State !== 'undefined') {
       Local1v1State.reset();
+    }
+
+    if (typeof GamepadUINav !== 'undefined') {
+      GamepadUINav.activeContainerId = null;
+      setTimeout(() => GamepadUINav.ensureValidFocus(), 30);
     }
   }
 

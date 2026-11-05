@@ -1310,25 +1310,59 @@
       z-index: 35 !important;
       position: relative;
     }
-    .bot-card.gamepad-focus, .mini-bot-card.gamepad-focus {
+    /* P1 Robot Cards Gamepad Focus (Cyan Glow & Lift) */
+    #p1-bot-selector .bot-card.gamepad-focus {
       outline: none !important;
-      box-shadow: none !important;
-      transform: none !important;
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45), 0 0 22px rgba(56, 189, 248, 0.7) !important;
+      transform: translateY(-3px) scale(1.03) !important;
+      z-index: 10 !important;
     }
-    #modal-select .bot-card,
-    #modal-select .bot-card.gamepad-focus {
+    /* P2 / AI Opponent Robot Cards Gamepad Focus (Coral Red Glow & Lift) */
+    #p2-bot-selector .bot-card.gamepad-focus {
       outline: none !important;
-      box-shadow: none !important;
-      transform: none !important;
+      border-color: #f87171 !important;
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.45), 0 0 22px rgba(248, 113, 113, 0.7) !important;
+      transform: translateY(-3px) scale(1.03) !important;
+      z-index: 10 !important;
     }
-    /* Strictly only .selected cards get border and glow in modal-select; unselected cards never get outline or border */
-    #modal-select .bot-card:not(.selected) {
+    /* Mini Bot Cards (Online Host / Join Modals) Gamepad Focus */
+    .mini-bot-card.gamepad-focus {
+      outline: none !important;
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.45), 0 0 16px rgba(56, 189, 248, 0.6) !important;
+      transform: translateY(-2px) scale(1.04) !important;
+      z-index: 10 !important;
+    }
+    /* Action & Random buttons Gamepad Focus */
+    .action-btn.gamepad-focus {
+      outline: 3px solid #38bdf8 !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.4), 0 0 28px rgba(56, 189, 248, 0.8) !important;
+      transform: translateY(-2px) scale(1.02) !important;
+      filter: brightness(1.15) !important;
+    }
+    .random-bot-btn.gamepad-focus {
+      outline: 2px solid #38bdf8 !important;
+      outline-offset: 2px !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.6) !important;
+      transform: translateY(-1px) scale(1.05) !important;
+    }
+    .controller-map-btn.gamepad-focus {
+      outline: 2px solid #38bdf8 !important;
+      outline-offset: 2px !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.6) !important;
+    }
+    /* Strictly only .selected and .gamepad-focus get active styling; unselected and unfocused cards remain clean */
+    #modal-select .bot-card:not(.selected):not(.gamepad-focus) {
       border-color: rgba(255, 255, 255, 0.1) !important;
       box-shadow: none !important;
       outline: none !important;
+      transform: none !important;
     }
-    #modal-select .bot-card:not(.selected):hover {
+    #modal-select .bot-card:not(.selected):not(.gamepad-focus):hover {
       border-color: rgba(255, 255, 255, 0.35) !important;
+      transform: translateY(-2px) !important;
     }
 
     #splitscreen-overlay {

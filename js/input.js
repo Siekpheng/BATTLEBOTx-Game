@@ -1333,6 +1333,12 @@
           AudioSys.beep(520, 0.04);
         }
         if (typeof resetMenuIdleTimer === 'function') resetMenuIdleTimer();
+
+        // In modal-select during single-player modes (vs_bot / practice),
+        // moving focus onto any bot-card automatically clicks/selects it!
+        if (container.id === 'modal-select' && bestCandidate.classList.contains('bot-card')) {
+          bestCandidate.click();
+        }
         return true;
       }
       return false;
@@ -1467,7 +1473,16 @@
       }
 
       const pads = getConnectedGamepadsList();
-      if (pads.length > 0) {
+      const isMappingModal = (container.id === 'modal-select' || container.id === 'modal-pause');
+      const is1v1Select = (container.id === 'modal-select' && typeof gameMode !== 'undefined' && gameMode === '1v1');
+
+      if (is1v1Select) {
+        // In 1v1 select modal, each player directly and independently navigates their row.
+        // Clear global single-focus outline so no orphaned focus rings appear.
+        if (this.focusedEl) {
+          this.clearFocus();
+        }
+      } else if (pads.length > 0) {
         this.ensureValidFocus();
       }
 
@@ -1478,26 +1493,54 @@
         this.p2NavCooldown = Math.max(0, this.p2NavCooldown - dt);
       }
 
-      const isMappingModal = (container.id === 'modal-select' || container.id === 'modal-pause');
-      const is1v1Select = (container.id === 'modal-select' && typeof gameMode !== 'undefined' && gameMode === '1v1');
-
-      const p1PadIndex = (typeof window.gamepadPlayerMap !== 'undefined' && typeof window.gamepadPlayerMap.p1 === 'number' && window.gamepadPlayerMap.p1 >= 0)
-        ? window.gamepadPlayerMap.p1
-        : 0;
-      const p2PadIndex = (typeof window.gamepadPlayerMap !== 'undefined' && typeof window.gamepadPlayerMap.p2 === 'number' && window.gamepadPlayerMap.p2 >= 0)
-        ? window.gamepadPlayerMap.p2
-        : 1;
+      const map = (typeof window.gamepadPlayerMap !== 'undefined' && window.gamepadPlayerMap)
+        ? window.gamepadPlayerMap
+        : { p1: 0, p2: 1 };
+      const rawP1 = (typeof map.p1 === 'number') ? map.p1 : 0;
+      const rawP2 = (typeof map.p2 === 'number') ? map.p2 : 1;
 
       for (let pIdx = 0; pIdx < Math.min(4, pads.length); pIdx++) {
         const pad = pads[pIdx];
         if (!pad) continue;
 
-        const isP1Pad = (pIdx === p1PadIndex);
-        const isP2Pad = (pIdx === p2PadIndex);
+        let isP1Pad = false;
+        let isP2Pad = false;
 
-        // REQUIREMENT:
-        // In the Main Menu (#menu-screen) and any non-1v1 mode (vs_bot, practice, online), ONLY Controller 1 can navigate.
-        // Controller 2 is strictly ignored.
+        if (is1v1Select) {
+          if (pads.length === 1) {
+            // Exactly 1 controller connected:
+            // If assigned to P2 (rawP1 < 0 && rawP2 >= 0), it controls P2!
+            // If assigned to P1 (rawP2 < 0 && rawP1 >= 0), it controls P1!
+            // If both >= 0 (default {p1:0, p2:1}), it controls P1 unless rawP2 === 0.
+            if (rawP1 < 0 && rawP2 >= 0) {
+              isP2Pad = true;
+            } else if (rawP2 < 0 && rawP1 >= 0) {
+              isP1Pad = true;
+            } else {
+              isP1Pad = (rawP1 === pIdx);
+              isP2Pad = (!isP1Pad && rawP2 === pIdx);
+            }
+          } else {
+            // 2 or more controllers connected:
+            isP1Pad = (rawP1 >= 0 && pIdx === rawP1);
+            isP2Pad = (rawP2 >= 0 && pIdx === rawP2);
+          }
+        } else {
+          // Single-player modes (vs_bot, practice, online) & Main Menu:
+          // If only 1 controller is connected, it ALWAYS controls navigation
+          // regardless of any prior 1v1 mapping!
+          if (pads.length === 1) {
+            isP1Pad = true;
+            if (map.p1 < 0) {
+              map.p1 = 0;
+              if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
+            }
+          } else {
+            isP1Pad = (rawP1 >= 0) ? (pIdx === rawP1) : (pIdx === 0);
+          }
+        }
+
+        // In single-player modes, only P1 controller can navigate
         if (!is1v1Select && !isP1Pad) {
           continue;
         }
@@ -1540,6 +1583,16 @@
         // ========================================================
         if (is1v1Select) {
           if (isP1Pad) {
+            // Ergonomic 1-controller flow: Press D-pad Down to switch control to P2!
+            if (pads.length === 1 && dir === 'down' && (dir !== prev.dir || this.navCooldown <= 0)) {
+              if (typeof GamepadMapper !== 'undefined') {
+                GamepadMapper.setPlayerPad(1, pIdx);
+                this.navCooldown = 0.28;
+                prev.dir = dir;
+                continue;
+              }
+            }
+
             // Controller 1 navigates P1 Robot Selection cards
             if (dir === 'left' || dir === 'right') {
               if (dir !== prev.dir || this.navCooldown <= 0) {
@@ -1571,7 +1624,17 @@
             }
           }
 
-          if (isP2Pad && (!isP1Pad || pads.length >= 2)) {
+          if (isP2Pad) {
+            // Ergonomic 1-controller flow: Press D-pad Up to switch control back to P1!
+            if (pads.length === 1 && dir === 'up' && (dir !== prev.dir || this.p2NavCooldown <= 0)) {
+              if (typeof GamepadMapper !== 'undefined') {
+                GamepadMapper.setPlayerPad(0, pIdx);
+                this.p2NavCooldown = 0.28;
+                prev.dir = dir;
+                continue;
+              }
+            }
+
             // Controller 2 navigates P2 Robot Selection cards
             if (dir === 'left' || dir === 'right') {
               if (dir !== prev.dir || this.p2NavCooldown <= 0) {
