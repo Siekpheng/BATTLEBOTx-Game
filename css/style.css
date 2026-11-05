@@ -1310,21 +1310,29 @@
       z-index: 35 !important;
       position: relative;
     }
-    /* P1 Robot Cards Gamepad Focus (Cyan Glow & Lift) */
+    /* P1 Robot Cards Gamepad Focus (Luminous Electric Cyan Selector Ring & Lift) */
     #p1-bot-selector .bot-card.gamepad-focus {
-      outline: none !important;
-      border-color: #38bdf8 !important;
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45), 0 0 22px rgba(56, 189, 248, 0.7) !important;
-      transform: translateY(-3px) scale(1.03) !important;
-      z-index: 10 !important;
+      outline: 3px solid #38bdf8 !important;
+      outline-offset: 3px !important;
+      border-color: #ffffff !important;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.5), 0 0 28px rgba(56, 189, 248, 0.9) !important;
+      transform: translateY(-4px) scale(1.04) !important;
+      z-index: 25 !important;
+      position: relative;
     }
-    /* P2 / AI Opponent Robot Cards Gamepad Focus (Coral Red Glow & Lift) */
+    /* P2 / AI Opponent Robot Cards Gamepad Focus (Luminous Coral Red Selector Ring & Lift) */
     #p2-bot-selector .bot-card.gamepad-focus {
+      outline: 3px solid #f87171 !important;
+      outline-offset: 3px !important;
+      border-color: #ffffff !important;
+      box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.5), 0 0 28px rgba(248, 113, 113, 0.9) !important;
+      transform: translateY(-4px) scale(1.04) !important;
+      z-index: 25 !important;
+      position: relative;
+    }
+    /* Cards without gamepad focus never show an outer outline ring */
+    #modal-select .bot-card:not(.gamepad-focus) {
       outline: none !important;
-      border-color: #f87171 !important;
-      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.45), 0 0 22px rgba(248, 113, 113, 0.7) !important;
-      transform: translateY(-3px) scale(1.03) !important;
-      z-index: 10 !important;
     }
     /* Mini Bot Cards (Online Host / Join Modals) Gamepad Focus */
     .mini-bot-card.gamepad-focus {
@@ -1716,6 +1724,8 @@
       border-color: #38bdf8 !important;
       background: rgba(56, 189, 248, 0.16) !important;
       box-shadow: 0 0 18px rgba(56, 189, 248, 0.38) !important;
+    }
+    #p1-bot-selector .bot-card.selected:not(.gamepad-focus) {
       outline: none !important;
     }
     #p1-bot-selector .bot-card.selected .bot-check {
@@ -1728,6 +1738,8 @@
       border-color: #f87171 !important;
       background: rgba(239, 68, 68, 0.16) !important;
       box-shadow: 0 0 18px rgba(239, 68, 68, 0.38) !important;
+    }
+    #p2-bot-selector .bot-card.selected:not(.gamepad-focus) {
       outline: none !important;
     }
     #p2-bot-selector .bot-card.selected .bot-check {

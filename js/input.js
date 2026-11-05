@@ -1384,6 +1384,8 @@
       const nodes = Array.from(container.querySelectorAll(selector));
       return nodes.filter(el => {
         if (el.disabled || el.classList.contains('hidden')) return false;
+        // In modal-select, keep controller navigation locked to robot cards and START MATCH; [B] button closes modal
+        if (container.id === 'modal-select' && el.classList.contains('close-btn')) return false;
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
         const rect = el.getBoundingClientRect();
@@ -1634,14 +1636,11 @@
       if (axX < -0.55) return 'left';
       if (axX > 0.55) return 'right';
 
-      // FlySky FS-i6 Left Stick support (CH3/CH4) for menu navigation:
-      if (Math.abs(axX) < 0.25 && Math.abs(axY) < 0.25 && pad.axes) {
-        const axZ = (pad.axes.length > 2) ? pad.axes[2] : 0;
-        const axR = (pad.axes.length > 3) ? pad.axes[3] : 0;
+      // FlySky FS-i6: Optional secondary steering on Left Stick X (CH4 Rudder):
+      if (typeof isFlySkyPad === 'function' && isFlySkyPad(pad) && Math.abs(axX) < 0.25 && Math.abs(axY) < 0.25 && pad.axes && pad.axes.length > 3) {
+        const axR = pad.axes[3];
         if (axR < -0.55) return 'left';
         if (axR > 0.55) return 'right';
-        if (axZ < -0.65) return 'up';
-        if (axZ > 0.65) return 'down';
       }
       return null;
     },
@@ -1666,7 +1665,8 @@
         if (this.focusedEl) {
           this.clearFocus();
         }
-      } else if (pads.length > 0) {
+      } else {
+        // In single-player modes (VS BOT, Practice, Main Menu), always keep a valid visible focus selector
         this.ensureValidFocus();
       }
 
@@ -1737,8 +1737,10 @@
 
         const isFlySky = isFlySkyPad(pad);
         const swaAxis = (pad.axes && pad.axes.length > 4) ? pad.axes[4] : 0;
-        const swaFlipped = isFlySky && (swaAxis > 0.25);
-        const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5)) || swaFlipped;
+        const swaActive = isFlySky && (swaAxis > 0.25);
+        const swaTriggered = swaActive && !prev.swa;
+        prev.swa = swaActive;
+        const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5)) || swaTriggered;
         const bPressed = !!(b[1] && (b[1].pressed || b[1].value > 0.5));
         const yPressed = !!(b[3] && (b[3].pressed || b[3].value > 0.5));
         const lbPressed = !!(b[4] && (b[4].pressed || b[4].value > 0.5));

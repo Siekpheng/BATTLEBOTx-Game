@@ -197,6 +197,10 @@
         updateControlsHint();
         refreshSelectModalLabels();
         modalSelect.classList.remove('hidden');
+        if (typeof GamepadUINav !== 'undefined') {
+          GamepadUINav.activeContainerId = null;
+          GamepadUINav.ensureValidFocus();
+        }
       }
     });
   });
@@ -236,7 +240,7 @@
       titleEl.textContent = '1V1 LOCAL BATTLE · SELECT ROBOTS & READY UP';
       p1Label.textContent = 'PLAYER 1 ROBOT';
       oppLabel.textContent = 'PLAYER 2 ROBOT';
-    } else if (gameMode === 'vs_bot') {
+    } else if (gameMode === 'bot' || gameMode === 'vs_bot') {
       titleEl.textContent = 'VS BOT · SELECT YOUR ROBOT';
       p1Label.textContent = 'YOUR ROBOT';
       oppLabel.textContent = 'AI OPPONENT ROBOT (SAME ROBOT ALLOWED)';
