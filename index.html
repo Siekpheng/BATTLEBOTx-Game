@@ -54,7 +54,7 @@
   </script>
 
   <!-- Custom Game Styles & Keyframe Animations -->
-  <link rel="stylesheet" href="css/style.css?v=20261105a" />
+  <link rel="stylesheet" href="css/style.css?v=20261105b" />
 </head>
 <body class="hide-touch-controls">
 <div id="app">
@@ -347,7 +347,12 @@
       <!-- 2-PLAYER CONTROLLER MAPPING BAR (Assign any controller to P1 or P2, or Swap) -->
       <div id="controller-mapping-bar" class="controller-mapping-bar">
         <div class="controller-map-header">
-          <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+            <button type="button" id="btn-toggle-rc-profile" class="rc-profile-toggle-btn" title="Toggle FlySky FS-i6 RC Transmitter Profile (Click to switch)">
+              📻 RC Mode: <strong id="rc-profile-state">AUTO / OFF</strong>
+            </button>
+          </div>
           <span id="controller-connected-status" class="controller-status-pill">🎮 Press any controller button to detect</span>
         </div>
         <div class="controller-map-row">
@@ -757,7 +762,12 @@
       <h2>MATCH PAUSED</h2>
       <div id="pause-controller-mapping" class="controller-mapping-bar pause-map-bar">
         <div class="controller-map-header">
-          <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>🎮 CONTROLLER MAPPING (P1 &amp; P2)</span>
+            <button type="button" id="btn-pause-toggle-rc-profile" class="rc-profile-toggle-btn" title="Toggle FlySky FS-i6 RC Transmitter Profile">
+              📻 RC Mode: <strong id="pause-rc-profile-state">AUTO / OFF</strong>
+            </button>
+          </div>
         </div>
         <div class="controller-map-row">
           <button type="button" id="btn-pause-map-p1" class="controller-map-btn p1-map-btn">
@@ -811,8 +821,8 @@
   <script src="js/particles.js?v=20261029g"></script>
   <script src="js/robots.js?v=20261029g"></script>
   <script src="js/physics.js?v=20261029g"></script>
-  <script src="js/input.js?v=20261105a"></script>
+  <script src="js/input.js?v=20261105b"></script>
   <script src="js/network.js?v=20261029g"></script>
-  <script src="js/game.js?v=20261105a"></script>
+  <script src="js/game.js?v=20261105b"></script>
 </body>
 </html>

@@ -78,6 +78,34 @@ if sys.platform == "win32":
             ("dwReserved2", wintypes.DWORD),
         ]
 
+    class JOYCAPSW(ctypes.Structure):
+        _fields_ = [
+            ("wMid", wintypes.WORD),
+            ("wPid", wintypes.WORD),
+            ("szPname", wintypes.WCHAR * 32),
+            ("wXmin", wintypes.UINT),
+            ("wXmax", wintypes.UINT),
+            ("wYmin", wintypes.UINT),
+            ("wYmax", wintypes.UINT),
+            ("wZmin", wintypes.UINT),
+            ("wZmax", wintypes.UINT),
+            ("wNumButtons", wintypes.UINT),
+            ("wPeriodMin", wintypes.UINT),
+            ("wPeriodMax", wintypes.UINT),
+            ("wRmin", wintypes.UINT),
+            ("wRmax", wintypes.UINT),
+            ("wUmin", wintypes.UINT),
+            ("wUmax", wintypes.UINT),
+            ("wVmin", wintypes.UINT),
+            ("wVmax", wintypes.UINT),
+            ("wCaps", wintypes.UINT),
+            ("wMaxAxes", wintypes.UINT),
+            ("wNumAxes", wintypes.UINT),
+            ("wMaxButtons", wintypes.UINT),
+            ("szRegKey", wintypes.WCHAR * 32),
+            ("szOEMVxD", wintypes.WCHAR * 260),
+        ]
+
 def read_windows_gamepads():
     """Reads all connected physical Xbox and USB gamepads on Windows."""
     pads = []
@@ -125,46 +153,74 @@ def read_windows_gamepads():
                     "packet": st.dwPacketNumber,
                 })
 
-    # 2. Poll DirectInput joysticks/gamepads via WinMM if extra pads are plugged in
+    # 2. Poll DirectInput joysticks & FlySky FS-i6 RC Transmitters via WinMM
     if winmm is not None:
-        winmm_pads = []
         for joy_id in range(8):
             info = JOYINFOEX()
             info.dwSize = ctypes.sizeof(JOYINFOEX)
             info.dwFlags = 0xFF
             if winmm.joyGetPosEx(joy_id, ctypes.byref(info)) == 0:
-                winmm_pads.append((joy_id, info))
-        if len(winmm_pads) > len(pads):
-            for idx in range(len(pads), len(winmm_pads)):
-                joy_id, info = winmm_pads[idx]
-                bmask = info.dwButtons
-                pov = info.dwPOV
-                d_up = (pov != 65535) and (pov <= 4500 or pov >= 31500)
-                d_right = (pov != 65535) and (4500 <= pov <= 13500)
-                d_down = (pov != 65535) and (13500 <= pov <= 22500)
-                d_left = (pov != 65535) and (22500 <= pov <= 31500)
-                buttons = [
-                    {"pressed": bool(bmask & (1 << i)), "value": 1.0 if (bmask & (1 << i)) else 0.0}
-                    for i in range(12)
-                ] + [
-                    {"pressed": d_up, "value": 1.0 if d_up else 0.0},
-                    {"pressed": d_down, "value": 1.0 if d_down else 0.0},
-                    {"pressed": d_left, "value": 1.0 if d_left else 0.0},
-                    {"pressed": d_right, "value": 1.0 if d_right else 0.0},
-                ]
-                lx = round((info.dwXpos - 32767.5) / 32767.5, 4)
-                ly = round((info.dwYpos - 32767.5) / 32767.5, 4)
-                rx = round((info.dwZpos - 32767.5) / 32767.5, 4)
-                ry = round((info.dwRpos - 32767.5) / 32767.5, 4)
-                pads.append({
-                    "index": len(pads),
-                    "id": f"USB Gamepad #{len(pads) + 1} (DirectInput)",
-                    "connected": True,
-                    "mapping": "standard",
-                    "buttons": buttons,
-                    "axes": [lx, ly, rx, ry],
-                    "packet": 1,
-                })
+                caps = JOYCAPSW()
+                dev_name = f"USB Gamepad #{joy_id + 1}"
+                is_flysky = False
+                if winmm.joyGetDevCapsW(joy_id, ctypes.byref(caps), ctypes.sizeof(JOYCAPSW)) == 0:
+                    raw_name = str(caps.szPname or "").strip()
+                    if raw_name:
+                        dev_name = raw_name
+                    # Detect FlySky FS-i6, FS-SM100 (VID 0x0401 PID 0x0401), or generic PPM USB adapters
+                    if (caps.wMid == 0x0401 or caps.wPid == 0x0401 or
+                        any(k in dev_name.lower() for k in ("flysky", "fs-i6", "sm100", "ppm", "rc sim", "taranis", "opentx", "radiomaster"))):
+                        is_flysky = True
+                        dev_name = f"FlySky FS-i6 (RC Transmitter)"
+
+                # Avoid duplicate XInput pads already detected above, unless this is a distinct FlySky RC transmitter
+                is_xinput_duplicate = ("xbox" in dev_name.lower() or "xinput" in dev_name.lower()) and len(pads) > 0
+                if not is_xinput_duplicate or is_flysky:
+                    lx = round((info.dwXpos - 32767.5) / 32767.5, 4)
+                    ly = round((info.dwYpos - 32767.5) / 32767.5, 4)
+                    rx = round((info.dwZpos - 32767.5) / 32767.5, 4)
+                    ry = round((info.dwRpos - 32767.5) / 32767.5, 4)
+                    u  = round((info.dwUpos - 32767.5) / 32767.5, 4)
+                    v  = round((info.dwVpos - 32767.5) / 32767.5, 4)
+
+                    bmask = info.dwButtons
+                    pov = info.dwPOV
+                    d_up = (pov != 65535) and (pov <= 4500 or pov >= 31500)
+                    d_right = (pov != 65535) and (4500 <= pov <= 13500)
+                    d_down = (pov != 65535) and (13500 <= pov <= 22500)
+                    d_left = (pov != 65535) and (22500 <= pov <= 31500)
+
+                    buttons = [
+                        {"pressed": bool(bmask & (1 << i)), "value": 1.0 if (bmask & (1 << i)) else 0.0}
+                        for i in range(12)
+                    ] + [
+                        {"pressed": d_up, "value": 1.0 if d_up else 0.0},
+                        {"pressed": d_down, "value": 1.0 if d_down else 0.0},
+                        {"pressed": d_left, "value": 1.0 if d_left else 0.0},
+                        {"pressed": d_right, "value": 1.0 if d_right else 0.0},
+                    ]
+
+                    # Map FlySky FS-i6 auxiliary channels (SWA / SWB) to buttons:
+                    # Switch SWA (U-axis / CH5): flipped down triggers Button 0 [A] and Button 4 [LB] (Weapon Arm)
+                    if is_flysky:
+                        if u > 0.25:
+                            buttons[0] = {"pressed": True, "value": 1.0}
+                            buttons[4] = {"pressed": True, "value": 1.0}
+                        # Switch SWB (V-axis / CH6): flipped down triggers Button 3 [Y] and Button 5 [RB] (Camera)
+                        if v > 0.25:
+                            buttons[3] = {"pressed": True, "value": 1.0}
+                            buttons[5] = {"pressed": True, "value": 1.0}
+
+                    pads.append({
+                        "index": len(pads),
+                        "id": f"{dev_name} #{len(pads) + 1} (DirectInput)",
+                        "connected": True,
+                        "mapping": "flysky" if is_flysky else "standard",
+                        "isFlySky": is_flysky,
+                        "buttons": buttons,
+                        "axes": [lx, ly, rx, ry, u, v],
+                        "packet": 1,
+                    })
 
     return pads
 

@@ -1474,6 +1474,47 @@
       color: #34d399;
       background: rgba(6, 78, 59, 0.45);
     }
+    .rc-profile-toggle-btn {
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      color: #6ee7b7;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      vertical-align: middle;
+    }
+    .rc-profile-toggle-btn:hover {
+      background: rgba(16, 185, 129, 0.28);
+      border-color: #34d399;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .rc-profile-toggle-btn.active {
+      background: rgba(16, 185, 129, 0.4);
+      border-color: #34d399;
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(52, 211, 153, 0.55);
+    }
+    .rc-badge-pill {
+      background: rgba(16, 185, 129, 0.22);
+      border: 1px solid rgba(52, 211, 153, 0.7);
+      color: #34d399;
+      padding: 1px 7px;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
     .controller-map-row {
       display: flex;
       align-items: stretch;

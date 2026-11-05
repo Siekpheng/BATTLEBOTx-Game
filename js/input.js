@@ -5,6 +5,26 @@
   // ========================================================
   // 7. INPUT HANDLING
   // ========================================================
+  function setPlayerWeaponState(bot = playerBot, active = true) {
+    const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
+    if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
+    if (typeof matchState !== 'undefined' && matchState === 'menu') return;
+    if (targetBot.weaponActive === !!active) return;
+    targetBot.weaponActive = !!active;
+    if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+      NetworkSys.conn.send({ type: 'guest_toggle_weapon' });
+    }
+    if (typeof AudioSys !== 'undefined' && AudioSys.ctx) {
+      if (targetBot.weaponActive) {
+        AudioSys.beep(840, 0.08); // High chirp for Weapon ON
+      } else {
+        AudioSys.beep(320, 0.12); // Low spindown hum for Weapon OFF
+      }
+    }
+    console.log(`⚡ Weapon state set: ${targetBot.weaponActive ? 'ON' : 'OFF'}`);
+  }
+  window.setPlayerWeaponState = setPlayerWeaponState;
+
   function togglePlayerWeapon(bot = playerBot) {
     const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
     if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
@@ -128,8 +148,46 @@
     pollNativeWinGamepads();
   }
 
+  window.flySkyProfileActive = false;
+
+  function isFlySkyPad(pad) {
+    if (!pad) return false;
+    if (pad.isFlySky === true) return true;
+    if (window.flySkyProfileActive) return true;
+    const id = String(pad.id || '').toLowerCase();
+    if (/flysky|fs-i6|fs-i6x|\bi6\b|sm100|ppm|taranis|radiomaster|opentx|frsky|rc transmitter|rc sim|rc controller/i.test(id)) {
+      return true;
+    }
+    if (/0401.*0401|0401:0401/i.test(id)) {
+      return true;
+    }
+    return false;
+  }
+  window.isFlySkyPad = isFlySkyPad;
+
+  function toggleFlySkyProfile(forceVal) {
+    if (typeof forceVal === 'boolean') {
+      window.flySkyProfileActive = forceVal;
+    } else {
+      window.flySkyProfileActive = !window.flySkyProfileActive;
+    }
+    if (typeof AudioSys !== 'undefined' && AudioSys.beep) {
+      AudioSys.init();
+      AudioSys.beep(window.flySkyProfileActive ? 880 : 440, 0.08);
+    }
+    if (typeof GamepadMapper !== 'undefined') {
+      GamepadMapper.updateUI();
+    }
+    if (typeof updateControlsHint === 'function') {
+      updateControlsHint();
+    }
+    return window.flySkyProfileActive;
+  }
+  window.toggleFlySkyProfile = toggleFlySkyProfile;
+
   function isStandardGamepad(pad) {
     if (!pad) return false;
+    if (isFlySkyPad(pad)) return true;
     if (pad.mapping === 'standard') return true;
     const id = String(pad.id || '').toLowerCase();
     return /xbox|xinput|standard|dualsense|dualshock|wireless controller|playstation|pro controller|gamepad/i.test(id);
@@ -156,11 +214,11 @@
     if (Array.isArray(window._nativeWinPads) && window._nativeWinPads.length > connectedPads.length) {
       return window._nativeWinPads.filter(p => p && p.connected !== false);
     }
-    // Prioritize standard gamepads ahead of raw unmapped virtual HID devices when multiple devices exist
+    // Prioritize recognized gamepads & FlySky RC transmitters ahead of raw unmapped virtual HID devices
     if (connectedPads.length > 1) {
       connectedPads.sort((a, b) => {
-        const aStd = isStandardGamepad(a) ? 1 : 0;
-        const bStd = isStandardGamepad(b) ? 1 : 0;
+        const aStd = (isStandardGamepad(a) || isFlySkyPad(a)) ? 1 : 0;
+        const bStd = (isStandardGamepad(b) || isFlySkyPad(b)) ? 1 : 0;
         if (aStd !== bStd) return bStd - aStd;
         return (a.index || 0) - (b.index || 0);
       });
@@ -171,6 +229,7 @@
   function shortPadName(pad, slotNum) {
     if (!pad || !pad.id) return `Controller #${slotNum}`;
     const id = String(pad.id);
+    if (isFlySkyPad(pad)) return `FlySky FS-i6 #${slotNum}`;
     if (/xbox|xinput/i.test(id)) return `Xbox #${slotNum}`;
     if (/dualsense|dualshock|wireless controller|054c/i.test(id)) return `PlayStation #${slotNum}`;
     if (/pro controller|nintendo/i.test(id)) return `Switch #${slotNum}`;
@@ -224,6 +283,8 @@
       bindClick('btn-pause-map-p1', () => this.handleMapButtonClick(0));
       bindClick('btn-pause-map-p2', () => this.handleMapButtonClick(1));
       bindClick('btn-pause-swap-controllers', () => this.swapControllers());
+      bindClick('btn-toggle-rc-profile', () => toggleFlySkyProfile());
+      bindClick('btn-pause-toggle-rc-profile', () => toggleFlySkyProfile());
       this.updateUI();
     },
 
@@ -511,6 +572,19 @@
       if (p2Badge) {
         p2Badge.textContent = `🔴 P2 · ${this.formatSlotLabel(map.p2, 'ARROWS', true)}`;
       }
+
+      // FlySky FS-i6 RC Profile UI Indicators
+      const hasFlySky = window.flySkyProfileActive || pads.some(p => isFlySkyPad(p));
+      const rcStateEl = document.getElementById('rc-profile-state');
+      const pauseRcStateEl = document.getElementById('pause-rc-profile-state');
+      const rcBtn = document.getElementById('btn-toggle-rc-profile');
+      const pauseRcBtn = document.getElementById('btn-pause-toggle-rc-profile');
+      const labelText = window.flySkyProfileActive ? 'ACTIVE (ON)' : (hasFlySky ? 'AUTO (DETECTED)' : 'AUTO / OFF');
+
+      if (rcStateEl) rcStateEl.textContent = labelText;
+      if (pauseRcStateEl) pauseRcStateEl.textContent = labelText;
+      if (rcBtn) rcBtn.classList.toggle('active', hasFlySky);
+      if (pauseRcBtn) pauseRcBtn.classList.toggle('active', hasFlySky);
     }
   };
   window.GamepadMapper = GamepadMapper;
@@ -525,6 +599,112 @@
       return sign * Math.min(1.0, (Math.abs(val) - threshold) / (1.0 - threshold));
     };
 
+    if (!prevGamepadButtons[playerIndex]) {
+      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false, back: false, a: false, x: false, y: false, swa: false, swb: false };
+    }
+    const prev = prevGamepadButtons[playerIndex];
+    const inMatch = (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'));
+    const isFlySky = isFlySkyPad(pad);
+
+    let throttle = 0;
+    let steer = 0;
+
+    if (isFlySky) {
+      // ========================================================
+      // FLYSKY FS-i6 COMBAT ROBOTICS DUAL-GIMBAL MIXER
+      // Standard RC Transmitter Mode 2 Layout:
+      // - Right Stick: CH1 = Steer (Left/Right), CH2 = Throttle (Fwd/Rev)
+      // - Left Stick:  CH3 = Throttle/Weapon,    CH4 = Yaw/Steer
+      // - Switch SWA (CH5 / Button 0 / Axis 4): Weapon Armed / Spin-up
+      // - Switch SWB (CH6 / Button 1 / Axis 5): Camera Angle Cycle
+      // ========================================================
+      const axes = pad.axes || [];
+      const ch1 = axes.length > 0 ? axes[0] : 0; // Right Stick X (Aileron / Steering)
+      const ch2 = axes.length > 1 ? axes[1] : 0; // Right Stick Y (Elevator / Throttle)
+      const ch3 = axes.length > 2 ? axes[2] : 0; // Left Stick Y (Throttle)
+      const ch4 = axes.length > 3 ? axes[3] : 0; // Left Stick X (Rudder / Yaw)
+
+      // Right Stick Steering (CH1)
+      const ch1_steer = applyDeadzone(ch1, 0.06);
+      // Right Stick Throttle (CH2): Stick UP is negative Y (-1.0) -> invert so forward is positive (+1.0)
+      const ch2_throttle = -applyDeadzone(ch2, 0.06);
+
+      // Left Stick Steering (CH4): Secondary steering
+      const ch4_steer = applyDeadzone(ch4, 0.06);
+
+      // Left Stick Throttle (CH3):
+      let ch3_throttle = 0;
+      if (Math.abs(ch3) > 0.08) {
+        // If stick is not resting at bottom peg (-1.0) on un-sprung ratchet gimbals
+        if (Math.abs(ch3 + 1.0) > 0.12 && Math.abs(ch3 - 1.0) > 0.12) {
+          ch3_throttle = -applyDeadzone(ch3, 0.08);
+        }
+      }
+
+      // Whichever stick the driver moves, the bot responds smoothly!
+      throttle = (Math.abs(ch2_throttle) >= Math.abs(ch3_throttle)) ? ch2_throttle : ch3_throttle;
+      steer = (Math.abs(ch1_steer) >= Math.abs(ch4_steer)) ? ch1_steer : ch4_steer;
+
+      // Tank Drive (Dual-Stick Skid-Steer):
+      // If both vertical gimbals (CH3 Left Track, CH2 Right Track) are being driven:
+      if (Math.abs(ch2_throttle) > 0.15 && Math.abs(ch3_throttle) > 0.15 && Math.abs(ch1_steer) < 0.15 && Math.abs(ch4_steer) < 0.15) {
+        throttle = (ch3_throttle + ch2_throttle) * 0.5;
+        steer = (ch2_throttle - ch3_throttle) * 0.5;
+      }
+
+      // Switch SWA (CH5): Weapon Master Arm / Spin-Up Switch
+      const b = pad.buttons || [];
+      const swaAxis = (axes.length > 4) ? axes[4] : 0;
+      const swaButton = !!((b[0] && (b[0].pressed || b[0].value > 0.5)) || (b[4] && (b[4].pressed || b[4].value > 0.5)));
+      const swaActive = swaButton || (swaAxis > 0.25);
+
+      if (swaActive !== prev.swa) {
+        if (inMatch) {
+          if (playerIndex === 0 && playerBot) {
+            setPlayerWeaponState(playerBot, swaActive);
+          } else if (playerIndex === 1 && enemyBot && gameMode === '1v1') {
+            setPlayerWeaponState(enemyBot, swaActive);
+          }
+        }
+        prev.swa = swaActive;
+      }
+
+      // Switch SWB (CH6): Camera Angle Switch
+      const swbAxis = (axes.length > 5) ? axes[5] : 0;
+      const swbButton = !!((b[1] && (b[1].pressed || b[1].value > 0.5)) || (b[3] && (b[3].pressed || b[3].value > 0.5)) || (b[5] && (b[5].pressed || b[5].value > 0.5)));
+      const swbActive = swbButton || (swbAxis > 0.25);
+
+      if (swbActive && !prev.swb) {
+        if (inMatch) {
+          if (playerIndex === 0) {
+            cycleCameraMode();
+          } else if (playerIndex === 1 && gameMode === '1v1') {
+            if (typeof cycleCameraModeP2 === 'function') cycleCameraModeP2();
+          }
+        }
+      }
+      prev.swb = swbActive;
+
+      // Start / Pause: SWC / SWD or button 9
+      const startPressed = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
+      if (startPressed && !prev.start) {
+        const btnPause = document.getElementById('btn-pause');
+        const btnResume = document.getElementById('btn-resume-game');
+        if (matchState === 'playing' && btnPause) btnPause.click();
+        else if (matchState === 'paused' && btnResume) btnResume.click();
+      }
+      prev.start = startPressed;
+
+      return {
+        throttle,
+        steer,
+        hasInput: Math.abs(throttle) > 0.05 || Math.abs(steer) > 0.05
+      };
+    }
+
+    // ========================================================
+    // STANDARD GAMEPAD (Xbox, PlayStation, Switch Pro, DirectInput)
+    // ========================================================
     // 1. Trigger acceleration/reverse controls:
     let rtVal = 0;
     let ltVal = 0;
@@ -544,7 +724,7 @@
     let leftY = (pad.axes && pad.axes.length > 1) ? pad.axes[1] : 0;
     let stickThrottle = -applyDeadzone(leftY, 0.16);
 
-    let throttle = (Math.abs(triggerThrottle) > 0.02) ? triggerThrottle : stickThrottle;
+    throttle = (Math.abs(triggerThrottle) > 0.02) ? triggerThrottle : stickThrottle;
 
     const povDir = readPovHatDir(pad);
     // Optional D-Pad / POV Hat fallback for throttle
@@ -563,19 +743,13 @@
     }
     let rightStickSteer = applyDeadzone(rightX, 0.16);
 
-    let steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
+    steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
 
     // Optional D-Pad / POV Hat fallback for steer
     if (Math.abs(steer) < 0.1) {
       if ((pad.buttons && pad.buttons[14] && (pad.buttons[14].pressed || pad.buttons[14].value > 0.5)) || povDir === 'left') steer = -1.0;
       else if ((pad.buttons && pad.buttons[15] && (pad.buttons[15].pressed || pad.buttons[15].value > 0.5)) || povDir === 'right') steer = 1.0;
     }
-
-    if (!prevGamepadButtons[playerIndex]) {
-      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false, back: false, a: false, x: false, y: false };
-    }
-    const prev = prevGamepadButtons[playerIndex];
-    const inMatch = (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'));
 
     // 4. Weapon ON / OFF toggle:
     // Left Bumper [LB] (buttons[4]) OR Face Buttons [A] (buttons[0]) / [X] (buttons[2])
@@ -1459,6 +1633,16 @@
       if (axY > 0.55) return 'down';
       if (axX < -0.55) return 'left';
       if (axX > 0.55) return 'right';
+
+      // FlySky FS-i6 Left Stick support (CH3/CH4) for menu navigation:
+      if (Math.abs(axX) < 0.25 && Math.abs(axY) < 0.25 && pad.axes) {
+        const axZ = (pad.axes.length > 2) ? pad.axes[2] : 0;
+        const axR = (pad.axes.length > 3) ? pad.axes[3] : 0;
+        if (axR < -0.55) return 'left';
+        if (axR > 0.55) return 'right';
+        if (axZ < -0.65) return 'up';
+        if (axZ > 0.65) return 'down';
+      }
       return null;
     },
 
@@ -1551,7 +1735,10 @@
         const prev = this.prevPadStates[pIdx];
         const b = pad.buttons || [];
 
-        const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5));
+        const isFlySky = isFlySkyPad(pad);
+        const swaAxis = (pad.axes && pad.axes.length > 4) ? pad.axes[4] : 0;
+        const swaFlipped = isFlySky && (swaAxis > 0.25);
+        const aPressed = !!(b[0] && (b[0].pressed || b[0].value > 0.5)) || swaFlipped;
         const bPressed = !!(b[1] && (b[1].pressed || b[1].value > 0.5));
         const yPressed = !!(b[3] && (b[3].pressed || b[3].value > 0.5));
         const lbPressed = !!(b[4] && (b[4].pressed || b[4].value > 0.5));

@@ -430,6 +430,18 @@
   function updateControlsHint() {
     const hint = document.getElementById('hint-controls-text');
     if (!hint) return;
+    const pads = (typeof getConnectedGamepadsList === 'function') ? getConnectedGamepadsList() : [];
+    const hasFlySky = (typeof window.flySkyProfileActive !== 'undefined' && window.flySkyProfileActive) ||
+                      pads.some(p => typeof isFlySkyPad === 'function' && isFlySkyPad(p));
+
+    if (hasFlySky) {
+      hint.innerHTML = '<span style="color:#34d399;font-weight:800;">📻 FLYSKY FS-i6 RC:</span> Right Stick: <strong>Drive &amp; Steer</strong> · SWA: <strong>Arm Weapon [A]</strong> · SWB: <strong>Camera [Y]</strong> · Left Stick: <strong>Throttle</strong>';
+      return;
+    }
+    if (pads.length > 0) {
+      hint.innerHTML = '<span style="color:#38bdf8;font-weight:700;">🎮 CONTROLLER READY:</span> <kbd>RT</kbd> Drive · <kbd>LT</kbd> Rev · Stick: Steer · <kbd>A</kbd>/<kbd>X</kbd>/<kbd>LB</kbd> Weapon · <kbd>Y</kbd>/<kbd>RB</kbd> Cam';
+      return;
+    }
     if (gameMode === '1v1') {
       hint.innerHTML = '<strong>P1:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · Auto Weapon Wind-Up &nbsp;|&nbsp; <strong>P2:</strong> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>';
     } else if (gameMode === 'practice') {
