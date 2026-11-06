@@ -767,9 +767,10 @@
       const isPractice = (gameMode === 'practice');
       const nowPerf = performance.now();
 
-      // Continuous weapon-contact grinding sparks & progressive grinding strike:
+      // Continuous weapon-contact grinding sparks & light gradual grinding wear:
       // When two robots are pushing/ramming against each other (`impactSpeed <= 1.8`) and a robot's weapon spins back up (`>= minWeaponSpin`)
-      // while pressing into the opponent, it emits grinding sparks AND bites/shreds into the opponent's armor!
+      // while pressing into the opponent, it emits grinding sparks and wears down armor gradually (requires 2-3 grind bites for 1 part to detach,
+      // or 3-4 grind bites for Robot 6's small weapon, and never detaches 2 parts at once).
       if (impactSpeed <= 1.8) {
         const pReachGrind = pSpecs.weaponReach;
         const eReachGrind = eSpecs.weaponReach;
@@ -782,7 +783,7 @@
             AudioSys.metalClashSound(0.85, false);
           }
 
-          // Accumulate grinding contact time (~0.16s of active spinning contact triggers a real weapon bite!)
+          // Accumulate grinding contact time (~0.35s of active spinning contact triggers 1 light grind bite)
           if (pSpinningContact) {
             playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016;
           } else {
@@ -794,20 +795,34 @@
             enemyBot._grindContactTimer = 0;
           }
 
-          if (pSpinningContact && eSpinningContact && (playerBot._grindContactTimer >= 0.16 || enemyBot._grindContactTimer >= 0.16)) {
+          if (pSpinningContact && eSpinningContact && (playerBot._grindContactTimer >= 0.35 || enemyBot._grindContactTimer >= 0.35)) {
             playerBot._grindContactTimer = 0;
             enemyBot._grindContactTimer = 0;
             AudioSys.weaponSliceSound();
-            spawnCollisionSparks(midPos, 28);
-            const grindPush = 3.2;
+            spawnCollisionSparks(midPos, 20);
+            const grindPush = 2.4;
             playerBot.vx -= nx * grindPush;
             playerBot.vz -= nz * grindPush;
             enemyBot.vx += nx * grindPush;
             enemyBot.vz += nz * grindPush;
-            if (!isPractice && Math.random() < eSpecs.partDamageChance) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            if (!isPractice) {
+              playerBot.grindHitCount = (playerBot.grindHitCount || 0) + 1;
+              if (!playerBot.grindHitsRequired) {
+                playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
+              }
+              if (playerBot.grindHitCount >= playerBot.grindHitsRequired) {
+                playerBot.grindHitCount = 0;
+                playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
+                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+              }
             }
-            if (Math.random() < pSpecs.partDamageChance) {
+            enemyBot.grindHitCount = (enemyBot.grindHitCount || 0) + 1;
+            if (!enemyBot.grindHitsRequired) {
+              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
+            }
+            if (enemyBot.grindHitCount >= enemyBot.grindHitsRequired) {
+              enemyBot.grindHitCount = 0;
+              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
               detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
             }
             if (typeof matchState === 'undefined' || matchState !== 'menu') {
@@ -817,27 +832,23 @@
               enemyBot.weaponStallTimer = eSpecs.defendStall;
               AudioSys.weaponStallSound();
             }
-          } else if (pSpinningContact && playerBot._grindContactTimer >= 0.16) {
+          } else if (pSpinningContact && playerBot._grindContactTimer >= 0.35) {
             playerBot._grindContactTimer = 0;
             AudioSys.weaponSliceSound();
-            const grindSparksP = (playerBot.type === 'robot6') ? 12 : 22;
+            const grindSparksP = (playerBot.type === 'robot6') ? 10 : 18;
             spawnCollisionSparks(midPos, grindSparksP);
-            const pGrindFling = pSpecs.flingBase * 0.78;
+            const pGrindFling = pSpecs.flingBase * 0.50;
             enemyBot.vx += nx * pGrindFling;
             enemyBot.vz += nz * pGrindFling;
-            playerBot.vx -= nx * 1.4;
-            playerBot.vz -= nz * 1.4;
-            if (playerBot.type === 'robot3' && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78) {
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            } else if (playerBot.type === 'robot4' && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78) {
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-              if (Math.random() < 0.65) detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            } else if (playerBot.type === 'robot6') {
-              if (Math.random() < pSpecs.partDamageChance) {
-                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-              }
-            } else {
+            playerBot.vx -= nx * 1.1;
+            playerBot.vz -= nz * 1.1;
+            enemyBot.grindHitCount = (enemyBot.grindHitCount || 0) + 1;
+            if (!enemyBot.grindHitsRequired) {
+              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
+            }
+            if (enemyBot.grindHitCount >= enemyBot.grindHitsRequired) {
+              enemyBot.grindHitCount = 0;
+              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
               detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
             }
             if (typeof matchState === 'undefined' || matchState !== 'menu') {
@@ -847,28 +858,24 @@
               enemyBot.weaponStallTimer = eSpecs.defendStall;
               AudioSys.weaponStallSound();
             }
-          } else if (eSpinningContact && enemyBot._grindContactTimer >= 0.16) {
+          } else if (eSpinningContact && enemyBot._grindContactTimer >= 0.35) {
             enemyBot._grindContactTimer = 0;
             AudioSys.weaponSliceSound();
-            const grindSparksE = (enemyBot.type === 'robot6') ? 12 : 22;
+            const grindSparksE = (enemyBot.type === 'robot6') ? 10 : 18;
             spawnCollisionSparks(midPos, grindSparksE);
-            const eGrindFling = eSpecs.flingBase * 0.78;
+            const eGrindFling = eSpecs.flingBase * 0.50;
             playerBot.vx -= nx * eGrindFling;
             playerBot.vz -= nz * eGrindFling;
-            enemyBot.vx += nx * 1.4;
-            enemyBot.vz += nz * 1.4;
+            enemyBot.vx += nx * 1.1;
+            enemyBot.vz += nz * 1.1;
             triggerDamageVignette();
-            if (enemyBot.type === 'robot3' && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            } else if (enemyBot.type === 'robot4' && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-              if (Math.random() < 0.65) detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            } else if (enemyBot.type === 'robot6') {
-              if (Math.random() < eSpecs.partDamageChance) {
-                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-              }
-            } else {
+            playerBot.grindHitCount = (playerBot.grindHitCount || 0) + 1;
+            if (!playerBot.grindHitsRequired) {
+              playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
+            }
+            if (playerBot.grindHitCount >= playerBot.grindHitsRequired) {
+              playerBot.grindHitCount = 0;
+              playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
               detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
             }
             if (typeof matchState === 'undefined' || matchState !== 'menu') {
