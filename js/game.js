@@ -24,6 +24,8 @@
       attackStall: 0.60,     // Quick recovery after hitting
       defendStall: 1.00,
       weaponReach: 0.30,
+      weaponWidth: 0.95,     // Accurate CAD weapon mesh width
+      weaponHalfWidth: 0.475,
       flingBase: 4.4,
       flingSpeedMult: 0.46,
       flipChance: 0.32,      // Front ramp wedges + angled blade lift opponents more easily
@@ -49,6 +51,8 @@
       attackStall: 0.75,
       defendStall: 0.90,
       weaponReach: 0.34,
+      weaponWidth: 0.55,     // Narrow 0.55m central heavy drum (corners are armored plow!)
+      weaponHalfWidth: 0.275,
       flingBase: 4.6,
       flingSpeedMult: 0.48,
       flipChance: 0.22,
@@ -74,6 +78,8 @@
       attackStall: 0.95,
       defendStall: 1.25,
       weaponReach: 0.15,     // Wide 150-degree horizontal bar arc
+      weaponWidth: 1.35,     // Wide 1.35m horizontal spinning bar
+      weaponHalfWidth: 0.675,
       flingBase: 6.2,
       flingSpeedMult: 0.55,
       flipChance: 0.18,
@@ -99,8 +105,9 @@
       attackStall: 0.85,
       defendStall: 1.15,
       weaponReach: 0.34,
+      weaponWidth: 0.38,     // Central vertical flywheel disc
+      weaponHalfWidth: 0.190,
       flingBase: 6.4,        // Highest knockback fling & vertical launch force
-      flingSpeedMult: 0.58,
       flipChance: 0.38,      // Highest uppercut flip probability on solid vertical hits
       flipResistance: 0.85,
       pushTractionMult: 1.15,
@@ -124,6 +131,8 @@
       attackStall: 0.45,     // Drum barely stalls on impact — relentless rapid-fire brawling
       defendStall: 0.80,
       weaponReach: 0.33,
+      weaponWidth: 0.78,     // Wide billet eggbeater drum
+      weaponHalfWidth: 0.390,
       flingBase: 4.8,
       flingSpeedMult: 0.48,
       flipChance: 0.26,
@@ -149,6 +158,8 @@
       attackStall: 0.55,
       defendStall: 1.10,
       weaponReach: 0.38,     // Narrower compact weapon reach
+      weaponWidth: 0.24,     // Compact narrow 0.24m vertical disc
+      weaponHalfWidth: 0.120,
       flingBase: 2.3,        // Least knockback force (small weapon)
       flingSpeedMult: 0.25,
       flipChance: 0.08,      // Rarely flips heavy full-size robots (8% only on max-speed charge)

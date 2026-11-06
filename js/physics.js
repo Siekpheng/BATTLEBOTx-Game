@@ -706,8 +706,8 @@
 
   function handleBotCollision() {
     if (!playerBot || !enemyBot) return;
-    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
-    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
 
     const dx = enemyBot.x - playerBot.x;
     const dz = enemyBot.z - playerBot.z;
@@ -766,23 +766,40 @@
 
       const pFwdDot = Math.sin(playerBot.yaw) * nx + Math.cos(playerBot.yaw) * nz;
       const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
-      const isPrac = (gameMode === 'practice');
+
+      // Local impact direction relative to each bot's heading:
+      const pHitForward = nx * Math.sin(playerBot.yaw) + nz * Math.cos(playerBot.yaw);
+      const pHitRight   = nx * Math.cos(playerBot.yaw) - nz * Math.sin(playerBot.yaw);
+      const eHitForward = (-nx) * Math.sin(enemyBot.yaw) + (-nz) * Math.cos(enemyBot.yaw);
+      const eHitRight   = (-nx) * Math.cos(enemyBot.yaw) - (-nz) * Math.sin(enemyBot.yaw);
+
+      // Lateral distance (meters from chassis center line) of the collision contact interface:
+      const pContactOffset = Math.abs(pHitRight) * pRad;
+      const eContactOffset = Math.abs(eHitRight) * eRad;
+
       const pReach = pSpecs.weaponReach;
       const eReach = eSpecs.weaponReach;
+      const pWeaponHalfWidth = (pSpecs.weaponHalfWidth || 0.45);
+      const eWeaponHalfWidth = (eSpecs.weaponHalfWidth || 0.45);
 
-      // Spinning weapon strike evaluation:
-      // High-spin strike thresholds (~28 RPM):
+      // Precise 3D CAD Weapon Hitbox Verification:
+      // A weapon ONLY connects if the contact is in front AND within the spinning weapon's physical width!
+      // If contact is outside the weapon (e.g. Robot 2's wide corner plow or Robot 6's side frame),
+      // the weapon does NOT connect, leaving that corner exposed to damage!
+      const pWeaponAligned = (pHitForward > pReach && pContactOffset <= (pWeaponHalfWidth + 0.08));
+      const eWeaponAligned = (eHitForward > eReach && eContactOffset <= (eWeaponHalfWidth + 0.08));
+
+      const isPrac = (gameMode === 'practice');
       const pHighSpinThreshold = Math.min((pSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
       const eHighSpinThreshold = Math.min((eSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
 
-      const pWeaponCanStrike = (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
-      const eWeaponCanStrike = (!isPrac && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+      const pWeaponCanStrike = (pWeaponAligned && playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
+      const eWeaponCanStrike = (!isPrac && eWeaponAligned && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
 
-      // WEAPON-TO-WEAPON CLASH: When both bots face each other with spinning weapons,
-      // it is ALWAYS an explosive weapon-to-weapon clash with separation! NEVER soft continuous grinding!
+      // WEAPON-TO-WEAPON CLASH: Both weapons must physically align and strike each other!
       const isBothWeaponClash = pWeaponCanStrike && eWeaponCanStrike;
 
-      // SINGLE WEAPON IMPACT: One spinning weapon hits opponent hull/armor/wedge
+      // SINGLE WEAPON IMPACT: One weapon physically connects with the other robot's body/corner
       const isPWeaponImpact = isBothWeaponClash || (pWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || playerBot.weaponSpinSpeed >= (pSpecs.maxWeaponRpm || 95) * 0.80));
       const isEWeaponImpact = isBothWeaponClash || (eWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || enemyBot.weaponSpinSpeed >= (eSpecs.maxWeaponRpm || 95) * 0.80));
       const isKineticStrike = isBothWeaponClash || isPWeaponImpact || isEWeaponImpact;
@@ -878,29 +895,17 @@
         AudioSys.metalClashSound(Math.min(2.6, 0.65 + impactSpeed * 0.26), impactSpeed > 5.0);
       }
 
-      const pForwardDot = Math.sin(playerBot.yaw) * nx + Math.cos(playerBot.yaw) * nz;
-      const eForwardDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
-
-      // Local impact direction relative to each bot's heading:
-      const eHitForward = (-nx) * Math.sin(enemyBot.yaw) + (-nz) * Math.cos(enemyBot.yaw);
-      const eHitRight   = (-nx) * Math.cos(enemyBot.yaw) - (-nz) * Math.sin(enemyBot.yaw);
-      const pHitForward = nx * Math.sin(playerBot.yaw) + nz * Math.cos(playerBot.yaw);
-      const pHitRight   = nx * Math.cos(playerBot.yaw) - nz * Math.sin(playerBot.yaw);
-
-      const isPractice = (gameMode === 'practice');
-
       // ========================================================
       // CONTINUOUS WEAPON WIND-UP & GRINDING DAMAGE DURING RAMMING / PUSHING (v1.4.1 / 87c3892)
       // - Whenever robots are ramming/pushing in close contact (!isKineticStrike), weapons NEVER stall!
       // - The weapon winds up smoothly all the way to 100% RPM and stays spinning continuously while grinding.
       // - Deals continuous gradual health wear every frame and detaches 1 part every ~3.30s of continuous grinding
       //   (~4.65s for Robot 6's small weapon) without stalling the weapon or flinging the opponent away!
+      // - Grinding ONLY triggers if the spinning weapon physically aligns with the contact point (not corner plow/frame!)
       // ========================================================
       const minGrindSpin = 12.0;
-      const pReachGrind = pSpecs.weaponReach;
-      const eReachGrind = eSpecs.weaponReach;
-      const pSpinningContact = (!isKineticStrike && playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && pForwardDot > pReachGrind && playerBot.weaponSpinSpeed >= minGrindSpin);
-      const eSpinningContact = (!isKineticStrike && !isPractice && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && eForwardDot > eReachGrind && enemyBot.weaponSpinSpeed >= minGrindSpin);
+      const pSpinningContact = (!isKineticStrike && pWeaponAligned && playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && playerBot.weaponSpinSpeed >= minGrindSpin);
+      const eSpinningContact = (!isKineticStrike && !isPractice && eWeaponAligned && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && enemyBot.weaponSpinSpeed >= minGrindSpin);
 
       if (pSpinningContact || eSpinningContact) {
         const pRpmRatio = pSpinningContact ? Math.min(1.0, playerBot.weaponSpinSpeed / (pSpecs.maxWeaponRpm || 95)) : 0;
