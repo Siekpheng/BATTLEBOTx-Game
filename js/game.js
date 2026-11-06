@@ -705,15 +705,6 @@
     });
   });
 
-  // Background preloader: preload all 6 robots so all menu combatants have instant high-res CAD models
-  setTimeout(() => {
-    if (typeof ensureBotModelLoaded === 'function') {
-      MENU_ROBOT_ROSTER.forEach((t, i) => {
-        setTimeout(() => ensureBotModelLoaded(t), i * 180);
-      });
-    }
-  }, 200);
-
   // HUD Touch Controls Toggle: OFF by default
   const btnToggleTouch = document.getElementById('btn-toggle-touch');
   const storedTouch = (function() {
@@ -2532,8 +2523,110 @@
     }
   });
 
-    // Launch initial Menu Exhibition Fight
-  startMenuDemoFight();
+  // ========================================================
+  // 12. INITIAL FULL-SCREEN ASSET & SHADER PRELOADER
+  // ========================================================
+  async function runInitialAssetPreloadAndStart() {
+    const screenEl = document.getElementById('initial-loading-screen');
+    const barEl = document.getElementById('initial-loading-bar-fill');
+    const pctEl = document.getElementById('initial-loading-pct');
+    const statusEl = document.getElementById('initial-loading-status');
 
-  requestAnimationFrame(animate);
+    const setProgress = (pct, msg) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+      if (barEl) barEl.style.width = clamped + '%';
+      if (pctEl) pctEl.textContent = clamped + '%';
+      if (statusEl && msg) statusEl.textContent = msg;
+    };
+
+    const waitNextFrame = () => new Promise(resolve => {
+      requestAnimationFrame(() => setTimeout(resolve, 16));
+    });
+
+    const botsToLoad = [
+      { id: 'robot1', label: 'Robot 1 · Razor CAD Model' },
+      { id: 'robot2', label: 'Robot 2 · IronClad CAD Model' },
+      { id: 'robot3', label: 'Robot 3 · KineticBar CAD Model' },
+      { id: 'robot4', label: 'Robot 4 · VertForce CAD Model' },
+      { id: 'robot5', label: 'Robot 5 · BlueThunder CAD Model' },
+      { id: 'robot6', label: 'Robot 6 · Vortex CAD Model' }
+    ];
+
+    setProgress(4, 'Initializing 3D Combat Arena...');
+    await waitNextFrame();
+
+    // Load all 6 high-resolution robot CAD models sequentially with frame yields
+    // so the loading screen progress bar animates smoothly without main-thread stutter
+    const totalBots = botsToLoad.length;
+    for (let i = 0; i < totalBots; i++) {
+      const item = botsToLoad[i];
+      const basePct = 6 + (i / totalBots) * 78;
+      const stepSpan = 78 / totalBots;
+      setProgress(basePct, `Loading ${item.label} (${i + 1}/${totalBots})...`);
+      await waitNextFrame();
+
+      if (typeof ensureBotModelLoaded === 'function') {
+        await ensureBotModelLoaded(item.id, (subProg) => {
+          setProgress(basePct + subProg * stepSpan * 0.9, `Loading ${item.label} (${i + 1}/${totalBots})...`);
+        });
+      }
+      setProgress(basePct + stepSpan, `Loaded ${item.label} (${i + 1}/${totalBots})`);
+      await waitNextFrame();
+    }
+
+    // Pre-compile WebGL shaders and upload all 6 robot geometries/materials to GPU
+    // while covered by the loading screen so gameplay and menu fights have zero lag!
+    setProgress(90, 'Compiling 3D Arena Shaders & GPU Buffers...');
+    await waitNextFrame();
+
+    try {
+      if (typeof window.refreshArenaTextures === 'function') {
+        window.refreshArenaTextures();
+      }
+      if (typeof window.refreshParticleTextures === 'function') {
+        window.refreshParticleTextures();
+      }
+
+      const warmupGroup = new THREE.Group();
+      warmupGroup.position.set(0, 0.5, 0);
+      botsToLoad.forEach((item, idx) => {
+        const sc = (typeof getBotScene === 'function') ? getBotScene(item.id) : null;
+        if (sc) {
+          const clone = sc.clone(true);
+          clone.position.set((idx - 2.5) * 1.5, 0, 0);
+          warmupGroup.add(clone);
+        }
+      });
+      scene.add(warmupGroup);
+
+      if (renderer && typeof renderer.compile === 'function') {
+        renderer.compile(scene, camera);
+      }
+      if (renderer) {
+        renderer.render(scene, camera);
+      }
+
+      scene.remove(warmupGroup);
+    } catch (e) {
+      console.warn('Shader warm-up warning:', e);
+    }
+
+    setProgress(100, 'Arena Ready! Entering BATTLEBOTx...');
+    await waitNextFrame();
+
+    // Launch initial Menu Exhibition Fight and start the main animation loop
+    startMenuDemoFight();
+    lastTime = performance.now();
+    requestAnimationFrame(animate);
+
+    // Smoothly fade out the initial loading screen
+    if (screenEl) {
+      screenEl.classList.add('fade-out');
+      setTimeout(() => {
+        screenEl.classList.add('hidden');
+      }, 480);
+    }
+  }
+
+  runInitialAssetPreloadAndStart();
 

@@ -54,10 +54,30 @@
   </script>
 
   <!-- Custom Game Styles & Keyframe Animations -->
-  <link rel="stylesheet" href="css/style.css?v=20261105c" />
+  <link rel="stylesheet" href="css/style.css?v=20261106_loading" />
 </head>
 <body class="hide-touch-controls">
 <div id="app">
+  <!-- INITIAL FULL-SCREEN ASSET & SHADER LOADING SCREEN -->
+  <div id="initial-loading-screen" class="initial-loading-screen">
+    <div class="initial-loading-card">
+      <div class="initial-loading-logos">
+        <img class="menu-brand-logo" src="logo_aifarm.png" alt="AI FARM ROBOTICS" />
+        <h1 class="initial-loading-title">BATTLEBOTx</h1>
+        <img class="menu-brand-logo" src="Picture1.png" alt="BATTLEBOTx" />
+      </div>
+      <div class="initial-loading-subtitle">AI FARM COMBAT ROBOTICS ARENA</div>
+      <div class="initial-loading-spinner-wrap">
+        <div class="match-loading-spinner"></div>
+        <div class="initial-loading-pct" id="initial-loading-pct">0%</div>
+      </div>
+      <div class="initial-loading-status" id="initial-loading-status">Initializing 3D Combat Arena...</div>
+      <div class="match-loading-bar-track initial-loading-bar-track">
+        <div class="match-loading-bar-fill" id="initial-loading-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="canvas-container"></div>
   <div id="damage-vignette"></div>
 
@@ -817,14 +837,14 @@
 
 
   <!-- Modular Game Engine Scripts -->
-  <script src="js/state.js?v=20261106_grindlight"></script>
-  <script src="js/audio.js?v=20261106_grindlight"></script>
-  <script src="js/arena.js?v=20261106_grindlight"></script>
-  <script src="js/particles.js?v=20261106_grindlight"></script>
-  <script src="js/robots.js?v=20261106_grindlight"></script>
-  <script src="js/physics.js?v=20261106_grindlight"></script>
-  <script src="js/input.js?v=20261106_grindlight"></script>
-  <script src="js/network.js?v=20261106_grindlight"></script>
-  <script src="js/game.js?v=20261106_grindlight"></script>
+  <script src="js/state.js?v=20261106_loading"></script>
+  <script src="js/audio.js?v=20261106_loading"></script>
+  <script src="js/arena.js?v=20261106_loading"></script>
+  <script src="js/particles.js?v=20261106_loading"></script>
+  <script src="js/robots.js?v=20261106_loading"></script>
+  <script src="js/physics.js?v=20261106_loading"></script>
+  <script src="js/input.js?v=20261106_loading"></script>
+  <script src="js/network.js?v=20261106_loading"></script>
+  <script src="js/game.js?v=20261106_loading"></script>
 </body>
 </html>
