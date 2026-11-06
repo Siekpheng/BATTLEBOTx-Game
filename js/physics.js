@@ -436,15 +436,48 @@
         bot.weaponStallTimer = Math.max(0, bot.weaponStallTimer - dt);
       }
 
-      // 2. TOTAL DEMOLITION WEAPON SHUTDOWN:
-      // Only shut down the weapon permanently when the robot itself is completely destroyed (driveHealth <= 0 or isEntirelyDestroyed)
-      if (!isMenu && !bot.weaponDestroyed && (bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
+      // 2. >70% DAMAGE WEAPON MOTOR & BELT BREAKDOWN + TOTAL DEMOLITION SHUTDOWN:
+      // Once a robot suffers over 70% damage (<= 30% HP or <= 30% parts remaining), its weapon belt and motor break
+      // permanently so the weapon can no longer spin!
+      const maxHpWeaponCheck = bot.maxDriveHealth || 900;
+      const threshold30Parts = (bot.totalInitialParts && bot.totalInitialParts > 0)
+        ? Math.max(1, Math.floor(bot.totalInitialParts * 0.30))
+        : 2;
+      const isOver70PercentDamage = (remainingParts <= threshold30Parts) ||
+        (bot.driveHealth < maxHpWeaponCheck * 0.30) ||
+        (typeof getBotDamagePercent === 'function' && getBotDamagePercent(bot) > 70);
+
+      if (!isMenu && !bot.weaponDestroyed && (isOver70PercentDamage || bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
         bot.weaponDestroyed = true;
+        bot.weaponMotorBroken = true;
         bot.weaponActive = false;
         bot.weaponSpinSpeed = 0;
+        bot.weaponStallTimer = 0;
         if (typeof AudioSys !== 'undefined' && AudioSys.weaponStallSound) AudioSys.weaponStallSound();
-        if (Math.random() < 0.15 && bot.root) {
-          spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 3);
+        if (bot.root) {
+          const breakPos = bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0));
+          spawnCollisionSparks(breakPos, 24);
+          try {
+            if (typeof scene !== 'undefined' && typeof detachedDebris !== 'undefined') {
+              const beltGeo = new THREE.TorusGeometry(0.16, 0.024, 6, 16, Math.PI * 1.65);
+              beltGeo._isClonedDebris = true;
+              const beltMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.85, metalness: 0.1 });
+              beltMat._isClonedDebris = true;
+              const beltMesh = new THREE.Mesh(beltGeo, beltMat);
+              beltMesh.position.copy(breakPos);
+              scene.add(beltMesh);
+              detachedDebris.push({
+                mesh: beltMesh,
+                isWheel: false,
+                vx: (Math.random() - 0.5) * 6.5,
+                vy: 4.8 + Math.random() * 2.5,
+                vz: (Math.random() - 0.5) * 6.5,
+                rx: (Math.random() - 0.5) * 22,
+                ry: (Math.random() - 0.5) * 22,
+                rz: (Math.random() - 0.5) * 22
+              });
+            }
+          } catch (e) {}
         }
       }
 

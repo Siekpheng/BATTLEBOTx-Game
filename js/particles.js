@@ -815,7 +815,21 @@
     const effectivePartDivisor = Math.max(baseDivisor, bot.totalInitialParts);
     const detachedCount = (bot.totalInitialParts - remainingCount);
     const healthLoss = (detachedCount / effectivePartDivisor) * bot.maxDriveHealth;
-    bot.driveHealth = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
+    const partBasedHp = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
+    bot.driveHealth = Math.min(bot.driveHealth ?? bot.maxDriveHealth, partBasedHp);
+
+    // >70% DAMAGE WEAPON MOTOR & BELT FAILURE RULE:
+    // Once a robot takes over 70% damage (<= 30% parts or HP remaining), its weapon belt & motor break permanently!
+    const threshold30 = Math.max(1, Math.floor((bot.totalInitialParts || 1) * 0.30));
+    const dmgPctNow = (typeof getBotDamagePercent === 'function') ? getBotDamagePercent(bot) : 0;
+    if (!bot.weaponDestroyed && (remainingCount <= threshold30 || dmgPctNow > 70)) {
+      bot.weaponDestroyed = true;
+      bot.weaponMotorBroken = true;
+      bot.weaponActive = false;
+      bot.weaponSpinSpeed = 0;
+      bot.weaponStallTimer = 0;
+      if (typeof AudioSys !== 'undefined' && AudioSys.weaponStallSound) AudioSys.weaponStallSound();
+    }
 
     // If remaining parts dropped to <= 20%, trigger explosion immediately so ALL remaining parts fly out all at once!
     if (remainingCount <= threshold20) {
@@ -1226,15 +1240,19 @@
 
   function getBotDamagePercent(bot) {
     if (!bot) return 0;
-    const maxHp = bot.maxDriveHealth || 100;
+    const maxHp = bot.maxDriveHealth || 900;
     const hpLoss = Math.max(0, Math.min(100, ((maxHp - (bot.driveHealth ?? maxHp)) / maxHp) * 100));
-    let armorLoss = hpLoss;
-    if (bot.armorPanels && bot.armorPanels.length > 0) {
+    let partsLoss = 0;
+    if (bot.detachableParts && bot.detachableParts.length > 0) {
+      const initialTotal = Math.max(1, bot.totalInitialParts || bot.detachableParts.length);
+      const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
+      partsLoss = Math.max(0, Math.min(100, ((initialTotal - remainingCount) / initialTotal) * 100));
+    } else if (bot.armorPanels && bot.armorPanels.length > 0) {
       const total = bot.armorPanels.length;
       const detached = bot.armorPanels.filter(p => !p.attached).length;
-      armorLoss = (detached / total) * 100;
+      partsLoss = (detached / total) * 100;
     }
-    return Math.max(hpLoss, hpLoss * 0.70 + armorLoss * 0.30);
+    return Math.max(hpLoss, partsLoss);
   }
 
   function isBotFlaming(bot) {

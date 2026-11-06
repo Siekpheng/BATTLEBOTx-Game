@@ -2241,7 +2241,9 @@
       const rpmFill = document.getElementById('weapon-rpm-fill');
       if (rpmText && rpmFill) {
         if (myLocalBot.weaponDestroyed || myLocalBot.isEntirelyDestroyed) {
-          rpmText.textContent = myLocalBot.weaponBeltRipped ? '0% (BELT RIPPED — BROKEN)' : '0% (WEAPON DESTROYED)';
+          rpmText.textContent = myLocalBot.weaponBeltRipped
+            ? '0% (BELT RIPPED — BROKEN)'
+            : (myLocalBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
           rpmText.style.color = '#ef4444';
           rpmFill.style.width = '0%';
           rpmFill.classList.remove('ready');
@@ -2463,7 +2465,9 @@
           const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');
           if (p2RpmText && p2RpmFill) {
             if (enemyBot.weaponDestroyed || enemyBot.isEntirelyDestroyed) {
-              p2RpmText.textContent = enemyBot.weaponBeltRipped ? '0% (BELT RIPPED — BROKEN)' : '0% (WEAPON DESTROYED)';
+              p2RpmText.textContent = enemyBot.weaponBeltRipped
+                ? '0% (BELT RIPPED — BROKEN)'
+                : (enemyBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
               p2RpmText.style.color = '#ef4444';
               p2RpmFill.style.width = '0%';
               p2RpmFill.classList.remove('ready');
