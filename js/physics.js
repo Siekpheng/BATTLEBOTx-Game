@@ -291,14 +291,15 @@
           triggerGamepadRumble(Math.min(0.55, 0.2 + Math.abs(velDot) * 0.08), 120, bot);
         }
 
-        // Wall weapon collision: if front strikes arena wall with spinning weapon, stall weapon briefly
+        // Wall weapon collision: ONLY stall weapon if front crashes into arena wall at high speed (velDot > 5.2)
+        // Pressing/sliding along the wall or pinning an opponent against the wall will NOT stall the weapon!
         const wallFrontDot = Math.sin(bot.yaw) * outNx + Math.cos(bot.yaw) * outNz;
-        const minWallStallSpin = 45.0; // Equal threshold for both robots
-        if (wallFrontDot > 0.4 && bot.weaponSpinSpeed >= minWallStallSpin) {
+        const minWallStallSpin = 55.0; // Equal threshold for both robots
+        if (velDot > 5.2 && wallFrontDot > 0.45 && bot.weaponSpinSpeed >= minWallStallSpin) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(outNx * 0.8, 0.3, outNz * 0.8)), 25);
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             AudioSys.metalClashSound(1.6, true);
-            bot.weaponSpinSpeed = 0; // Stalls weapon briefly on wall impact, then automatically spins back up!
+            bot.weaponSpinSpeed = 0; // Stalls weapon briefly on hard wall crash, then automatically spins back up!
             bot.weaponStallTimer = 1.0;
             AudioSys.weaponStallSound();
           }
@@ -700,10 +701,15 @@
     const eRad = eSpecs.collisionRadius || 1.12;
     const minDist = pRad + eRad;
 
-    if (dist < minDist && dist > 0.0001) {
+    const nowPerf = performance.now();
+    const wasInContactRecently = !!(window._lastBotContactPerf && (nowPerf - window._lastBotContactPerf < 320));
+    const grindEnvelope = wasInContactRecently ? 0.14 : 0.0;
+
+    if (dist < (minDist + grindEnvelope) && dist > 0.0001) {
+      window._lastBotContactPerf = nowPerf;
       const nx = dx / dist;
       const nz = dz / dist;
-      const overlap = minDist - dist;
+      const overlap = Math.max(0, minDist - dist);
 
       // Mass-weighted separation (heavier armored tanks yield less than compact lightweight bots)
       const pWeight = (pSpecs.maxHealth || 300) * (pSpecs.pushTractionMult || 1.0);
@@ -712,10 +718,12 @@
       const pMoveRatio = eWeight / totalWeight;
       const eMoveRatio = pWeight / totalWeight;
 
-      playerBot.x -= nx * overlap * pMoveRatio;
-      playerBot.z -= nz * overlap * pMoveRatio;
-      enemyBot.x += nx * overlap * eMoveRatio;
-      enemyBot.z += nz * overlap * eMoveRatio;
+      if (overlap > 0) {
+        playerBot.x -= nx * overlap * pMoveRatio;
+        playerBot.z -= nz * overlap * pMoveRatio;
+        enemyBot.x += nx * overlap * eMoveRatio;
+        enemyBot.z += nz * overlap * eMoveRatio;
+      }
 
       const rvx = playerBot.vx - enemyBot.vx;
       const rvz = playerBot.vz - enemyBot.vz;
@@ -725,7 +733,7 @@
       // Whenever the two robots collide or strike each other during a match,
       // immediately reset the 10-second Referee KO / Draw countdowns and hold a 2.5s engagement grace window
       // so the attacking robot can keep fighting for No Mercy Total Destruction without a premature KO count-out!
-      if (typeof matchState !== 'undefined' && matchState === 'playing' && impactSpeed > 0.3) {
+      if (typeof matchState !== 'undefined' && matchState === 'playing') {
         combatEngageTimer = 2.5;
         if (playerBot) playerBot.stoppedTimer = 0.0;
         if (enemyBot) enemyBot.stoppedTimer = 0.0;
@@ -743,13 +751,19 @@
 
       const pFwdDot = Math.sin(playerBot.yaw) * nx + Math.cos(playerBot.yaw) * nz;
       const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
-      const minWpSpin = 40.0;
       const isPrac = (gameMode === 'practice');
       const pReach = pSpecs.weaponReach;
       const eReach = eSpecs.weaponReach;
-      const isPWeaponImpact = (playerBot.weaponActive !== false && pFwdDot > pReach && playerBot.weaponSpinSpeed >= minWpSpin);
-      const isEWeaponImpact = (!isPrac && enemyBot.weaponActive !== false && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= minWpSpin);
-      const isKineticStrike = (impactSpeed > 1.8) && (isPWeaponImpact || isEWeaponImpact);
+
+      // Discrete high-speed weapon strike ONLY occurs on a fresh high-speed closing collision (!wasInContactRecently)
+      // when the weapon is already spun up near max RPM (>= 78% maxWeaponRpm).
+      // When ramming, pushing, or winding up in close contact, the weapon NEVER stalls — it winds up to 100% and grinds continuously!
+      const pHighSpinThreshold = (pSpecs.maxWeaponRpm || 95) * 0.78;
+      const eHighSpinThreshold = (eSpecs.maxWeaponRpm || 95) * 0.78;
+      const isFreshHighSpeedCharge = (!wasInContactRecently && relNormalVel > 4.2 && impactSpeed > 5.0);
+      const isPWeaponImpact = isFreshHighSpeedCharge && (playerBot.weaponActive !== false && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
+      const isEWeaponImpact = isFreshHighSpeedCharge && (!isPrac && enemyBot.weaponActive !== false && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+      const isKineticStrike = isPWeaponImpact || isEWeaponImpact;
 
       if (isKineticStrike) {
         // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
@@ -764,7 +778,7 @@
         // Inelastic steel crunch (e = 0.08) absorbs relative approach speed cleanly,
         // turning high-speed head-on rams into solid, crunchy, weighted collisions!
         // ========================================================
-        if (relNormalVel > 0.04) {
+        if (overlap > 0 && relNormalVel > 0.04) {
           const restitution = 0.08; // 8% minimal bounce (solid steel energy absorption)
           const dampedNormalImpulse = (1.0 + restitution) * relNormalVel;
           playerBot.vx -= nx * dampedNormalImpulse * pMoveRatio;
@@ -837,8 +851,8 @@
 
       // Exact hull contact interface between the two robots (accurate even when Robot 6 collides with a full-size bot)
       const midPos = new THREE.Vector3(playerBot.x + nx * pRad, 0.3, playerBot.z + nz * pRad);
-      // Only play collision audio when there is an actual closing impact (not silent pushing/grinding)
-      if (impactSpeed > 1.8) {
+      // Only play discrete collision audio when there is an actual closing impact (not silent pushing/grinding)
+      if (!wasInContactRecently && impactSpeed > 1.8) {
         AudioSys.metalClashSound(Math.min(2.6, 0.65 + impactSpeed * 0.26), impactSpeed > 5.0);
       }
 
@@ -851,148 +865,88 @@
       const pHitForward = nx * Math.sin(playerBot.yaw) + nz * Math.cos(playerBot.yaw);
       const pHitRight   = nx * Math.cos(playerBot.yaw) - nz * Math.sin(playerBot.yaw);
 
-      const minWeaponSpin = 40.0;
       const isPractice = (gameMode === 'practice');
-      const nowPerf = performance.now();
 
-      // Continuous weapon-contact grinding sparks & light gradual grinding wear:
-      // When two robots are pushing/ramming against each other (`impactSpeed <= 1.8`) and a robot's weapon spins back up (`>= minWeaponSpin`)
-      // while pressing into the opponent, it emits grinding sparks and wears down armor gradually (requires 2-3 grind bites for 1 part to detach,
-      // or 3-4 grind bites for Robot 6's small weapon, and never detaches 2 parts at once).
-      if (impactSpeed <= 1.8) {
-        const pReachGrind = pSpecs.weaponReach;
-        const eReachGrind = eSpecs.weaponReach;
-        const pSpinningContact = (playerBot.weaponActive !== false && (playerBot.weaponStallTimer || 0) <= 0 && pForwardDot > pReachGrind && playerBot.weaponSpinSpeed >= minWeaponSpin);
-        const eSpinningContact = (!isPractice && enemyBot.weaponActive !== false && (enemyBot.weaponStallTimer || 0) <= 0 && eForwardDot > eReachGrind && enemyBot.weaponSpinSpeed >= minWeaponSpin);
-        if (pSpinningContact || eSpinningContact) {
-          if (!window._lastWeaponGrindSparkTime || nowPerf - window._lastWeaponGrindSparkTime > 90) {
-            window._lastWeaponGrindSparkTime = nowPerf;
-            spawnCollisionSparks(midPos, 10);
-            AudioSys.metalClashSound(0.85, false);
-          }
+      // ========================================================
+      // CONTINUOUS WEAPON WIND-UP & GRINDING DAMAGE DURING RAMMING / PUSHING
+      // - Whenever robots are ramming/pushing in close contact (!isKineticStrike), weapons NEVER stall!
+      // - The weapon winds up smoothly all the way to 100% RPM and stays spinning continuously while grinding.
+      // - Deals continuous gradual health wear every frame and detaches 1 part every ~1.10s of continuous grinding
+      //   (~1.55s for Robot 6's small weapon) without stalling the weapon or flinging the opponent away!
+      // ========================================================
+      const minGrindSpin = 12.0;
+      const pReachGrind = pSpecs.weaponReach;
+      const eReachGrind = eSpecs.weaponReach;
+      const pSpinningContact = (!isKineticStrike && playerBot.weaponActive !== false && (playerBot.weaponStallTimer || 0) <= 0 && pForwardDot > pReachGrind && playerBot.weaponSpinSpeed >= minGrindSpin);
+      const eSpinningContact = (!isKineticStrike && !isPractice && enemyBot.weaponActive !== false && (enemyBot.weaponStallTimer || 0) <= 0 && eForwardDot > eReachGrind && enemyBot.weaponSpinSpeed >= minGrindSpin);
 
-          // Accumulate grinding contact time (~0.35s of active spinning contact triggers 1 light grind bite)
-          if (pSpinningContact) {
-            playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016;
-          } else {
-            playerBot._grindContactTimer = 0;
-          }
-          if (eSpinningContact) {
-            enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016;
-          } else {
-            enemyBot._grindContactTimer = 0;
-          }
+      if (pSpinningContact || eSpinningContact) {
+        const pRpmRatio = pSpinningContact ? Math.min(1.0, playerBot.weaponSpinSpeed / (pSpecs.maxWeaponRpm || 95)) : 0;
+        const eRpmRatio = eSpinningContact ? Math.min(1.0, enemyBot.weaponSpinSpeed / (eSpecs.maxWeaponRpm || 95)) : 0;
+        const maxGrindRpmRatio = Math.max(pRpmRatio, eRpmRatio);
 
-          if (pSpinningContact && eSpinningContact && (playerBot._grindContactTimer >= 0.35 || enemyBot._grindContactTimer >= 0.35)) {
-            playerBot._grindContactTimer = 0;
-            enemyBot._grindContactTimer = 0;
+        // Continuous grinding sparks & metallic grinding sound (scales with current weapon RPM as it winds up)
+        if (!window._lastWeaponGrindSparkTime || nowPerf - window._lastWeaponGrindSparkTime > 85) {
+          window._lastWeaponGrindSparkTime = nowPerf;
+          const grindSparkCount = Math.max(4, Math.round(5 + maxGrindRpmRatio * 10));
+          spawnCollisionSparks(midPos, grindSparkCount);
+          AudioSys.metalClashSound(0.55 + maxGrindRpmRatio * 0.45, false);
+          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: grindSparkCount });
+          }
+        }
+
+        // Continuous gradual health wear & part-shearing progress (weapon keeps spinning without stalling!)
+        if (pSpinningContact) {
+          const pGrindRate = 0.40 + 0.60 * pRpmRatio;
+          playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
+          const pContinuousDps = (playerBot.type === 'robot6') ? 4.5 : 8.0;
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 300) - pContinuousDps * pGrindRate * 0.016);
+
+          const pGrindInterval = (playerBot.type === 'robot6') ? 1.55 : 1.10;
+          if (playerBot._grindContactTimer >= pGrindInterval) {
+            playerBot._grindContactTimer -= pGrindInterval;
             AudioSys.weaponSliceSound();
-            spawnCollisionSparks(midPos, 20);
-            const grindPush = 2.4;
-            playerBot.vx -= nx * grindPush;
-            playerBot.vz -= nz * grindPush;
-            enemyBot.vx += nx * grindPush;
-            enemyBot.vz += nz * grindPush;
-            if (!isPractice) {
-              playerBot.grindHitCount = (playerBot.grindHitCount || 0) + 1;
-              if (!playerBot.grindHitsRequired) {
-                playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-              }
-              if (playerBot.grindHitCount >= playerBot.grindHitsRequired) {
-                playerBot.grindHitCount = 0;
-                playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-              }
-            }
-            enemyBot.grindHitCount = (enemyBot.grindHitCount || 0) + 1;
-            if (!enemyBot.grindHitsRequired) {
-              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-            }
-            if (enemyBot.grindHitCount >= enemyBot.grindHitsRequired) {
-              enemyBot.grindHitCount = 0;
-              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            }
-            if (typeof matchState === 'undefined' || matchState !== 'menu') {
-              playerBot.weaponSpinSpeed = 0;
-              enemyBot.weaponSpinSpeed = 0;
-              playerBot.weaponStallTimer = pSpecs.defendStall;
-              enemyBot.weaponStallTimer = eSpecs.defendStall;
-              AudioSys.weaponStallSound();
-            }
-          } else if (pSpinningContact && playerBot._grindContactTimer >= 0.35) {
-            playerBot._grindContactTimer = 0;
+            const burstSparksP = (playerBot.type === 'robot6') ? 10 : 16;
+            spawnCollisionSparks(midPos, burstSparksP);
+            // Subtle grinding vibration jolt (does NOT fling opponent away or stall weapon!)
+            enemyBot.vx += nx * 0.35;
+            enemyBot.vz += nz * 0.35;
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
+          }
+        }
+
+        if (eSpinningContact) {
+          const eGrindRate = 0.40 + 0.60 * eRpmRatio;
+          enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
+          const eContinuousDps = (enemyBot.type === 'robot6') ? 4.5 : 8.0;
+          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 300) - eContinuousDps * eGrindRate * 0.016);
+
+          const eGrindInterval = (enemyBot.type === 'robot6') ? 1.55 : 1.10;
+          if (enemyBot._grindContactTimer >= eGrindInterval) {
+            enemyBot._grindContactTimer -= eGrindInterval;
             AudioSys.weaponSliceSound();
-            const grindSparksP = (playerBot.type === 'robot6') ? 10 : 18;
-            spawnCollisionSparks(midPos, grindSparksP);
-            const pGrindFling = pSpecs.flingBase * 0.50;
-            enemyBot.vx += nx * pGrindFling;
-            enemyBot.vz += nz * pGrindFling;
-            playerBot.vx -= nx * 1.1;
-            playerBot.vz -= nz * 1.1;
-            enemyBot.grindHitCount = (enemyBot.grindHitCount || 0) + 1;
-            if (!enemyBot.grindHitsRequired) {
-              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-            }
-            if (enemyBot.grindHitCount >= enemyBot.grindHitsRequired) {
-              enemyBot.grindHitCount = 0;
-              enemyBot.grindHitsRequired = (playerBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            }
-            if (typeof matchState === 'undefined' || matchState !== 'menu') {
-              playerBot.weaponSpinSpeed = 0;
-              enemyBot.weaponSpinSpeed = 0;
-              playerBot.weaponStallTimer = pSpecs.attackStall;
-              enemyBot.weaponStallTimer = eSpecs.defendStall;
-              AudioSys.weaponStallSound();
-            }
-          } else if (eSpinningContact && enemyBot._grindContactTimer >= 0.35) {
-            enemyBot._grindContactTimer = 0;
-            AudioSys.weaponSliceSound();
-            const grindSparksE = (enemyBot.type === 'robot6') ? 10 : 18;
-            spawnCollisionSparks(midPos, grindSparksE);
-            const eGrindFling = eSpecs.flingBase * 0.50;
-            playerBot.vx -= nx * eGrindFling;
-            playerBot.vz -= nz * eGrindFling;
-            enemyBot.vx += nx * 1.1;
-            enemyBot.vz += nz * 1.1;
+            const burstSparksE = (enemyBot.type === 'robot6') ? 10 : 16;
+            spawnCollisionSparks(midPos, burstSparksE);
+            playerBot.vx -= nx * 0.35;
+            playerBot.vz -= nz * 0.35;
             triggerDamageVignette();
-            playerBot.grindHitCount = (playerBot.grindHitCount || 0) + 1;
-            if (!playerBot.grindHitsRequired) {
-              playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-            }
-            if (playerBot.grindHitCount >= playerBot.grindHitsRequired) {
-              playerBot.grindHitCount = 0;
-              playerBot.grindHitsRequired = (enemyBot.type === 'robot6') ? (3 + Math.floor(Math.random() * 2)) : (2 + Math.floor(Math.random() * 2));
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
-            if (typeof matchState === 'undefined' || matchState !== 'menu') {
-              enemyBot.weaponSpinSpeed = 0;
-              playerBot.weaponSpinSpeed = 0;
-              enemyBot.weaponStallTimer = eSpecs.attackStall;
-              playerBot.weaponStallTimer = pSpecs.defendStall;
-              AudioSys.weaponStallSound();
-            }
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
           }
+        }
 
-          if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
-          } else if (!isPractice && playerBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
-          } else if (enemyBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
-          }
-        } else {
-          playerBot._grindContactTimer = 0;
-          enemyBot._grindContactTimer = 0;
+        if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+          if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
+        } else if (!isPractice && playerBot.isEntirelyDestroyed) {
+          if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
+        } else if (enemyBot.isEntirelyDestroyed) {
+          if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
         }
       }
 
-      if (impactSpeed > 1.8) {
-        const pReachHit = pSpecs.weaponReach;
-        const eReachHit = eSpecs.weaponReach;
-        const isPWeaponHit = (playerBot.weaponActive !== false && pForwardDot > pReachHit && playerBot.weaponSpinSpeed >= minWeaponSpin);
-        const isEWeaponHit = (!isPractice && enemyBot.weaponActive !== false && eForwardDot > eReachHit && enemyBot.weaponSpinSpeed >= minWeaponSpin);
+      if (isKineticStrike || (impactSpeed > 1.8 && !pSpinningContact && !eSpinningContact)) {
+        const isPWeaponHit = isPWeaponImpact;
+        const isEWeaponHit = isEWeaponImpact;
         const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
 
         if (isBothWeaponClash) {
@@ -1471,6 +1425,9 @@
           }
         }
       }
+    } else if (!wasInContactRecently) {
+      if (playerBot._grindContactTimer > 0) playerBot._grindContactTimer = Math.max(0, playerBot._grindContactTimer - 0.032);
+      if (enemyBot._grindContactTimer > 0) enemyBot._grindContactTimer = Math.max(0, enemyBot._grindContactTimer - 0.032);
     }
   }
 
