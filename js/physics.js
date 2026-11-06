@@ -377,49 +377,20 @@
         const gyroDanceTilt = -steerVal * spinFactor * 0.12 * gyroMult;
         bot.roll = THREE.MathUtils.lerp(bot.roll, gyroDanceTilt, Math.min(1.0, 12.0 * dt));
       }
-      // Bi-stable Pitch Physics (end-over-end frontflip/backflip on ground)
-      if (bot.flipped || Math.abs(bot.pitch) > 0.04 || Math.abs(bot.pitchVel) > 0.04) {
-        bot.pitch += bot.pitchVel * dt;
-        while (bot.pitch > Math.PI) bot.pitch -= Math.PI * 2;
-        while (bot.pitch < -Math.PI) bot.pitch += Math.PI * 2;
-
-        const targetPitch = Math.abs(bot.pitch) > Math.PI * 0.48 ? (bot.pitch > 0 ? Math.PI : -Math.PI) : 0;
-        const pitchError = targetPitch - bot.pitch;
-        bot.pitchVel += pitchError * 35 * dt;
-        bot.pitchVel *= Math.pow(0.04, dt);
-
-        if (Math.abs(bot.pitch) < 0.03 && Math.abs(bot.pitchVel) < 0.15) {
-          bot.pitch = 0;
-          bot.pitchVel = 0;
-        } else if (Math.abs(Math.abs(bot.pitch) - Math.PI) < 0.04 && Math.abs(bot.pitchVel) < 0.15) {
-          bot.pitch = (bot.pitch > 0 ? Math.PI : -Math.PI);
-          bot.pitchVel = 0;
-        }
-      } else {
-        bot.pitch = 0;
+      // Ground Leveling & Flip Resting Physics
+      if (bot.flipped) {
+        // Flipped upside down on roof: cleanly settle inverted without oscillating
+        const targetPitch = (bot.pitch > 0 ? Math.PI : -Math.PI);
+        bot.pitch = THREE.MathUtils.lerp(bot.pitch, targetPitch, Math.min(1.0, 24.0 * dt));
         bot.pitchVel = 0;
-      }
-
-      // Bi-stable Roll Physics (barrel roll sideways on ground)
-      if (bot.flipped || Math.abs(bot.roll) > 0.04 || Math.abs(bot.rollVel) > 0.04) {
-        bot.roll += bot.rollVel * dt;
-        while (bot.roll > Math.PI) bot.roll -= Math.PI * 2;
-        while (bot.roll < -Math.PI) bot.roll += Math.PI * 2;
-
-        const targetRoll = Math.abs(bot.roll) > Math.PI * 0.48 ? (bot.roll > 0 ? Math.PI : -Math.PI) : 0;
-        const rollError = targetRoll - bot.roll;
-        bot.rollVel += rollError * 35 * dt;
-        bot.rollVel *= Math.pow(0.04, dt);
-
-        if (Math.abs(bot.roll) < 0.03 && Math.abs(bot.rollVel) < 0.15) {
-          bot.roll = 0;
-          bot.rollVel = 0;
-        } else if (Math.abs(Math.abs(bot.roll) - Math.PI) < 0.04 && Math.abs(bot.rollVel) < 0.15) {
-          bot.roll = (bot.roll > 0 ? Math.PI : -Math.PI);
-          bot.rollVel = 0;
-        }
+        const targetRoll = (bot.roll > 0 ? Math.PI : -Math.PI);
+        bot.roll = THREE.MathUtils.lerp(bot.roll, targetRoll, Math.min(1.0, 24.0 * dt));
+        bot.rollVel = 0;
       } else {
-        bot.roll = 0;
+        // Firmly grounded on wheels: critically damped alignment flat to the arena floor (zero goofy rocking!)
+        bot.pitch = THREE.MathUtils.lerp(bot.pitch, 0, Math.min(1.0, 32.0 * dt));
+        bot.pitchVel = 0;
+        bot.roll = THREE.MathUtils.lerp(bot.roll, 0, Math.min(1.0, 32.0 * dt));
         bot.rollVel = 0;
       }
     }
@@ -1096,11 +1067,21 @@
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
 
-          // Natural vertical pop / hop on clash
-          playerBot.vy = 2.1 + Math.random() * 0.4;
-          playerBot.airY = 0.16;
-          enemyBot.vy = 2.1 + Math.random() * 0.4;
-          enemyBot.airY = 0.16;
+          // Firmly grounded on wheels with clean flat recoil slide (NO floaty air hop & NO goofy rocking!)
+          playerBot.vy = 0;
+          playerBot.airY = 0;
+          enemyBot.vy = 0;
+          enemyBot.airY = 0;
+
+          playerBot.pitch = 0;
+          playerBot.pitchVel = 0;
+          playerBot.roll = 0;
+          playerBot.rollVel = 0;
+
+          enemyBot.pitch = 0;
+          enemyBot.pitchVel = 0;
+          enemyBot.roll = 0;
+          enemyBot.rollVel = 0;
 
           // Recoil slide timers so both robots slide apart across the arena floor
           playerBot.recoilLockTimer = 0.30;
@@ -1129,11 +1110,6 @@
             playerBot.vz += nx * tangKick;
             playerBot.yaw += 0.28;
           }
-
-          playerBot.pitchVel = (pHitForward > 0 ? -3.4 : 3.4);
-          enemyBot.pitchVel = (eHitForward > 0 ? -3.4 : 3.4);
-          playerBot.rollVel = (Math.random() - 0.5) * 1.5;
-          enemyBot.rollVel = (Math.random() - 0.5) * 1.5;
 
           spawnCollisionSparks(midPos, 65);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
@@ -1237,6 +1213,14 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
+            enemyBot.pitch = 0;
+            enemyBot.pitchVel = 0;
+            enemyBot.roll = 0;
+            enemyBot.rollVel = 0;
+            playerBot.pitch = 0;
+            playerBot.pitchVel = 0;
+            playerBot.roll = 0;
+            playerBot.rollVel = 0;
             enemyBot.recoilLockTimer = 0.28;
             playerBot.recoilLockTimer = 0.16;
             const pFling = Math.max(7.2, (pSpecs.flingBase || 4.0) * 1.35 + impactSpeed * (pSpecs.flingSpeedMult || 0.45));
@@ -1253,14 +1237,6 @@
               playerBot.vx -= (-nz) * (tangKick * 0.45);
               playerBot.vz -= nx * (tangKick * 0.45);
               playerBot.yaw += 0.14;
-            }
-
-            if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
-              enemyBot.rollVel = 0;
-            } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -1.2 : 1.2);
-              enemyBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO enemyBot.flipped = true
 
@@ -1372,6 +1348,14 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
+            playerBot.pitch = 0;
+            playerBot.pitchVel = 0;
+            playerBot.roll = 0;
+            playerBot.rollVel = 0;
+            enemyBot.pitch = 0;
+            enemyBot.pitchVel = 0;
+            enemyBot.roll = 0;
+            enemyBot.rollVel = 0;
             playerBot.recoilLockTimer = 0.28;
             enemyBot.recoilLockTimer = 0.16;
             const eFling = Math.max(7.2, (eSpecs.flingBase || 4.0) * 1.35 + impactSpeed * (eSpecs.flingSpeedMult || 0.45));
@@ -1388,14 +1372,6 @@
               enemyBot.vx += (-nz) * (tangKick * 0.45);
               enemyBot.vz += nx * (tangKick * 0.45);
               enemyBot.yaw += 0.14;
-            }
-
-            if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);
-              playerBot.rollVel = 0;
-            } else {
-              playerBot.rollVel = (pHitRight > 0 ? -1.2 : 1.2);
-              playerBot.pitchVel = 0;
             }
             // Firmly remains on wheels: NO playerBot.flipped = true
 
@@ -1491,7 +1467,8 @@
               window._lastPracRamCountTime = nowPerf;
               enemyBot.vy = 0;
               enemyBot.airY = 0;
-              enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
+              enemyBot.pitchVel = 0;
+              enemyBot.rollVel = 0;
               applyRamHitCounter(enemyBot, nx, nz);
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
@@ -1507,7 +1484,8 @@
               window._lastPRamCountTime = nowPerf;
               enemyBot.vy = 0;
               enemyBot.airY = 0;
-              enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
+              enemyBot.pitchVel = 0;
+              enemyBot.rollVel = 0;
               applyRamHitCounter(enemyBot, nx, nz);
               if (impactSpeed >= 6.5 && enemyBot.weaponSpinSpeed > 0) {
                 enemyBot.weaponSpinSpeed = 0;
@@ -1521,7 +1499,8 @@
               triggerDamageVignette();
               playerBot.vy = 0;
               playerBot.airY = 0;
-              playerBot.rollVel = (pHitRight > 0 ? -1.5 : 1.5);
+              playerBot.pitchVel = 0;
+              playerBot.rollVel = 0;
               applyRamHitCounter(playerBot, -nx, -nz);
               if (impactSpeed >= 6.5 && playerBot.weaponSpinSpeed > 0) {
                 playerBot.weaponSpinSpeed = 0;
