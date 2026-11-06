@@ -575,7 +575,7 @@
   }
   window.explodeRobot = explodeRobot;
 
-  function detachSinglePart(bot, impactDir = { x: 0, z: 1 }, hitPoint = null, forcedPartIdx = null) {
+  function detachSinglePart(bot, impactDir = { x: 0, z: 1 }, hitPoint = null, forcedPartIdx = null, suppressExtraSparks = false) {
     if (!bot || bot.isEntirelyDestroyed) return null;
     if (!bot.detachableParts || bot.detachableParts.length === 0) {
       initBotDetachableParts(bot);
@@ -771,7 +771,9 @@
     });
 
     if (typeof AudioSys !== 'undefined' && AudioSys.metalClashSound) AudioSys.metalClashSound(1.9, true);
-    spawnCollisionSparks(worldPos, 26);
+    if (!suppressExtraSparks) {
+      spawnCollisionSparks(worldPos, 26);
+    }
     if (typeof AudioSys !== 'undefined' && AudioSys.crowdGasp) AudioSys.crowdGasp(0.75);
     addCameraTrauma(0.26);
     triggerGamepadRumble(0.60, 190);
