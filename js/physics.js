@@ -706,8 +706,8 @@
 
   function handleBotCollision() {
     if (!playerBot || !enemyBot) return;
-    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
-    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { mass: 250, weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { mass: 250, weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
 
     const dx = enemyBot.x - playerBot.x;
     const dz = enemyBot.z - playerBot.z;
@@ -726,9 +726,9 @@
       const nz = dz / dist;
       const overlap = Math.max(0, minDist - dist);
 
-      // Mass-weighted separation (heavier armored tanks yield less than compact lightweight bots)
-      const pWeight = (pSpecs.maxHealth || 300) * (pSpecs.pushTractionMult || 1.0);
-      const eWeight = (eSpecs.maxHealth || 300) * (eSpecs.pushTractionMult || 1.0);
+      // Mass-weighted separation (all full-size robots 1-5 have identical 250 lb mass; Robot 6 is the only lightweight bot at 160 lb)
+      const pWeight = (pSpecs.mass || 250);
+      const eWeight = (eSpecs.mass || 250);
       const totalWeight = pWeight + eWeight || 1;
       const pMoveRatio = eWeight / totalWeight;
       const eMoveRatio = pWeight / totalWeight;
@@ -871,11 +871,17 @@
           playerBot.pitch = THREE.MathUtils.lerp(playerBot.pitch || 0, -0.11 * Math.sign(pFwdDot || 1), 0.18);
         }
 
-        const pTraction = ((playerBot.type === 'robot3' || playerBot.type === 'robot5') ? Math.min(2.0, pWheels) : (pWheels / 2)) * (pSpecs.pushTractionMult || 1.0) * pWheelAlignment * pWedgeGripPenalty;
-        const eTraction = ((enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? Math.min(2.0, eWheels) : (eWheels / 2)) * (eSpecs.pushTractionMult || 1.0) * eWheelAlignment * eWedgeGripPenalty;
+        // Wheel traction: normalized to attached wheel ratio so 2-wheel and 4-wheel bots push with equal traction when intact
+        const pMaxWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.length : ((playerBot.type === 'robot2' || playerBot.type === 'robot4' || playerBot.type === 'robot6') ? 4 : 2);
+        const eMaxWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.length : ((enemyBot.type === 'robot2' || enemyBot.type === 'robot4' || enemyBot.type === 'robot6') ? 4 : 2);
+        const pWheelHealth = Math.min(1.0, Math.max(0.0, pWheels / pMaxWheels));
+        const eWheelHealth = Math.min(1.0, Math.max(0.0, eWheels / eMaxWheels));
+
+        const pTraction = pWheelHealth * (pSpecs.pushTractionMult || 1.0) * pWheelAlignment * pWedgeGripPenalty;
+        const eTraction = eWheelHealth * (eSpecs.pushTractionMult || 1.0) * eWheelAlignment * eWedgeGripPenalty;
         const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * pTraction;
         const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * eTraction;
-        const netPushTraction = (pDriveForce - eDriveForce) * 2.6 * 0.016;
+        const netPushTraction = (pDriveForce - eDriveForce) * 5.2 * 0.016;
 
         playerBot.vx += nx * netPushTraction;
         playerBot.vz += nz * netPushTraction;

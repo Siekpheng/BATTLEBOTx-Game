@@ -15,6 +15,7 @@
     robot1: {
       name: 'Razor',
       role: 'Fast Spin · Wedge Lifter',
+      mass: 250,             // Standard 250 lb combat heavyweight
       maxHealth: 900,
       maxSpeed: 15.8,
       turnRate: 3.65,
@@ -30,7 +31,7 @@
       flingSpeedMult: 0.46,
       flipChance: 0.32,      // Front ramp wedges + angled blade lift opponents more easily
       flipResistance: 1.0,
-      pushTractionMult: 1.05,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.35,
       partDamageHigh: 1,
       partDivisor: 28,
@@ -42,6 +43,7 @@
     robot2: {
       name: 'IronClad',
       role: 'Heavy Armor · Juggernaut Tank',
+      mass: 250,             // Standard 250 lb combat heavyweight (equal physical weight to Robots 1, 3, 4, 5)
       maxHealth: 1080,       // +20% reinforced tank hull durability (3x baseline HP)
       maxSpeed: 13.8,        // Heavier armored chassis
       turnRate: 3.15,
@@ -56,8 +58,8 @@
       flingBase: 4.6,
       flingSpeedMult: 0.48,
       flipChance: 0.22,
-      flipResistance: 0.60,  // Heavy low center-of-gravity resists getting flipped by 40%
-      pushTractionMult: 1.45,// Superior 4WD pushing power in bumper-to-bumper shoving matches
+      flipResistance: 0.60,  // Low center-of-gravity resists getting flipped
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots (no longer bulldozes)
       partDamageChance: 0.32,
       partDamageHigh: 1,
       partDivisor: 34,       // Reinforced armor plates absorb more hits before depleting HP
@@ -69,6 +71,7 @@
     robot3: {
       name: 'KineticBar',
       role: 'Wide Reach · Multi-Part Shredder',
+      mass: 250,             // Standard 250 lb combat heavyweight
       maxHealth: 870,
       maxSpeed: 15.0,
       turnRate: 3.75,
@@ -84,7 +87,7 @@
       flingSpeedMult: 0.55,
       flipChance: 0.18,
       flipResistance: 1.0,
-      pushTractionMult: 1.0,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.45,
       partDamageHigh: 1,
       partDivisor: 28,
@@ -96,6 +99,7 @@
     robot4: {
       name: 'VertForce',
       role: 'Heavy Disc · Uppercut Launcher',
+      mass: 250,             // Standard 250 lb combat heavyweight
       maxHealth: 930,
       maxSpeed: 14.8,
       turnRate: 3.40,
@@ -110,7 +114,7 @@
       flingBase: 6.4,        // Highest knockback fling & vertical launch force
       flipChance: 0.38,      // Highest uppercut flip probability on solid vertical hits
       flipResistance: 0.85,
-      pushTractionMult: 1.15,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.42,
       partDamageHigh: 1,
       partDivisor: 30,
@@ -122,6 +126,7 @@
     robot5: {
       name: 'BlueThunder',
       role: 'Rapid Drum · Non-Stop Brawler',
+      mass: 250,             // Standard 250 lb combat heavyweight
       maxHealth: 945,
       maxSpeed: 15.6,
       turnRate: 3.85,        // Snappy 2WD pivot turning
@@ -137,7 +142,7 @@
       flingSpeedMult: 0.48,
       flipChance: 0.26,
       flipResistance: 0.90,
-      pushTractionMult: 1.15,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.38,// Consistent relentless part grinding
       partDamageHigh: 1,
       partDivisor: 30,
@@ -149,6 +154,7 @@
     robot6: {
       name: 'Vortex',
       role: 'Mini Speedster · Light Damage',
+      mass: 160,             // Compact lightweight frame (only lightweight bot at 160 lb)
       maxHealth: 795,        // Compact lightweight frame (3x baseline HP)
       maxSpeed: 19.5,        // Fastest robot in the arena
       turnRate: 4.60,        // Ultra-nimble cornering
