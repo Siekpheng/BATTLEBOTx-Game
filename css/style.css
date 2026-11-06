@@ -1536,7 +1536,8 @@
       border: 1.5px solid rgba(59, 130, 246, 0.65);
     }
     .splitscreen-badge.p2-badge {
-      left: calc(50% + 18px);
+      right: 18px;
+      left: auto;
       color: #f87171;
       border: 1.5px solid rgba(239, 68, 68, 0.65);
     }
