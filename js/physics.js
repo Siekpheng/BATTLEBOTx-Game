@@ -789,12 +789,13 @@
       const pWeaponAligned = (pHitForward > pReach && pContactOffset <= (pWeaponHalfWidth + 0.08));
       const eWeaponAligned = (eHitForward > eReach && eContactOffset <= (eWeaponHalfWidth + 0.08));
 
-      const isPrac = (gameMode === 'practice');
+      const isPractice = (typeof gameMode !== 'undefined' && gameMode === 'practice');
+      const isPrac = isPractice;
       const pHighSpinThreshold = Math.min((pSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
       const eHighSpinThreshold = Math.min((eSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
 
       const pWeaponCanStrike = (pWeaponAligned && playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
-      const eWeaponCanStrike = (!isPrac && eWeaponAligned && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+      const eWeaponCanStrike = (!isPractice && eWeaponAligned && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
 
       // WEAPON-TO-WEAPON CLASH: Both weapons must physically align and strike each other!
       const isBothWeaponClash = pWeaponCanStrike && eWeaponCanStrike;
@@ -857,7 +858,7 @@
         const eWheelAlignment = 0.18 + 0.82 * Math.abs(eFwdDot);
 
         const pWedgeScore = (pFwdDot > 0.65 && (playerBot.throttleInput || 0) > 0.25 && !playerBot.flipped) ? (pSpecs.wedgeRating || 1.0) * pFwdDot : 0;
-        const eWedgeScore = (!isPrac && eFwdDot > 0.65 && (enemyBot.throttleInput || 0) > 0.25 && !enemyBot.flipped) ? (eSpecs.wedgeRating || 1.0) * eFwdDot : 0;
+        const eWedgeScore = (!isPractice && eFwdDot > 0.65 && (enemyBot.throttleInput || 0) > 0.25 && !enemyBot.flipped) ? (eSpecs.wedgeRating || 1.0) * eFwdDot : 0;
 
         let pWedgeGripPenalty = 1.0;
         let eWedgeGripPenalty = 1.0;
