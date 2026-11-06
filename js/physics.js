@@ -767,17 +767,129 @@
       const isPractice = (gameMode === 'practice');
       const nowPerf = performance.now();
 
-      // Continuous weapon-contact grinding sparks:
-      // Even at lower closing speed, if a robot's spinning weapon (not stalled, not off) is actively touching the opponent, emit weapon sparks!
+      // Continuous weapon-contact grinding sparks & progressive grinding strike:
+      // When two robots are pushing/ramming against each other (`impactSpeed <= 1.8`) and a robot's weapon spins back up (`>= minWeaponSpin`)
+      // while pressing into the opponent, it emits grinding sparks AND bites/shreds into the opponent's armor!
       if (impactSpeed <= 1.8) {
-        const pReachGrind = (playerBot.type === 'robot3') ? 0.15 : 0.35;
-        const eReachGrind = (enemyBot.type === 'robot3') ? 0.15 : 0.35;
+        const pReachGrind = pSpecs.weaponReach;
+        const eReachGrind = eSpecs.weaponReach;
         const pSpinningContact = (playerBot.weaponActive !== false && (playerBot.weaponStallTimer || 0) <= 0 && pForwardDot > pReachGrind && playerBot.weaponSpinSpeed >= minWeaponSpin);
         const eSpinningContact = (!isPractice && enemyBot.weaponActive !== false && (enemyBot.weaponStallTimer || 0) <= 0 && eForwardDot > eReachGrind && enemyBot.weaponSpinSpeed >= minWeaponSpin);
-        if ((pSpinningContact || eSpinningContact) && (!window._lastWeaponGrindSparkTime || nowPerf - window._lastWeaponGrindSparkTime > 90)) {
-          window._lastWeaponGrindSparkTime = nowPerf;
-          spawnCollisionSparks(midPos, 10);
-          AudioSys.metalClashSound(0.85, false);
+        if (pSpinningContact || eSpinningContact) {
+          if (!window._lastWeaponGrindSparkTime || nowPerf - window._lastWeaponGrindSparkTime > 90) {
+            window._lastWeaponGrindSparkTime = nowPerf;
+            spawnCollisionSparks(midPos, 10);
+            AudioSys.metalClashSound(0.85, false);
+          }
+
+          // Accumulate grinding contact time (~0.16s of active spinning contact triggers a real weapon bite!)
+          if (pSpinningContact) {
+            playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016;
+          } else {
+            playerBot._grindContactTimer = 0;
+          }
+          if (eSpinningContact) {
+            enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016;
+          } else {
+            enemyBot._grindContactTimer = 0;
+          }
+
+          if (pSpinningContact && eSpinningContact && (playerBot._grindContactTimer >= 0.16 || enemyBot._grindContactTimer >= 0.16)) {
+            playerBot._grindContactTimer = 0;
+            enemyBot._grindContactTimer = 0;
+            AudioSys.weaponSliceSound();
+            spawnCollisionSparks(midPos, 28);
+            const grindPush = 3.2;
+            playerBot.vx -= nx * grindPush;
+            playerBot.vz -= nz * grindPush;
+            enemyBot.vx += nx * grindPush;
+            enemyBot.vz += nz * grindPush;
+            if (!isPractice && Math.random() < eSpecs.partDamageChance) {
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            }
+            if (Math.random() < pSpecs.partDamageChance) {
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            }
+            if (typeof matchState === 'undefined' || matchState !== 'menu') {
+              playerBot.weaponSpinSpeed = 0;
+              enemyBot.weaponSpinSpeed = 0;
+              playerBot.weaponStallTimer = pSpecs.defendStall;
+              enemyBot.weaponStallTimer = eSpecs.defendStall;
+              AudioSys.weaponStallSound();
+            }
+          } else if (pSpinningContact && playerBot._grindContactTimer >= 0.16) {
+            playerBot._grindContactTimer = 0;
+            AudioSys.weaponSliceSound();
+            const grindSparksP = (playerBot.type === 'robot6') ? 12 : 22;
+            spawnCollisionSparks(midPos, grindSparksP);
+            const pGrindFling = pSpecs.flingBase * 0.78;
+            enemyBot.vx += nx * pGrindFling;
+            enemyBot.vz += nz * pGrindFling;
+            playerBot.vx -= nx * 1.4;
+            playerBot.vz -= nz * 1.4;
+            if (playerBot.type === 'robot3' && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78) {
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            } else if (playerBot.type === 'robot4' && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78) {
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+              if (Math.random() < 0.65) detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            } else if (playerBot.type === 'robot6') {
+              if (Math.random() < pSpecs.partDamageChance) {
+                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+              }
+            } else {
+              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+            }
+            if (typeof matchState === 'undefined' || matchState !== 'menu') {
+              playerBot.weaponSpinSpeed = 0;
+              enemyBot.weaponSpinSpeed = 0;
+              playerBot.weaponStallTimer = pSpecs.attackStall;
+              enemyBot.weaponStallTimer = eSpecs.defendStall;
+              AudioSys.weaponStallSound();
+            }
+          } else if (eSpinningContact && enemyBot._grindContactTimer >= 0.16) {
+            enemyBot._grindContactTimer = 0;
+            AudioSys.weaponSliceSound();
+            const grindSparksE = (enemyBot.type === 'robot6') ? 12 : 22;
+            spawnCollisionSparks(midPos, grindSparksE);
+            const eGrindFling = eSpecs.flingBase * 0.78;
+            playerBot.vx -= nx * eGrindFling;
+            playerBot.vz -= nz * eGrindFling;
+            enemyBot.vx += nx * 1.4;
+            enemyBot.vz += nz * 1.4;
+            triggerDamageVignette();
+            if (enemyBot.type === 'robot3' && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78) {
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            } else if (enemyBot.type === 'robot4' && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78) {
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+              if (Math.random() < 0.65) detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            } else if (enemyBot.type === 'robot6') {
+              if (Math.random() < eSpecs.partDamageChance) {
+                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+              }
+            } else {
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            }
+            if (typeof matchState === 'undefined' || matchState !== 'menu') {
+              enemyBot.weaponSpinSpeed = 0;
+              playerBot.weaponSpinSpeed = 0;
+              enemyBot.weaponStallTimer = eSpecs.attackStall;
+              playerBot.weaponStallTimer = pSpecs.defendStall;
+              AudioSys.weaponStallSound();
+            }
+          }
+
+          if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
+          } else if (!isPractice && playerBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
+          } else if (enemyBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
+          }
+        } else {
+          playerBot._grindContactTimer = 0;
+          enemyBot._grindContactTimer = 0;
         }
       }
 
@@ -1165,30 +1277,44 @@
             }
           }
 
+          // Helper: Non-weapon high-speed ram counter (requires 3 to 4 hard rams before 1 piece flies off!)
+          const applyRamHitCounter = (victimBot, dirX, dirZ) => {
+            if (!victimBot) return;
+            victimBot.ramHitCount = (victimBot.ramHitCount || 0) + 1;
+            if (!victimBot.ramHitsRequired) {
+              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 3 : 4; // 3–4 hard rams per part
+            }
+            if (victimBot.ramHitCount >= victimBot.ramHitsRequired) {
+              victimBot.ramHitCount = 0;
+              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 3 : 4;
+              detachSinglePart(victimBot, { x: dirX, z: dirZ }, midPos, null, true);
+            }
+          };
+
           if (isPractice) {
-            // Practice dummy: only detach a part on a genuinely fast, hard ram (and detachSinglePart won't over-spark)
-            if (impactSpeed >= 6.5 && relNormalVel >= 5.5 && Math.random() < 0.35) {
+            // Practice dummy: requires 3-4 fast, hard rams for 1 piece to fly off
+            if (impactSpeed >= 6.0 && relNormalVel >= 4.8 && (!window._lastPracRamCountTime || nowPerf - window._lastPracRamCountTime > 320)) {
+              window._lastPracRamCountTime = nowPerf;
               enemyBot.vy = 0;
               enemyBot.airY = 0;
               enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
+              applyRamHitCounter(enemyBot, nx, nz);
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
             }
           } else {
             // Real combat ramming (weapons stalled/off or non-weapon side collision):
-            // Only detach a part on a genuinely high-speed ram (impactSpeed >= 6.5 && relNormalVel >= 5.5)
-            const pIsFastAttacker = (pSpeedBefore >= 6.5 && pApproach >= 5.5 && pApproach > eApproach * 1.15);
-            const eIsFastAttacker = (eSpeedBefore >= 6.5 && eApproach >= 5.5 && eApproach > pApproach * 1.15);
+            // Requires 3-4 genuinely fast, hard rams (cooldown-gated per distinct ram) for 1 piece to fly off!
+            const pIsFastAttacker = (pSpeedBefore >= 6.0 && pApproach >= 4.8 && pApproach > eApproach * 1.15);
+            const eIsFastAttacker = (eSpeedBefore >= 6.0 && eApproach >= 4.8 && eApproach > pApproach * 1.15);
 
-            if (pIsFastAttacker) {
-              if (impactSpeed >= 6.5 && Math.random() < 0.35) {
-                enemyBot.vy = 0;
-                enemyBot.airY = 0;
-                enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
-                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
-              }
+            if (pIsFastAttacker && (!window._lastPRamCountTime || nowPerf - window._lastPRamCountTime > 320)) {
+              window._lastPRamCountTime = nowPerf;
+              enemyBot.vy = 0;
+              enemyBot.airY = 0;
+              enemyBot.rollVel = (eHitRight > 0 ? -1.5 : 1.5);
+              applyRamHitCounter(enemyBot, nx, nz);
               if (impactSpeed >= 6.5 && enemyBot.weaponSpinSpeed > 0) {
                 enemyBot.weaponSpinSpeed = 0;
                 enemyBot.weaponStallTimer = 1.0;
@@ -1196,14 +1322,13 @@
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
               }
-            } else if (eIsFastAttacker) {
+            } else if (eIsFastAttacker && (!window._lastERamCountTime || nowPerf - window._lastERamCountTime > 320)) {
+              window._lastERamCountTime = nowPerf;
               triggerDamageVignette();
-              if (impactSpeed >= 6.5 && Math.random() < 0.35) {
-                playerBot.vy = 0;
-                playerBot.airY = 0;
-                playerBot.rollVel = (pHitRight > 0 ? -1.5 : 1.5);
-                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
-              }
+              playerBot.vy = 0;
+              playerBot.airY = 0;
+              playerBot.rollVel = (pHitRight > 0 ? -1.5 : 1.5);
+              applyRamHitCounter(playerBot, -nx, -nz);
               if (impactSpeed >= 6.5 && playerBot.weaponSpinSpeed > 0) {
                 playerBot.weaponSpinSpeed = 0;
                 playerBot.weaponStallTimer = 1.0;
@@ -1211,12 +1336,11 @@
               if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
               }
-            } else if (impactSpeed >= 7.5 && relNormalVel >= 6.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0) {
-              // High-speed mutual head-on ram
-              if (Math.random() < 0.35) {
-                detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
-                detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
-              }
+            } else if (impactSpeed >= 7.0 && relNormalVel >= 5.5 && pSpeedBefore >= 5.8 && eSpeedBefore >= 5.8 && (!window._lastMutualRamCountTime || nowPerf - window._lastMutualRamCountTime > 320)) {
+              // High-speed mutual head-on ram: increments both robots' 3-4 hit counters
+              window._lastMutualRamCountTime = nowPerf;
+              applyRamHitCounter(playerBot, -nx, -nz);
+              applyRamHitCounter(enemyBot, nx, nz);
               if (playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
               } else if (playerBot.isEntirelyDestroyed) {
