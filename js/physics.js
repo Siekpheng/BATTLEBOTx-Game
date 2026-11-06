@@ -1130,49 +1130,49 @@
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
 
-          // Instant positional separation + powerful repulsive knockback velocity so both robots launch apart
-          const sepPush = 0.22;
+          // Instant positional separation + well-balanced repulsive knockback velocity
+          const sepPush = 0.10;
           playerBot.x -= nx * sepPush * pMoveRatio;
           playerBot.z -= nz * sepPush * pMoveRatio;
           enemyBot.x += nx * sepPush * eMoveRatio;
           enemyBot.z += nz * sepPush * eMoveRatio;
 
-          const clashKnockback = Math.max(12.5, Math.min(20.5, 10.5 + avgSpinRatio * 6.5 + impactSpeed * 0.55));
-          playerBot.vx = -nx * clashKnockback * (0.55 + pMoveRatio * 0.85);
-          playerBot.vz = -nz * clashKnockback * (0.55 + pMoveRatio * 0.85);
-          enemyBot.vx = nx * clashKnockback * (0.55 + eMoveRatio * 0.85);
-          enemyBot.vz = nz * clashKnockback * (0.55 + eMoveRatio * 0.85);
+          const clashKnockback = Math.max(8.5, Math.min(14.5, 7.0 + avgSpinRatio * 4.8 + impactSpeed * 0.38));
+          playerBot.vx = -nx * clashKnockback * (0.50 + pMoveRatio * 0.40);
+          playerBot.vz = -nz * clashKnockback * (0.50 + pMoveRatio * 0.40);
+          enemyBot.vx = nx * clashKnockback * (0.50 + eMoveRatio * 0.40);
+          enemyBot.vz = nz * clashKnockback * (0.50 + eMoveRatio * 0.40);
 
           // Horizontal Bar Spinner (Robot 3) sideways tangential kick during weapon-on-weapon clash
           if (playerBot.type === 'robot3') {
-            const tangKickP = 3.8 * pSpinRatio;
+            const tangKickP = 2.4 * pSpinRatio;
             enemyBot.vx += (-nz) * tangKickP;
             enemyBot.vz += nx * tangKickP;
-            enemyBot.yaw -= 0.28;
+            enemyBot.yaw -= 0.18;
           }
           if (enemyBot.type === 'robot3') {
-            const tangKickE = 3.8 * eSpinRatio;
+            const tangKickE = 2.4 * eSpinRatio;
             playerBot.vx -= (-nz) * tangKickE;
             playerBot.vz -= nx * tangKickE;
-            playerBot.yaw += 0.28;
+            playerBot.yaw += 0.18;
           }
 
-          // Weapon-Dependent Vertical Air Launch (Pop-Up / Fly-Up Physics):
+          // Weapon-Dependent Vertical Air Launch (Controlled Hop / Fly-Up Physics):
           // Vertical uppercut spinners (Robot 4 Large Disc, Robot 5 Eggbeater Drum, Robot 2 Heavy Drum, Robot 1/6 Discs)
-          // bite upward on weapon-to-weapon contact and launch the opposing robot into the air depending on weapon power & bot weight!
+          // deliver an upward pop to the opposing robot depending on weapon power & bot weight without catapulting too far!
           const computeWeaponClashLift = (attackerBot, attackerSpinRatio, victimBot) => {
-            let baseLift = 4.6;
+            let baseLift = 2.4;
             if (attackerBot.type === 'robot4' || attackerBot.type === 'robot5') {
-              baseLift = 6.8; // Uppercut vertical disc / eggbeater drum: highest vertical pop
+              baseLift = 3.8; // Uppercut vertical disc / eggbeater drum: crisp upward pop
             } else if (attackerBot.type === 'robot2') {
-              baseLift = 5.8; // Heavy vertical drum spinner
+              baseLift = 3.2; // Heavy vertical drum spinner
             } else if (attackerBot.type === 'robot1' || attackerBot.type === 'robot6') {
-              baseLift = 5.0; // Angled / compact vertical disc spinner
+              baseLift = 2.6; // Angled / compact vertical disc spinner
             } else if (attackerBot.type === 'robot3') {
-              baseLift = 2.6; // Horizontal bar spinner: mostly flat horizontal throw with a small deflection hop
+              baseLift = 1.2; // Horizontal bar spinner: mostly flat horizontal recoil with a slight tire bounce
             }
-            const victimWeightMult = (victimBot.type === 'robot6') ? 1.32 : ((victimBot.type === 'robot2') ? 0.72 : 1.0);
-            const speedBonus = Math.min(2.2, impactSpeed * 0.18);
+            const victimWeightMult = (victimBot.type === 'robot6') ? 1.20 : ((victimBot.type === 'robot2') ? 0.80 : 1.0);
+            const speedBonus = Math.min(1.2, impactSpeed * 0.12);
             return (baseLift * (0.55 + 0.45 * attackerSpinRatio) + speedBonus) * victimWeightMult;
           };
 
@@ -1181,34 +1181,34 @@
 
           playerBot.vy = pFlyUpVy;
           enemyBot.vy = eFlyUpVy;
-          playerBot.airY = 0.14;
-          enemyBot.airY = 0.14;
+          playerBot.airY = 0.08;
+          enemyBot.airY = 0.08;
 
-          // Pitch & Roll reaction in mid-air (with a small chance of flipping if launched hard by a vertical spinner)
+          // Pitch & Roll reaction in mid-air (with a controlled flip chance only on extreme high-speed clashes)
           const eIsVertLauncher = (enemyBot.type !== 'robot3');
           const pIsVertLauncher = (playerBot.type !== 'robot3');
-          const pFlipInClash = !isPractice && eIsVertLauncher && (eSpinRatio >= 0.78 && impactSpeed >= 5.5) && (Math.random() < (eSpecs.flipChance || 0.22) * (pSpecs.flipResistance || 1.0) * 0.55);
-          const eFlipInClash = pIsVertLauncher && (pSpinRatio >= 0.78 && impactSpeed >= 5.5) && (Math.random() < (pSpecs.flipChance || 0.22) * (eSpecs.flipResistance || 1.0) * 0.55);
+          const pFlipInClash = !isPractice && eIsVertLauncher && (eSpinRatio >= 0.88 && impactSpeed >= 6.8) && (Math.random() < (eSpecs.flipChance || 0.22) * (pSpecs.flipResistance || 1.0) * 0.40);
+          const eFlipInClash = pIsVertLauncher && (pSpinRatio >= 0.88 && impactSpeed >= 6.8) && (Math.random() < (pSpecs.flipChance || 0.22) * (eSpecs.flipResistance || 1.0) * 0.40);
 
           if (pFlipInClash) {
-            playerBot.pitchVel = -8.2;
-            playerBot.rollVel = (Math.random() - 0.5) * 3.0;
+            playerBot.pitchVel = -7.5;
+            playerBot.rollVel = (Math.random() - 0.5) * 2.5;
             playerBot.flipped = true;
           } else {
-            playerBot.pitchVel = -Math.min(4.6, 1.8 + pFlyUpVy * 0.42);
-            playerBot.rollVel = (Math.random() - 0.5) * 2.2;
+            playerBot.pitchVel = -Math.min(3.2, 1.2 + pFlyUpVy * 0.32);
+            playerBot.rollVel = (Math.random() - 0.5) * 1.6;
           }
 
           if (eFlipInClash) {
-            enemyBot.pitchVel = -8.2;
-            enemyBot.rollVel = (Math.random() - 0.5) * 3.0;
+            enemyBot.pitchVel = -7.5;
+            enemyBot.rollVel = (Math.random() - 0.5) * 2.5;
             enemyBot.flipped = true;
           } else {
-            enemyBot.pitchVel = -Math.min(4.6, 1.8 + eFlyUpVy * 0.42);
-            enemyBot.rollVel = (Math.random() - 0.5) * 2.2;
+            enemyBot.pitchVel = -Math.min(3.2, 1.2 + eFlyUpVy * 0.32);
+            enemyBot.rollVel = (Math.random() - 0.5) * 1.6;
           }
 
-          const deflectYaw = (Math.random() < 0.5 ? 1 : -1) * 0.18;
+          const deflectYaw = (Math.random() < 0.5 ? 1 : -1) * 0.14;
           playerBot.yaw += deflectYaw;
           enemyBot.yaw -= deflectYaw;
 
@@ -1318,14 +1318,14 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // SOLID HIT: HEAVY KNOCKBACK + WEAPON-DEPENDENT VERTICAL POP
-            const pVertLiftBase = (playerBot.type === 'robot4' || playerBot.type === 'robot5') ? 3.8 : ((playerBot.type === 'robot2') ? 3.2 : ((playerBot.type === 'robot3') ? 1.4 : 2.8));
-            const eWeightLift = (enemyBot.type === 'robot6') ? 1.25 : ((enemyBot.type === 'robot2') ? 0.75 : 1.0);
+            // SOLID HIT: CONTROLLED KNOCKBACK + WEAPON-DEPENDENT TIRE HOP
+            const pVertLiftBase = (playerBot.type === 'robot4' || playerBot.type === 'robot5') ? 2.6 : ((playerBot.type === 'robot2') ? 2.2 : ((playerBot.type === 'robot3') ? 0.9 : 1.8));
+            const eWeightLift = (enemyBot.type === 'robot6') ? 1.20 : ((enemyBot.type === 'robot2') ? 0.80 : 1.0);
             enemyBot.vy = pVertLiftBase * (0.60 + 0.40 * pSpinRatioHit) * eWeightLift;
-            enemyBot.airY = 0.10;
-            const pFling = Math.max(7.2, (pSpecs.flingBase || 4.0) * (0.95 + 0.55 * pSpinRatioHit) + impactSpeed * (pSpecs.flingSpeedMult || 0.45));
-            enemyBot.vx = nx * pFling * (0.60 + eMoveRatio * 0.80);
-            enemyBot.vz = nz * pFling * (0.60 + eMoveRatio * 0.80);
+            enemyBot.airY = 0.06;
+            const pFling = Math.max(6.2, (pSpecs.flingBase || 4.0) * (0.85 + 0.45 * pSpinRatioHit) + impactSpeed * (pSpecs.flingSpeedMult || 0.45));
+            enemyBot.vx = nx * pFling * (0.55 + eMoveRatio * 0.60);
+            enemyBot.vz = nz * pFling * (0.55 + eMoveRatio * 0.60);
 
             // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
             // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
@@ -1463,14 +1463,14 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // SOLID HIT: HEAVY KNOCKBACK + WEAPON-DEPENDENT VERTICAL POP
-            const eVertLiftBase = (enemyBot.type === 'robot4' || enemyBot.type === 'robot5') ? 3.8 : ((enemyBot.type === 'robot2') ? 3.2 : ((enemyBot.type === 'robot3') ? 1.4 : 2.8));
-            const pWeightLift = (playerBot.type === 'robot6') ? 1.25 : ((playerBot.type === 'robot2') ? 0.75 : 1.0);
+            // SOLID HIT: CONTROLLED KNOCKBACK + WEAPON-DEPENDENT TIRE HOP
+            const eVertLiftBase = (enemyBot.type === 'robot4' || enemyBot.type === 'robot5') ? 2.6 : ((enemyBot.type === 'robot2') ? 2.2 : ((enemyBot.type === 'robot3') ? 0.9 : 1.8));
+            const pWeightLift = (playerBot.type === 'robot6') ? 1.20 : ((playerBot.type === 'robot2') ? 0.80 : 1.0);
             playerBot.vy = eVertLiftBase * (0.60 + 0.40 * eSpinRatioHit) * pWeightLift;
-            playerBot.airY = 0.10;
-            const eFling = Math.max(7.2, (eSpecs.flingBase || 4.0) * (0.95 + 0.55 * eSpinRatioHit) + impactSpeed * (eSpecs.flingSpeedMult || 0.45));
-            playerBot.vx = -nx * eFling * (0.60 + pMoveRatio * 0.80);
-            playerBot.vz = -nz * eFling * (0.60 + pMoveRatio * 0.80);
+            playerBot.airY = 0.06;
+            const eFling = Math.max(6.2, (eSpecs.flingBase || 4.0) * (0.85 + 0.45 * eSpinRatioHit) + impactSpeed * (eSpecs.flingSpeedMult || 0.45));
+            playerBot.vx = -nx * eFling * (0.55 + pMoveRatio * 0.60);
+            playerBot.vz = -nz * eFling * (0.55 + pMoveRatio * 0.60);
 
             // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
             // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
