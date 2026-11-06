@@ -1,7 +1,7 @@
 // ========================================================
 // BATTLEBOTx - CORE GAME STATE & SHARED REFERENCES
 // ========================================================
-var GAME_VERSION = 'v1.4.7';
+var GAME_VERSION = 'v1.4.8';
 var gameMode = 'bot'; // 'bot', '1v1', 'practice'
 var selectedBotType = 'robot1';
 var matchState = 'menu'; // 'menu', 'countdown', 'playing', 'paused', 'gameover'
@@ -11,6 +11,8 @@ var enemyScore = 0;
 
 var cameraMode = 0;
 var cameraModeP2 = 0;
+var cameraZoomScale = 1.0;
+var targetCameraZoom = 1.0;
 var bothCantFightTimer = 0.0;
 var mutualStallTimer = 0.0;
 var combatEngageTimer = 0.0;

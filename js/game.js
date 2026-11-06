@@ -964,12 +964,31 @@
   }
   window.isSplitScreenActive = isSplitScreenActive;
 
+  function adjustCameraZoom(delta) {
+    if (typeof targetCameraZoom !== 'number') targetCameraZoom = 1.0;
+    targetCameraZoom = Math.max(0.45, Math.min(1.85, targetCameraZoom + delta));
+  }
+  window.adjustCameraZoom = adjustCameraZoom;
+
   document.getElementById('btn-cam-up').addEventListener('click', () => {
-    cameraHeight = Math.min(32, cameraHeight + 2.5);
+    // Cam + zooms IN (closer to the robot) for both P1 and P2
+    adjustCameraZoom(-0.14);
   });
   document.getElementById('btn-cam-down').addEventListener('click', () => {
-    cameraHeight = Math.max(10, cameraHeight - 2.5);
+    // Cam - zooms OUT (wider arena view) for both P1 and P2
+    adjustCameraZoom(0.14);
   });
+
+  window.addEventListener('wheel', (e) => {
+    if (typeof matchState === 'undefined' || (matchState !== 'playing' && matchState !== 'countdown' && matchState !== 'celebrating')) {
+      return;
+    }
+    if (e.target && e.target.closest && e.target.closest('.overlay-screen:not(.hidden)')) {
+      return;
+    }
+    const step = (e.deltaY > 0) ? 0.10 : -0.10;
+    adjustCameraZoom(step);
+  }, { passive: true });
 
   document.getElementById('btn-pause').addEventListener('click', () => {
     if (matchState === 'playing') {
@@ -1551,12 +1570,15 @@
     if (isP2Cam) smoothCamHeadingP2 = heading;
     else smoothCamHeading = heading;
 
+    const zScale = (typeof cameraZoomScale === 'number') ? cameraZoomScale : 1.0;
+
     if (mode === 0) {
       // Follow Direction mode:
       // When in 1v1 split screen, zoom camera out further back and higher up so both players
       // can see the entire width of the arena, arena hazards, and their opponent easily.
-      const followDist = isSplit ? 15.2 : 10.5;
-      const followHeight = isSplit ? 8.2 : 5.2;
+      // Zoom scale (Cam - / Cam + / Mouse Scroll Wheel) applies equally to both P1 and P2!
+      const followDist = (isSplit ? 15.2 : 10.5) * zScale;
+      const followHeight = (isSplit ? 8.2 : 5.2) * zScale;
 
       let camX = targetBot.x - Math.sin(heading) * followDist;
       let camZ = targetBot.z - Math.cos(heading) * followDist;
@@ -1568,7 +1590,7 @@
         camY += wallNear * (isSplit ? 1.8 : 1.5);
       }
 
-      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 2.5);
+      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 2.5) * Math.max(1.0, zScale);
       camX = Math.max(-maxCamCoord, Math.min(maxCamCoord, camX));
       camZ = Math.max(-maxCamCoord, Math.min(maxCamCoord, camZ));
 
@@ -1584,11 +1606,11 @@
       const pDistFromCenter = Math.max(Math.abs(targetBot.x), Math.abs(targetBot.z));
       const wallDanger = Math.max(0, pDistFromCenter - (ARENA_HALF - 4.2));
 
-      const baseDist = isSplit ? 17.5 : 12.8;
+      const baseDist = (isSplit ? 17.5 : 12.8) * zScale;
       let rawCamX = targetBot.x - Math.sin(heading) * baseDist * 0.72;
       let rawCamZ = targetBot.z - Math.cos(heading) * baseDist * 0.72;
 
-      const dynamicHeight = (isSplit ? 22.5 : 17.5) + wallDanger * 2.2;
+      const dynamicHeight = ((isSplit ? 22.5 : 17.5) + wallDanger * 2.2) * zScale;
 
       if (wallDanger > 0) {
         const centerPull = (wallDanger / 4.2) * 0.35;
@@ -1596,7 +1618,7 @@
         rawCamZ = rawCamZ * (1 - centerPull);
       }
 
-      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 4.0);
+      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 4.0) * Math.max(1.0, zScale);
       rawCamX = Math.max(-maxCamCoord, Math.min(maxCamCoord, rawCamX));
       rawCamZ = Math.max(-maxCamCoord, Math.min(maxCamCoord, rawCamZ));
 
@@ -1611,7 +1633,7 @@
       // For P2: view from Red side (-Z) looking down at arena (Red at bottom, Green at top)
       const isRedSide = isP2Cam || (targetBot === enemyBot);
       const viewSign = isRedSide ? -1 : 1;
-      desiredPos.set(0, isSplit ? 34.5 : 28.5, viewSign * 1.2);
+      desiredPos.set(0, (isSplit ? 34.5 : 28.5) * zScale, viewSign * 1.2);
       lookTarget.set(0, 0, 0);
     } else {
       // Full Arena Broadcast view:
@@ -1619,8 +1641,8 @@
       // For P2: view from Red side (-Z) looking South across the arena
       const isRedSide = isP2Cam || (targetBot === enemyBot);
       const viewSign = isRedSide ? -1 : 1;
-      const camDist = isSplit ? 27.5 : 23.5;
-      const camHeight = isSplit ? 24.0 : 20.0;
+      const camDist = (isSplit ? 27.5 : 23.5) * zScale;
+      const camHeight = (isSplit ? 24.0 : 20.0) * zScale;
       desiredPos.set(0, camHeight, viewSign * camDist);
       lookTarget.set(0, isSplit ? 1.2 : 1.8, 0);
     }
@@ -1658,6 +1680,10 @@
       camera.position.set(0, 20, 18);
       camera.lookAt(0, 0, 0);
       return;
+    }
+
+    if (typeof targetCameraZoom === 'number' && typeof cameraZoomScale === 'number') {
+      cameraZoomScale += (targetCameraZoom - cameraZoomScale) * Math.min(1, dt * 10.0);
     }
 
     updateSingleViewportCamera(camera, activeTargetBot, otherBot, cameraMode, false, dt);
