@@ -56,6 +56,10 @@ exit /b 1
 
 :START_SERVER
 echo [OK] Python detected: %PYTHON_CMD%
+echo [OK] Cleaning up any stale server processes...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING 2^>nul') do (
+    taskkill /F /PID %%a >nul 2>nul
+)
 echo [OK] Launching local game server...
 echo.
 

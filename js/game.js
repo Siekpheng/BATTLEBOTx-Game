@@ -3,9 +3,7 @@
 // ========================================================
 
   function getBotMaxHealth(type) {
-    if (type === 'robot2') return 450; // Most HP: Heavily armored drum tank
-    if (type === 'robot3' || type === 'robot6') return 200; // Least HP: Glass cannon & lightweight speedster
-    return 300; // Similar HP for other robots (robot1, robot4, robot5)
+    return 300; // Balanced 300 HP base health across all robots for identical durability
   }
   window.getBotMaxHealth = getBotMaxHealth;
 
@@ -33,6 +31,8 @@
       rollVel: 0,
       weaponSpinSpeed: (typeof matchState !== 'undefined' && matchState === 'menu') ? 95.0 : 0.0,
       weaponActive: true,
+      weaponDestroyed: false,
+      weaponStallTimer: 0.0,
       halfWidth: 1.02,
       halfLength: 1.25,
       height: 0.78,
@@ -168,6 +168,7 @@
     if (enemyBot) { scene.remove(enemyBot.root); enemyBot = null; }
     clearArenaDebris();
     smoothCameraInitialized = false;
+    smoothCameraP2Initialized = false;
   }
 
 
@@ -690,22 +691,63 @@
   }
 
   const camBtn = document.getElementById('btn-cam-mode');
-  function cycleCameraMode() {
-    cameraMode = (cameraMode + 1) % 4;
-    const labels = [
-      '🎥 Cam: Follow Direction [C]',
-      '🎥 Cam: Tactical 1v1 [C]',
-      '🎥 Cam: Top-Down Aerial [C]',
-      '🎥 Cam: Full Arena Broadcast [C]'
-    ];
-    camBtn.textContent = labels[cameraMode];
+  const camBtnP2 = document.getElementById('btn-cam-mode-p2');
+  const camBtnP2Panel = document.getElementById('btn-p2-cam');
+  let lastSplitActiveState = null;
+
+  const CAM_LABELS = [
+    'Follow Direction',
+    'Tactical 1v1',
+    'Top-Down Aerial',
+    'Full Arena Broadcast'
+  ];
+
+  function updateCameraUI() {
+    const isSplit = typeof isSplitScreenActive === 'function' && isSplitScreenActive();
+    const p1Mode = typeof cameraMode === 'number' ? cameraMode : 0;
+    const p2Mode = typeof cameraModeP2 === 'number' ? cameraModeP2 : 0;
+
+    if (camBtn) {
+      if (isSplit) {
+        camBtn.innerHTML = `<span style="color:#60a5fa; font-weight:700;">🔵 P1 Cam:</span> ${CAM_LABELS[p1Mode]} <kbd style="font-size:0.7em; background:#1e293b; padding:1px 4px; border-radius:3px;">C</kbd>`;
+        camBtn.classList.add('p1-cam-highlight');
+      } else {
+        camBtn.textContent = `🎥 Cam: ${CAM_LABELS[p1Mode]} [C]`;
+        camBtn.classList.remove('p1-cam-highlight');
+      }
+    }
+
+    if (camBtnP2) {
+      if (isSplit) {
+        camBtnP2.classList.remove('hidden');
+        camBtnP2.innerHTML = `<span style="color:#f87171; font-weight:700;">🔴 P2 Cam:</span> ${CAM_LABELS[p2Mode]} <kbd style="font-size:0.7em; background:#1e293b; padding:1px 4px; border-radius:3px;">M</kbd>`;
+        camBtnP2.classList.add('p2-cam-highlight');
+      } else {
+        camBtnP2.classList.add('hidden');
+        camBtnP2.classList.remove('p2-cam-highlight');
+      }
+    }
+
+    if (camBtnP2Panel) {
+      camBtnP2Panel.innerHTML = `🎥 P2 Cam: <strong>${CAM_LABELS[p2Mode]}</strong> <kbd style="font-size:0.7em; background:#334155; padding:1px 4px; border-radius:3px; color:#fff;">M</kbd>`;
+    }
   }
-  camBtn.addEventListener('click', cycleCameraMode);
+  window.updateCameraUI = updateCameraUI;
+
+  function cycleCameraMode() {
+    cameraMode = ((typeof cameraMode === 'number' ? cameraMode : 0) + 1) % 4;
+    updateCameraUI();
+  }
+  window.cycleCameraMode = cycleCameraMode;
+  if (camBtn) camBtn.addEventListener('click', cycleCameraMode);
 
   function cycleCameraModeP2() {
     cameraModeP2 = ((typeof cameraModeP2 === 'number' ? cameraModeP2 : 0) + 1) % 4;
+    updateCameraUI();
   }
   window.cycleCameraModeP2 = cycleCameraModeP2;
+  if (camBtnP2) camBtnP2.addEventListener('click', cycleCameraModeP2);
+  if (camBtnP2Panel) camBtnP2Panel.addEventListener('click', cycleCameraModeP2);
 
   function isSplitScreenActive() {
     return (
@@ -848,8 +890,8 @@
       botTypeChoice = NetworkSys.isHost ? NetworkSys.selectedBot : NetworkSys.opponentBot;
       enemyType = NetworkSys.isHost ? NetworkSys.opponentBot : NetworkSys.selectedBot;
     } else if (gameMode === '1v1') {
-      // Local 1v1: Use selected Player 2 robot (same robot as P1 is fully supported!)
-      enemyType = (selectedP2BotType && selectedP2BotType !== 'random') ? selectedP2BotType : (selectedBotType || 'robot2');
+      // Local 1v1: Use selected Player 2 robot (defaults to matching P1 mirror match if unselected)
+      enemyType = (selectedP2BotType && selectedP2BotType !== 'random') ? selectedP2BotType : botTypeChoice;
     } else {
       // VS Bot or Practice: Use picked opponent or pick randomly from ALL 5 robots (including mirror match!)
       if (selectedP2BotType && selectedP2BotType !== 'random' && allBots.includes(selectedP2BotType)) {
@@ -930,6 +972,15 @@
       rpmFillInit.classList.remove('ready');
       rpmFillInit.style.background = '';
     }
+    const p2RpmTextInit = document.getElementById('p2-weapon-rpm-text');
+    const p2RpmFillInit = document.getElementById('p2-weapon-rpm-fill');
+    if (p2RpmTextInit && p2RpmFillInit) {
+      p2RpmTextInit.textContent = '0% (WAITING FOR FIGHT...)';
+      p2RpmTextInit.style.color = '#94a3b8';
+      p2RpmFillInit.style.width = '0%';
+      p2RpmFillInit.classList.remove('ready');
+      p2RpmFillInit.style.background = '';
+    }
 
     matchTimeRemaining = 180;
     bothCantFightTimer = 0.0;
@@ -940,6 +991,7 @@
     updateTimerDisplay();
     document.getElementById('flip-warning-container').classList.add('hidden');
     hud.classList.remove('hidden');
+    updateCameraUI();
 
     matchState = 'countdown';
     countdownOverlay.classList.remove('hidden');
@@ -1083,31 +1135,42 @@
       }
       AudioSys.beep(300, 0.3);
     } else if (didIWin) {
-      heading.textContent = isTotalDestruction ? 'TOTAL DESTRUCTION!' : (isKO ? 'KNOCKOUT!' : 'VICTORY');
+      heading.textContent = (gameMode === '1v1')
+        ? (isTotalDestruction ? 'P1 TOTAL DESTRUCTION!' : (isKO ? 'P1 KNOCKOUT VICTORY!' : 'PLAYER 1 WINS!'))
+        : (isTotalDestruction ? 'TOTAL DESTRUCTION!' : (isKO ? 'KNOCKOUT!' : 'VICTORY'));
       heading.className = 'result-title win';
       if (detail) {
-        detail.textContent = isTotalDestruction
-          ? 'Opponent robot obliterated! All parts destroyed!'
-          : (isKO ? 'Opponent counted out by referee! KO Victory!' : 'Won by Judges\' Decision!');
+        detail.textContent = (gameMode === '1v1')
+          ? (isTotalDestruction ? 'Player 2 robot obliterated! All parts destroyed!' : (isKO ? 'Player 2 counted out by referee!' : 'Player 1 won by Judges\' Decision!'))
+          : (isTotalDestruction ? 'Opponent robot obliterated! All parts destroyed!' : (isKO ? 'Opponent counted out by referee! KO Victory!' : 'Won by Judges\' Decision!'));
       }
       if (!isTotalDestruction) {
         AudioSys.winFanfare();
         AudioSys.crowdCheer(1.0, 2.5);
       }
     } else {
-      heading.textContent = isTotalDestruction ? 'DEFEAT — DEMOLISHED!' : (isKO ? 'DEFEAT — COUNTED OUT!' : 'DEFEAT');
-      heading.className = 'result-title lose';
+      heading.textContent = (gameMode === '1v1')
+        ? (isTotalDestruction ? 'P2 TOTAL DESTRUCTION!' : (isKO ? 'P2 KNOCKOUT VICTORY!' : 'PLAYER 2 WINS!'))
+        : (isTotalDestruction ? 'DEFEAT — DEMOLISHED!' : (isKO ? 'DEFEAT — COUNTED OUT!' : 'DEFEAT'));
+      heading.className = (gameMode === '1v1') ? 'result-title win' : 'result-title lose';
       if (detail) {
-        detail.textContent = isTotalDestruction
-          ? 'Your robot was torn apart! All parts destroyed!'
-          : (isKO ? 'Your robot was immobilized and counted out!' : 'Lost by Judges\' Decision!');
+        detail.textContent = (gameMode === '1v1')
+          ? (isTotalDestruction ? 'Player 1 robot obliterated! All parts destroyed!' : (isKO ? 'Player 1 counted out by referee!' : 'Player 2 won by Judges\' Decision!'))
+          : (isTotalDestruction ? 'Your robot was torn apart! All parts destroyed!' : (isKO ? 'Your robot was immobilized and counted out!' : 'Lost by Judges\' Decision!'));
       }
       if (!isTotalDestruction) {
-        AudioSys.loseSound();
+        if (gameMode === '1v1') {
+          AudioSys.winFanfare();
+          AudioSys.crowdCheer(1.0, 2.5);
+        } else {
+          AudioSys.loseSound();
+        }
       }
     }
 
-    document.getElementById('result-score').textContent = `YOU ${playerScore} - ${enemyScore} OPPONENT`;
+    document.getElementById('result-score').textContent = (gameMode === '1v1')
+      ? `P1 ${playerScore} - ${enemyScore} P2`
+      : `YOU ${playerScore} - ${enemyScore} OPPONENT`;
     modalGameover.classList.remove('hidden');
     if (typeof GamepadUINav !== 'undefined' && typeof GamepadUINav.ensureValidFocus === 'function') {
       GamepadUINav.ensureValidFocus();
@@ -1257,6 +1320,7 @@
     if (!camObj || !targetBot) return;
     const desiredPos = new THREE.Vector3();
     const lookTarget = new THREE.Vector3();
+    const isSplit = isSplitScreenActive();
 
     let heading = isP2Cam ? smoothCamHeadingP2 : smoothCamHeading;
     const curLook = isP2Cam ? currentCamLookTargetP2 : currentCamLookTarget;
@@ -1282,8 +1346,11 @@
     else smoothCamHeading = heading;
 
     if (mode === 0) {
-      const followDist = 10.5;
-      const followHeight = 5.2;
+      // Follow Direction mode:
+      // When in 1v1 split screen, zoom camera out further back and higher up so both players
+      // can see the entire width of the arena, arena hazards, and their opponent easily.
+      const followDist = isSplit ? 15.2 : 10.5;
+      const followHeight = isSplit ? 8.2 : 5.2;
 
       let camX = targetBot.x - Math.sin(heading) * followDist;
       let camZ = targetBot.z - Math.cos(heading) * followDist;
@@ -1292,16 +1359,16 @@
       const pDistCenter = Math.max(Math.abs(targetBot.x), Math.abs(targetBot.z));
       const wallNear = Math.max(0, pDistCenter - (ARENA_HALF - 3.8));
       if (wallNear > 0) {
-        camY += wallNear * 1.5;
+        camY += wallNear * (isSplit ? 1.8 : 1.5);
       }
 
-      const maxCamCoord = ARENA_HALF + 2.5;
+      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 2.5);
       camX = Math.max(-maxCamCoord, Math.min(maxCamCoord, camX));
       camZ = Math.max(-maxCamCoord, Math.min(maxCamCoord, camZ));
 
       desiredPos.set(camX, camY, camZ);
 
-      const forwardLead = 4.8;
+      const forwardLead = isSplit ? 3.2 : 4.8;
       lookTarget.set(
         targetBot.x + Math.sin(heading) * forwardLead,
         (targetBot.root ? targetBot.root.position.y : 0) + 0.85,
@@ -1311,11 +1378,11 @@
       const pDistFromCenter = Math.max(Math.abs(targetBot.x), Math.abs(targetBot.z));
       const wallDanger = Math.max(0, pDistFromCenter - (ARENA_HALF - 4.2));
 
-      const baseDist = 12.8;
+      const baseDist = isSplit ? 17.5 : 12.8;
       let rawCamX = targetBot.x - Math.sin(heading) * baseDist * 0.72;
       let rawCamZ = targetBot.z - Math.cos(heading) * baseDist * 0.72;
 
-      const dynamicHeight = 17.5 + wallDanger * 2.2;
+      const dynamicHeight = (isSplit ? 22.5 : 17.5) + wallDanger * 2.2;
 
       if (wallDanger > 0) {
         const centerPull = (wallDanger / 4.2) * 0.35;
@@ -1323,7 +1390,7 @@
         rawCamZ = rawCamZ * (1 - centerPull);
       }
 
-      const maxCamCoord = ARENA_HALF + 4.0;
+      const maxCamCoord = ARENA_HALF + (isSplit ? 6.5 : 4.0);
       rawCamX = Math.max(-maxCamCoord, Math.min(maxCamCoord, rawCamX));
       rawCamZ = Math.max(-maxCamCoord, Math.min(maxCamCoord, rawCamZ));
 
@@ -1333,11 +1400,23 @@
       const midZ = otherBot ? (targetBot.z * 0.58 + otherBot.z * 0.42) : targetBot.z;
       lookTarget.set(midX, 0.75, midZ);
     } else if (mode === 2) {
-      desiredPos.set(0, 28.5, 0.1);
+      // Top-Down Aerial view:
+      // For P1: view from Green side (+Z) looking down at arena (Green at bottom, Red at top)
+      // For P2: view from Red side (-Z) looking down at arena (Red at bottom, Green at top)
+      const isRedSide = isP2Cam || (targetBot === enemyBot);
+      const viewSign = isRedSide ? -1 : 1;
+      desiredPos.set(0, isSplit ? 34.5 : 28.5, viewSign * 1.2);
       lookTarget.set(0, 0, 0);
     } else {
-      desiredPos.set(0, 24.0, 22.5);
-      lookTarget.set(0, 2.0, -1.5);
+      // Full Arena Broadcast view:
+      // For P1: view from Green side (+Z) looking North across the arena
+      // For P2: view from Red side (-Z) looking South across the arena
+      const isRedSide = isP2Cam || (targetBot === enemyBot);
+      const viewSign = isRedSide ? -1 : 1;
+      const camDist = isSplit ? 27.5 : 23.5;
+      const camHeight = isSplit ? 24.0 : 20.0;
+      desiredPos.set(0, camHeight, viewSign * camDist);
+      lookTarget.set(0, isSplit ? 1.2 : 1.8, 0);
     }
 
     camObj.position.lerp(desiredPos, Math.min(1, dt * 6.0));
@@ -1357,6 +1436,11 @@
 
   function updateCamera(dt) {
     if (matchState === 'menu') {
+      if (camera.fov !== 46) {
+        camera.fov = 46;
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
       smoothCameraP2Initialized = false;
       updateMenuCamera(dt);
       return;
@@ -1393,7 +1477,9 @@
 
   function driveMenuBotAI(bot, target, dt, isP1) {
     if (!bot || !target) return;
-    const bNoWheels = (!bot.wheels || bot.wheels.length === 0 || bot.wheels.filter(w => w.attached).length === 0);
+    const bHasWheels = (bot.wheels && bot.wheels.length > 0 && bot.wheels.some(w => w.attached !== false)) ||
+      (bot.detachableParts && bot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
+    const bNoWheels = !bHasWheels;
     if (bot.driveHealth <= 0 || bot.flipped || bot.isEntirelyDestroyed || bNoWheels) {
       bot.drivePower = 0;
       bot.throttleInput = 0;
@@ -1786,7 +1872,7 @@
       if (typeof updateMenuIdleSpectate === 'function') {
         updateMenuIdleSpectate(dt);
       }
-      if (gp1 && gp1.hasInput) {
+      if ((gp1 && gp1.hasInput) || (gp2 && gp2.hasInput)) {
         if (typeof isMenuSpectating === 'function' && isMenuSpectating()) {
           toggleMenuSpectate(false);
         }
@@ -1920,6 +2006,13 @@
           rpmFill.style.width = '0%';
           rpmFill.classList.remove('ready');
           rpmFill.style.background = '#475569';
+        } else if (myLocalBot.weaponStallTimer > 0) {
+          const stallSec = Math.ceil(myLocalBot.weaponStallTimer);
+          rpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
+          rpmText.style.color = '#f59e0b';
+          rpmFill.style.width = '0%';
+          rpmFill.classList.remove('ready');
+          rpmFill.style.background = '#f59e0b';
         } else if (myLocalBot.weaponActive === false) {
           rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
           rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
@@ -1951,12 +2044,22 @@
         matchTimeRemaining -= dt;
         if (matchTimeRemaining <= 0) {
           matchTimeRemaining = 0;
-          // Judges' Decision based on remaining drive power & attached armor pieces
-          const pAttached = playerBot.armorPanels.filter(p => p.attached).length;
-          const eAttached = enemyBot.armorPanels.filter(p => p.attached).length;
-          const pScore = playerBot.driveHealth * 0.6 + pAttached * 10;
-          const eScore = enemyBot.driveHealth * 0.6 + eAttached * 10;
-          const isDraw = Math.abs(pScore - eScore) < 4;
+          // Balanced Judges' Decision: 60% Health ratio + 40% Intact Parts ratio (100% fair across all CAD models)
+          const getPartsRatio = (bot) => {
+            if (!bot) return 1.0;
+            if (bot.detachableParts && bot.detachableParts.length > 0) {
+              const attached = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
+              return attached / Math.max(1, bot.totalInitialParts || bot.detachableParts.length);
+            }
+            if (bot.armorPanels && bot.armorPanels.length > 0) {
+              const attached = bot.armorPanels.filter(p => p.attached).length;
+              return attached / bot.armorPanels.length;
+            }
+            return 1.0;
+          };
+          const pScore = (playerBot.driveHealth / (playerBot.maxDriveHealth || 300)) * 60 + getPartsRatio(playerBot) * 40;
+          const eScore = (enemyBot.driveHealth / (enemyBot.maxDriveHealth || 300)) * 60 + getPartsRatio(enemyBot) * 40;
+          const isDraw = Math.abs(pScore - eScore) < 2.5;
           endMatch(pScore > eScore, isDraw, false, false);
         }
         updateTimerDisplay();
@@ -2105,6 +2208,10 @@
     const splitOverlay = document.getElementById('splitscreen-overlay');
     const splitActive = isSplitScreenActive();
     document.body.classList.toggle('splitscreen-mode', splitActive);
+    if (splitActive !== lastSplitActiveState) {
+      lastSplitActiveState = splitActive;
+      updateCameraUI();
+    }
     if (splitOverlay) {
       if (splitActive) {
         splitOverlay.classList.remove('hidden');
@@ -2120,6 +2227,13 @@
               p2RpmFill.style.width = '0%';
               p2RpmFill.classList.remove('ready');
               p2RpmFill.style.background = '#475569';
+            } else if (enemyBot.weaponStallTimer > 0) {
+              const stallSec = Math.ceil(enemyBot.weaponStallTimer);
+              p2RpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
+              p2RpmText.style.color = '#f59e0b';
+              p2RpmFill.style.width = '0%';
+              p2RpmFill.classList.remove('ready');
+              p2RpmFill.style.background = '#f59e0b';
             } else if (enemyBot.weaponActive === false) {
               p2RpmText.textContent = p2RpmPct > 0 ? `${p2RpmPct}% (COASTING)` : 'OFF (R-SHIFT / LB)';
               p2RpmText.style.color = p2RpmPct > 0 ? '#f59e0b' : '#94a3b8';
@@ -2163,6 +2277,15 @@
 
       renderer.setScissorTest(true);
 
+      // Calibrated wider FOV for split-screen portrait aspect ratio to reveal the entire arena width
+      const splitFov = 58;
+      if (camera.fov !== splitFov) {
+        camera.fov = splitFov;
+      }
+      if (cameraP2.fov !== splitFov) {
+        cameraP2.fov = splitFov;
+      }
+
       // Left Viewport: Player 1 (Blue Corner)
       camera.aspect = halfW / fullH;
       camera.updateProjectionMatrix();
@@ -2184,7 +2307,9 @@
       renderer.setScissorTest(false);
       renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
       const targetAspect = window.innerWidth / window.innerHeight;
-      if (Math.abs(camera.aspect - targetAspect) > 0.001) {
+      const normalFov = 46;
+      if (camera.fov !== normalFov || Math.abs(camera.aspect - targetAspect) > 0.001) {
+        camera.fov = normalFov;
         camera.aspect = targetAspect;
         camera.updateProjectionMatrix();
       }
@@ -2199,8 +2324,15 @@
   }
 
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const isSplit = typeof isSplitScreenActive === 'function' && isSplitScreenActive();
+    camera.fov = isSplit ? 58 : 46;
+    camera.aspect = (isSplit ? (window.innerWidth * 0.5) : window.innerWidth) / window.innerHeight;
     camera.updateProjectionMatrix();
+    if (typeof cameraP2 !== 'undefined') {
+      cameraP2.fov = isSplit ? 58 : 46;
+      cameraP2.aspect = (window.innerWidth * 0.5) / window.innerHeight;
+      cameraP2.updateProjectionMatrix();
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
     if (typeof PerfSys !== 'undefined') {
       PerfSys.applySettings();

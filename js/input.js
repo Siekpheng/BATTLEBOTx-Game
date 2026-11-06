@@ -8,6 +8,7 @@
   function setPlayerWeaponState(bot = playerBot, active = true) {
     const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
     if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
+    if (active && targetBot.weaponStallTimer > 0) return;
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     if (targetBot.weaponActive === !!active) return;
     targetBot.weaponActive = !!active;
@@ -28,6 +29,10 @@
   function togglePlayerWeapon(bot = playerBot) {
     const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
     if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
+    if (targetBot.weaponStallTimer > 0) {
+      if (typeof AudioSys !== 'undefined' && AudioSys.beep) AudioSys.beep(220, 0.12); // Low warning buzz: stalled!
+      return;
+    }
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     targetBot.weaponActive = (targetBot.weaponActive === false) ? true : false;
     if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
@@ -47,6 +52,13 @@
   const keys = {};
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
+    if ((e.code === 'Escape' || e.code === 'KeyP') && (matchState === 'playing' || matchState === 'paused')) {
+      e.preventDefault();
+      const btnPause = document.getElementById('btn-pause');
+      const btnResume = document.getElementById('btn-resume-game');
+      if (matchState === 'playing' && btnPause) btnPause.click();
+      else if (matchState === 'paused' && btnResume) btnResume.click();
+    }
     if (e.code === 'KeyC' && (matchState === 'playing' || matchState === 'countdown')) {
       cycleCameraMode();
     }
@@ -155,10 +167,19 @@
     if (pad.isFlySky === true) return true;
     if (window.flySkyProfileActive) return true;
     const id = String(pad.id || '').toLowerCase();
-    if (/flysky|fs-i6|fs-i6x|\bi6\b|sm100|ppm|taranis|radiomaster|opentx|frsky|rc transmitter|rc sim|rc controller/i.test(id)) {
+    if (/flysky|fs-i6|fs-i6x|fs-th9x|fs-t6|fs-ct6b|\bi6\b|\bi6x\b|sm100|ppm|taranis|radiomaster|opentx|edgetx|frsky|rc transmitter|rc sim|rc controller|rc-usb|kmodel|khobby|gold|phoenix|aerofly|reflex|fms|vjoy|0e8f|0401|0b9b|4012|pc-joystick|joystick/i.test(id)) {
       return true;
     }
-    if (/0401.*0401|0401:0401/i.test(id)) {
+    if (/0401.*0401|0401:0401|0b9b.*4012|0b9b:4012/i.test(id)) {
+      return true;
+    }
+    // Automatically identify RC simulator USB dongles / adapters by structural signature:
+    // 4-8 axes, <= 8 buttons (RC transmitters do not have 16-17 gamepad buttons)
+    if (pad.axes && pad.axes.length >= 4 && pad.buttons && pad.buttons.length <= 8) {
+      return true;
+    }
+    // DirectInput controllers without standard mapping that have 4 to 8 axes
+    if (pad.axes && pad.axes.length >= 4 && pad.mapping !== 'standard') {
       return true;
     }
     return false;
@@ -197,6 +218,12 @@
     if (window._mockGamepads && Array.isArray(window._mockGamepads) && window._mockGamepads.length > 0) {
       return window._mockGamepads.filter(p => p && p.connected !== false);
     }
+    // If the Windows Native XInput/DirectInput bridge has active controllers,
+    // ALWAYS use them! They are directly polled from Windows WinMM kernel API with exact
+    // hardware calibration, zero phantom buttons, and dedicated FlySky FS-i6 RC profiles.
+    if (Array.isArray(window._nativeWinPads) && window._nativeWinPads.length > 0) {
+      return window._nativeWinPads.filter(p => p && p.connected !== false);
+    }
     const navPads = (typeof navigator.getGamepads === 'function')
       ? navigator.getGamepads()
       : (typeof navigator.webkitGetGamepads === 'function' ? navigator.webkitGetGamepads() : null);
@@ -208,11 +235,6 @@
           connectedPads.push(p);
         }
       }
-    }
-    // If browser Gamepad API returned fewer controllers than the Windows Native XInput/DirectInput bridge,
-    // use the native Windows controllers so connected controllers are always recognized!
-    if (Array.isArray(window._nativeWinPads) && window._nativeWinPads.length > connectedPads.length) {
-      return window._nativeWinPads.filter(p => p && p.connected !== false);
     }
     // Prioritize recognized gamepads & FlySky RC transmitters ahead of raw unmapped virtual HID devices
     if (connectedPads.length > 1) {
@@ -600,7 +622,7 @@
     };
 
     if (!prevGamepadButtons[playerIndex]) {
-      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false, back: false, a: false, x: false, y: false, swa: false, swb: false };
+      prevGamepadButtons[playerIndex] = { lb: false, rb: false, start: false, back: false, a: false, x: false, y: false, swa: null, swb: false };
     }
     const prev = prevGamepadButtons[playerIndex];
     const inMatch = (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown'));
@@ -612,44 +634,40 @@
     if (isFlySky) {
       // ========================================================
       // FLYSKY FS-i6 COMBAT ROBOTICS DUAL-GIMBAL MIXER
-      // Standard RC Transmitter Mode 2 Layout:
+      // Mode 2 RC Transmitter Standard Combat Layout:
       // - Right Stick: CH1 = Steer (Left/Right), CH2 = Throttle (Fwd/Rev)
-      // - Left Stick:  CH3 = Throttle/Weapon,    CH4 = Yaw/Steer
-      // - Switch SWA (CH5 / Button 0 / Axis 4): Weapon Armed / Spin-up
+      //   (Dual spring-centered gimbal - 100% full speed, zero drift, identical for P1 and P2)
+      // - Left Stick:  CH3 = Unsprung ratchet (decoupled from throttle to prevent phantom self-driving)
+      //                CH4 = Rudder / Yaw (optional secondary steer with firm deadzone)
+      // - Switch SWA (CH5 / Button 0 / Axis 4): Weapon Master Arm / Spin-Up Switch
       // - Switch SWB (CH6 / Button 1 / Axis 5): Camera Angle Cycle
       // ========================================================
       const axes = pad.axes || [];
       const ch1 = axes.length > 0 ? axes[0] : 0; // Right Stick X (Aileron / Steering)
       const ch2 = axes.length > 1 ? axes[1] : 0; // Right Stick Y (Elevator / Throttle)
-      const ch3 = axes.length > 2 ? axes[2] : 0; // Left Stick Y (Throttle)
+      const ch3 = axes.length > 2 ? axes[2] : 0; // Left Stick Y (Unsprung Ratchet)
       const ch4 = axes.length > 3 ? axes[3] : 0; // Left Stick X (Rudder / Yaw)
 
-      // Right Stick Steering (CH1)
-      const ch1_steer = applyDeadzone(ch1, 0.06);
-      // Right Stick Throttle (CH2): Stick UP is negative Y (-1.0) -> invert so forward is positive (+1.0)
-      const ch2_throttle = -applyDeadzone(ch2, 0.06);
+      // Right Stick (Dedicated Single-Stick Combat Arcade Drive - 100% full speed & agile turning)
+      const ch1_steer = applyDeadzone(ch1, 0.12);
+      const ch2_throttle = -applyDeadzone(ch2, 0.12); // DirectInput Y: Up is negative (-1.0) -> +1.0 Forward
 
-      // Left Stick Steering (CH4): Secondary steering
-      const ch4_steer = applyDeadzone(ch4, 0.06);
+      // Left Stick X (CH4 Rudder / Secondary Steer):
+      // Only active if driver deliberately deflects Left Stick X past a firm 0.28 deadzone AND Right Stick is centered.
+      const ch4_steer = applyDeadzone(ch4, 0.28);
 
-      // Left Stick Throttle (CH3):
-      let ch3_throttle = 0;
-      if (Math.abs(ch3) > 0.08) {
-        // If stick is not resting at bottom peg (-1.0) on un-sprung ratchet gimbals
-        if (Math.abs(ch3 + 1.0) > 0.12 && Math.abs(ch3 - 1.0) > 0.12) {
-          ch3_throttle = -applyDeadzone(ch3, 0.08);
-        }
-      }
+      // Unsprung Ratchet Stick (Left Stick Y / CH3):
+      // On Mode 2 RC transmitters, Left Stick Y has NO return-to-center spring (friction ratchet).
+      // Decoupled from throttle to prevent self-driving phantom movement. Throttle is 100% driven by Right Stick CH2.
+      throttle = ch2_throttle;
 
-      // Whichever stick the driver moves, the bot responds smoothly!
-      throttle = (Math.abs(ch2_throttle) >= Math.abs(ch3_throttle)) ? ch2_throttle : ch3_throttle;
-      steer = (Math.abs(ch1_steer) >= Math.abs(ch4_steer)) ? ch1_steer : ch4_steer;
-
-      // Tank Drive (Dual-Stick Skid-Steer):
-      // If both vertical gimbals (CH3 Left Track, CH2 Right Track) are being driven:
-      if (Math.abs(ch2_throttle) > 0.15 && Math.abs(ch3_throttle) > 0.15 && Math.abs(ch1_steer) < 0.15 && Math.abs(ch4_steer) < 0.15) {
-        throttle = (ch3_throttle + ch2_throttle) * 0.5;
-        steer = (ch2_throttle - ch3_throttle) * 0.5;
+      // Steering Selection: Right Stick (CH1) has primary authority; optional Left Stick X (CH4) secondary
+      if (Math.abs(ch1_steer) > 0.01) {
+        steer = ch1_steer;
+      } else if (Math.abs(ch4_steer) > 0.01) {
+        steer = ch4_steer;
+      } else {
+        steer = 0;
       }
 
       // Switch SWA (CH5): Weapon Master Arm / Spin-Up Switch
@@ -658,7 +676,7 @@
       const swaButton = !!((b[0] && (b[0].pressed || b[0].value > 0.5)) || (b[4] && (b[4].pressed || b[4].value > 0.5)));
       const swaActive = swaButton || (swaAxis > 0.25);
 
-      if (swaActive !== prev.swa) {
+      if (prev.swa !== null && typeof prev.swa !== 'undefined' && swaActive !== prev.swa) {
         if (inMatch) {
           if (playerIndex === 0 && playerBot) {
             setPlayerWeaponState(playerBot, swaActive);
@@ -666,8 +684,8 @@
             setPlayerWeaponState(enemyBot, swaActive);
           }
         }
-        prev.swa = swaActive;
       }
+      prev.swa = swaActive;
 
       // Switch SWB (CH6): Camera Angle Switch
       const swbAxis = (axes.length > 5) ? axes[5] : 0;
@@ -685,15 +703,10 @@
       }
       prev.swb = swbActive;
 
-      // Start / Pause: SWC / SWD or button 9
-      const startPressed = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
-      if (startPressed && !prev.start) {
-        const btnPause = document.getElementById('btn-pause');
-        const btnResume = document.getElementById('btn-resume-game');
-        if (matchState === 'playing' && btnPause) btnPause.click();
-        else if (matchState === 'paused' && btnResume) btnResume.click();
-      }
-      prev.start = startPressed;
+      // RC Transmitters (FlySky FS-i6 / PPM / Simulator adapters):
+      // Auxiliary switches (SWA/SWB/SWC/SWD) and knobs must NOT trigger game pause
+      // to prevent random/accidental pause menu popups while flying/driving.
+      prev.start = false;
 
       return {
         throttle,
@@ -726,27 +739,38 @@
 
     throttle = (Math.abs(triggerThrottle) > 0.02) ? triggerThrottle : stickThrottle;
 
-    const povDir = readPovHatDir(pad);
-    // Optional D-Pad / POV Hat fallback for throttle
-    if (Math.abs(throttle) < 0.1) {
+    const isStdGamepad = (pad.mapping === 'standard') && !isFlySkyPad(pad);
+    const povDir = isStdGamepad ? readPovHatDir(pad) : null;
+    // Optional D-Pad / POV Hat fallback for throttle (Standard controllers with genuine hat switch only)
+    if (isStdGamepad && Math.abs(throttle) < 0.1) {
       if ((pad.buttons && pad.buttons[12] && (pad.buttons[12].pressed || pad.buttons[12].value > 0.5)) || povDir === 'up') throttle = 1.0;
       else if ((pad.buttons && pad.buttons[13] && (pad.buttons[13].pressed || pad.buttons[13].value > 0.5)) || povDir === 'down') throttle = -1.0;
     }
 
-    // 3. Turn Left and Right: Supports BOTH Left Joystick (axes[0]) AND Right Joystick (axes[2])
+    // 3. Turn Left and Right: Standard gamepad Left Stick X (axes[0])
     let leftX = (pad.axes && pad.axes.length > 0) ? pad.axes[0] : 0;
     let leftStickSteer = applyDeadzone(leftX, 0.16);
 
-    let rightX = (pad.axes && pad.axes.length > 2) ? pad.axes[2] : 0;
-    if (Math.abs(rightX) < 0.1 && pad.axes && pad.axes.length > 5 && Math.abs(pad.axes[5]) > 0.1) {
-      rightX = pad.axes[5];
+    // Only genuine standard Xbox/PlayStation controllers with standard mapping have Right Stick X on axes[2].
+    // DirectInput Z-axis (friction ratchet / slider / trigger) is NEVER interpreted as steering!
+    let rightStickSteer = 0;
+    if (pad.mapping === 'standard' && !isFlySkyPad(pad) && pad.axes && pad.axes.length > 2) {
+      let rightX = pad.axes[2];
+      if (Math.abs(rightX + 1.0) > 0.18 && Math.abs(rightX - 1.0) > 0.18) {
+        rightStickSteer = applyDeadzone(rightX, 0.16);
+      }
     }
-    let rightStickSteer = applyDeadzone(rightX, 0.16);
 
-    steer = Math.abs(leftStickSteer) >= Math.abs(rightStickSteer) ? leftStickSteer : rightStickSteer;
+    if (Math.abs(leftStickSteer) > 0.01) {
+      steer = leftStickSteer;
+    } else if (Math.abs(rightStickSteer) > 0.01) {
+      steer = rightStickSteer;
+    } else {
+      steer = 0;
+    }
 
-    // Optional D-Pad / POV Hat fallback for steer
-    if (Math.abs(steer) < 0.1) {
+    // Optional D-Pad / POV Hat fallback for steer (Standard controllers with genuine hat switch only)
+    if (isStdGamepad && Math.abs(steer) < 0.1) {
       if ((pad.buttons && pad.buttons[14] && (pad.buttons[14].pressed || pad.buttons[14].value > 0.5)) || povDir === 'left') steer = -1.0;
       else if ((pad.buttons && pad.buttons[15] && (pad.buttons[15].pressed || pad.buttons[15].value > 0.5)) || povDir === 'right') steer = 1.0;
     }
@@ -785,10 +809,12 @@
     prev.rb = rbPressed;
     prev.y = yPressed;
 
-    // 6. Start / Menu button (buttons[9]) or Back / Select (buttons[8]) for pause toggle
-    const startPressed   = !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
-    const backBtnPressed = !!(pad.buttons && pad.buttons[8] && (pad.buttons[8].pressed || pad.buttons[8].value > 0.5));
-    const pauseTriggered = (startPressed && !prev.start) || (backBtnPressed && !prev.back);
+    // 6. Start / Menu button (buttons[9]) for pause toggle on standard gamepads only:
+    // Only genuine standard gamepads (Xbox / PS / Switch Pro with standard mapping) may trigger pause via Start.
+    // buttons[8] (Back/Select/Share) and non-standard RC dongles are strictly ignored to prevent menu popups during play.
+    const isStandardPad = (pad.mapping === 'standard') && !isFlySkyPad(pad);
+    const startPressed   = isStandardPad && !!(pad.buttons && pad.buttons[9] && (pad.buttons[9].pressed || pad.buttons[9].value > 0.5));
+    const pauseTriggered = startPressed && !prev.start;
 
     if (pauseTriggered) {
       const btnPause = document.getElementById('btn-pause');
@@ -797,7 +823,7 @@
       else if (matchState === 'paused' && btnResume) btnResume.click();
     }
     prev.start = startPressed;
-    prev.back = backBtnPressed;
+    prev.back = false;
 
     return {
       throttle,
@@ -1336,6 +1362,7 @@
     activeContainerId: null,
     navCooldown: 0,
     p2NavCooldown: 0,
+    modalEnterCooldown: 0,
     prevPadStates: [
       { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
       { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, dir: null },
@@ -1427,6 +1454,8 @@
       }
       if (this.activeContainerId !== container.id || !this.focusedEl || !items.includes(this.focusedEl)) {
         this.activeContainerId = container.id;
+        // 450ms lockout debounce: swallows ongoing driving stick/switch inputs so held controls don't trigger menu buttons
+        this.modalEnterCooldown = 0.45;
         // Pick a sensible default focus element in the new container
         let def = null;
         if (container.id === 'menu-screen') {
@@ -1637,10 +1666,13 @@
       if (axX > 0.55) return 'right';
 
       // FlySky FS-i6: Optional secondary steering on Left Stick X (CH4 Rudder):
+      // Ignore if pegged near -1.0 or +1.0 (unsprung throttle/dial)
       if (typeof isFlySkyPad === 'function' && isFlySkyPad(pad) && Math.abs(axX) < 0.25 && Math.abs(axY) < 0.25 && pad.axes && pad.axes.length > 3) {
         const axR = pad.axes[3];
-        if (axR < -0.55) return 'left';
-        if (axR > 0.55) return 'right';
+        if (Math.abs(axR + 1.0) > 0.18 && Math.abs(axR - 1.0) > 0.18) {
+          if (axR < -0.55) return 'left';
+          if (axR > 0.55) return 'right';
+        }
       }
       return null;
     },
@@ -1652,10 +1684,31 @@
       const container = this.getActiveContainer();
       if (!container) {
         if (this.focusedEl) this.clearFocus();
+        this.activeContainerId = null;
+        this.modalEnterCooldown = 0;
         return;
       }
 
       const pads = getConnectedGamepadsList();
+
+      // Lockout buffer: Swallow driving inputs when entering a modal so held sticks/switches don't trigger menu items
+      if (this.modalEnterCooldown > 0) {
+        this.modalEnterCooldown = Math.max(0, this.modalEnterCooldown - (dt || 0.016));
+        for (let pIdx = 0; pIdx < Math.min(4, pads.length); pIdx++) {
+          const pad = pads[pIdx];
+          if (!pad) continue;
+          if (!this.prevPadStates[pIdx]) {
+            this.prevPadStates[pIdx] = { a: false, b: false, x: false, y: false, lb: false, rb: false, start: false, lt: false, rt: false, dir: null };
+          }
+          const prev = this.prevPadStates[pIdx];
+          const b = pad.buttons || [];
+          prev.a = !!(b[0] && (b[0].pressed || b[0].value > 0.5));
+          prev.b = !!(b[1] && (b[1].pressed || b[1].value > 0.5));
+          prev.start = !!(b[9] && (b[9].pressed || b[9].value > 0.5));
+          prev.dir = this.readPadDir(pad);
+        }
+        return;
+      }
       const isMappingModal = (container.id === 'modal-select' || container.id === 'modal-pause');
       const is1v1Select = (container.id === 'modal-select' && typeof gameMode !== 'undefined' && gameMode === '1v1');
 
@@ -1724,8 +1777,11 @@
           }
         }
 
-        // In single-player modes, only P1 controller can navigate
-        if (!is1v1Select && !isP1Pad) {
+        // In single-player modes, only P1 controller can navigate.
+        // In 1v1 local matches, both Controller 1 and Controller 2 can navigate shared modals (pause, gameover)
+        const is2PlayerSharedModal = (typeof gameMode !== 'undefined' && gameMode === '1v1') &&
+          (container.id === 'modal-pause' || container.id === 'modal-gameover');
+        if (!is1v1Select && !is2PlayerSharedModal && !isP1Pad) {
           continue;
         }
 

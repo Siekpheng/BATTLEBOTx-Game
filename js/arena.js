@@ -839,21 +839,23 @@
     const camRef = activeCam || camera;
     const cx = camRef.position.x;
     const cz = camRef.position.z;
+    const botRef = primaryBot || playerBot;
 
     for (let i = 0; i < arenaWallMeshes.length; i++) {
       const w = arenaWallMeshes[i];
       let targetOpacity = 0.28;
 
-      if (playerBot) {
-        const px = playerBot.x;
-        const pz = playerBot.z;
+      if (botRef) {
+        const px = botRef.x;
+        const pz = botRef.z;
         // Normal points outward
         const pDot = px * w.nx + pz * w.nz;
         const pDist = ARENA_HALF - pDot;
 
         let eDist = 999;
-        if (enemyBot) {
-          const eDot = enemyBot.x * w.nx + enemyBot.z * w.nz;
+        const otherBot = (botRef === playerBot) ? enemyBot : playerBot;
+        if (otherBot) {
+          const eDot = otherBot.x * w.nx + otherBot.z * w.nz;
           eDist = ARENA_HALF - eDot;
         }
 
@@ -870,8 +872,8 @@
         }
 
         // When camera is on the other side looking through or close to this wall
-        if (cDist < 3.0 || (cDot > pDot && cDot > ARENA_HALF - 2.5)) {
-          const camProximity = Math.max(0, Math.min(1, Math.max(0, cDist) / 3.0));
+        if (cDist < 3.5 || (cDot > pDot && cDot > ARENA_HALF - 2.8)) {
+          const camProximity = Math.max(0, Math.min(1, Math.max(0, cDist) / 3.5));
           targetOpacity = Math.min(targetOpacity, 0.02 + 0.18 * camProximity);
         }
       } else {

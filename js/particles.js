@@ -129,10 +129,10 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    // Health hierarchy: Robot 2 most HP (450), Robot 3 & 6 least HP (200), Others similar HP (300)
+    // Standardized base HP across all robots for identical baseline durability
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
-      : ((bot.type === 'robot2') ? 450 : ((bot.type === 'robot3' || bot.type === 'robot6') ? 200 : 300));
+      : 300;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
@@ -627,9 +627,9 @@
       chosen = pool[0];
     }
 
-    // Weapon Retention Protection for combat robots:
-    // Robot 5 (BlueThunder) and Robot 3 primary weapons NEVER detach while exterior armor, wheels, or chassis remain!
-    if (chosen && chosen.category === 'weapon' && (bot.type === 'robot5' || bot.type === 'robot3')) {
+    // Weapon Retention Protection for all combat robots:
+    // Primary weapons NEVER detach while exterior armor, wheels, or chassis remain!
+    if (chosen && chosen.category === 'weapon') {
       const nonWeaponPool = remaining.filter(p => p.category !== 'weapon' && p.category !== 'chassis_core');
       if (nonWeaponPool.length > 0) {
         // Divert impact shockwave to rip off exterior armor or wheels instead of breaking the primary weapon
@@ -723,10 +723,10 @@
       bot.vz = 0;
     }
 
-    // Check if ALL weapon parts on the robot are now detached
+    // Check if weapon part on the robot is detached or all weapon parts are gone
     const hadWeaponParts = bot.detachableParts.some(p => p.category === 'weapon');
     const remainingWeaponParts = bot.detachableParts.filter(p => p.category === 'weapon' && p.attached && p.mesh && p.mesh.parent).length;
-    if ((hadWeaponParts && remainingWeaponParts === 0) || chosen.category === 'weapon' && remainingWeaponParts === 0) {
+    if (chosen.category === 'weapon' || (hadWeaponParts && remainingWeaponParts === 0)) {
       bot.weaponDestroyed = true;
       bot.weaponSpinSpeed = 0;
       bot.weaponActive = false;
@@ -778,6 +778,19 @@
     const detachedCount = (bot.totalInitialParts - remainingCount);
     const healthLoss = (detachedCount / effectivePartDivisor) * bot.maxDriveHealth;
     bot.driveHealth = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
+
+    // Critical damage weapon failure: if robot is damaged very hard (<= 40% health or <= 35% parts remaining)
+    const curHpRatio = bot.driveHealth / (bot.maxDriveHealth || 300);
+    const partsRatio = remainingCount / Math.max(1, bot.totalInitialParts);
+    if ((curHpRatio <= 0.40 || partsRatio <= 0.35) && !bot.weaponDestroyed) {
+      bot.weaponDestroyed = true;
+      bot.weaponActive = false;
+      bot.weaponSpinSpeed = 0;
+      if (typeof AudioSys !== 'undefined' && AudioSys.weaponStallSound) {
+        AudioSys.weaponStallSound();
+      }
+      spawnCollisionSparks(worldPos, 30);
+    }
 
     // If remaining parts dropped to <= 20%, trigger explosion immediately so ALL remaining parts fly out all at once!
     if (remainingCount <= threshold20) {

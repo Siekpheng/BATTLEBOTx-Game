@@ -663,6 +663,7 @@
       <button class="hud-icon-btn" id="btn-hud-music" type="button" title="Toggle Background Music">🎵</button>
       <button class="hud-icon-btn" id="btn-pause" type="button" title="Pause Game">II</button>
       <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam [C]</button>
+      <button class="hud-icon-btn hidden" id="btn-cam-mode-p2" type="button" title="Cycle Player 2 Camera Angle">🎥 P2 Cam [M]</button>
       <button class="hud-icon-btn" id="btn-cam-down" type="button" title="Lower Camera">Cam -</button>
       <button class="hud-icon-btn" id="btn-cam-up" type="button" title="Raise Camera">Cam +</button>
       <button class="hud-icon-btn" id="btn-toggle-touch" type="button" title="Toggle Touch Controls">🎮 Touch: OFF</button>
@@ -725,6 +726,7 @@
       <div class="splitscreen-badge p1-badge">🔵 P1 · CONTROLLER 1 / WASD</div>
       <div class="splitscreen-badge p2-badge">🔴 P2 · CONTROLLER 2 / ARROWS</div>
       <div class="p2-hud-panel" id="p2-hud-panel">
+        <button type="button" class="p2-cam-toggle-btn" id="btn-p2-cam" title="Cycle Player 2 Camera Angle (Key M / Controller RB)">🎥 P2 Cam: Follow Direction [M]</button>
         <div class="desktop-hint p2-hint-card">
           <div class="weapon-rpm-wrap" id="p2-weapon-rpm-wrap" title="Click or press [Right Shift] / Controller 2 [LB] to toggle P2 weapon">
             <div class="weapon-rpm-header">
@@ -815,14 +817,14 @@
 
 
   <!-- Modular Game Engine Scripts -->
-  <script src="js/state.js?v=20261029g"></script>
-  <script src="js/audio.js?v=20261029g"></script>
-  <script src="js/arena.js?v=20261029g"></script>
-  <script src="js/particles.js?v=20261029g"></script>
-  <script src="js/robots.js?v=20261029g"></script>
-  <script src="js/physics.js?v=20261029g"></script>
-  <script src="js/input.js?v=20261105c"></script>
-  <script src="js/network.js?v=20261029g"></script>
-  <script src="js/game.js?v=20261105c"></script>
+  <script src="js/state.js?v=20261106_2pbalance"></script>
+  <script src="js/audio.js?v=20261106_2pbalance"></script>
+  <script src="js/arena.js?v=20261106_2pbalance"></script>
+  <script src="js/particles.js?v=20261106_2pbalance"></script>
+  <script src="js/robots.js?v=20261106_2pbalance"></script>
+  <script src="js/physics.js?v=20261106_2pbalance"></script>
+  <script src="js/input.js?v=20261106_2pbalance"></script>
+  <script src="js/network.js?v=20261106_2pbalance"></script>
+  <script src="js/game.js?v=20261106_2pbalance"></script>
 </body>
 </html>

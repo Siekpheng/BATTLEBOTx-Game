@@ -420,7 +420,7 @@
             vx: playerBot.vx || 0, vz: playerBot.vz || 0,
             yaw: playerBot.yaw, pitch: playerBot.pitch, roll: playerBot.roll,
             spin: playerBot.weaponSpinSpeed, hp: playerBot.driveHealth, fp: playerBot.flipped,
-            wa: playerBot.weaponActive !== false, wd: !!playerBot.weaponDestroyed,
+            wa: playerBot.weaponActive !== false, wd: !!playerBot.weaponDestroyed, ws: playerBot.weaponStallTimer || 0,
             ed: !!playerBot.isEntirelyDestroyed, st: playerBot.stoppedTimer || 0,
             rc: p1Parts, dp: p1Detached
           },
@@ -430,7 +430,7 @@
             vx: enemyBot.vx || 0, vz: enemyBot.vz || 0,
             yaw: enemyBot.yaw, pitch: enemyBot.pitch, roll: enemyBot.roll,
             spin: enemyBot.weaponSpinSpeed, hp: enemyBot.driveHealth, fp: enemyBot.flipped,
-            wa: enemyBot.weaponActive !== false, wd: !!enemyBot.weaponDestroyed,
+            wa: enemyBot.weaponActive !== false, wd: !!enemyBot.weaponDestroyed, ws: enemyBot.weaponStallTimer || 0,
             ed: !!enemyBot.isEntirelyDestroyed, st: enemyBot.stoppedTimer || 0,
             rc: p2Parts, dp: p2Detached
           },
@@ -491,6 +491,7 @@
       playerBot.flipped = data.p1.fp;
       playerBot.weaponActive = (data.p1.wa !== false);
       playerBot.weaponDestroyed = !!data.p1.wd;
+      playerBot.weaponStallTimer = data.p1.ws || 0;
       playerBot.stoppedTimer = data.p1.st || 0;
 
       // Guest robot (p2 -> enemyBot at +7.5 on both Host and Guest)
@@ -525,6 +526,7 @@
       enemyBot.flipped = data.p2.fp;
       enemyBot.weaponActive = (data.p2.wa !== false);
       enemyBot.weaponDestroyed = !!data.p2.wd;
+      enemyBot.weaponStallTimer = data.p2.ws || 0;
       enemyBot.stoppedTimer = data.p2.st || 0;
 
       if (data.events && Array.isArray(data.events)) {

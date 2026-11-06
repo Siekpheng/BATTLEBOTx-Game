@@ -168,8 +168,13 @@ def read_windows_gamepads():
                     if raw_name:
                         dev_name = raw_name
                     # Detect FlySky FS-i6, FS-SM100 (VID 0x0401 PID 0x0401), or generic PPM USB adapters
-                    if (caps.wMid == 0x0401 or caps.wPid == 0x0401 or
-                        any(k in dev_name.lower() for k in ("flysky", "fs-i6", "sm100", "ppm", "rc sim", "taranis", "opentx", "radiomaster"))):
+                    is_rc_adapter = (
+                        caps.wMid in (0x0401, 0x0b9b, 0x0483, 0x0e8f) or
+                        caps.wPid in (0x0401, 0x4012, 0x5710, 0x0003) or
+                        caps.wNumButtons <= 8 or
+                        any(k in dev_name.lower() for k in ("flysky", "fs-i6", "sm100", "ppm", "rc sim", "taranis", "opentx", "radiomaster", "joystick"))
+                    )
+                    if is_rc_adapter:
                         is_flysky = True
                         dev_name = f"FlySky FS-i6 (RC Transmitter)"
 
@@ -184,7 +189,8 @@ def read_windows_gamepads():
                     v  = round((info.dwVpos - 32767.5) / 32767.5, 4)
 
                     bmask = info.dwButtons
-                    pov = info.dwPOV
+                    has_pov = bool(caps.wCaps & (0x10 | 0x20 | 0x40)) # JOYCAPS_HASPOV | JOYCAPS_POV4DIR | JOYCAPS_POVCTS
+                    pov = info.dwPOV if has_pov else 65535
                     d_up = (pov != 65535) and (pov <= 4500 or pov >= 31500)
                     d_right = (pov != 65535) and (4500 <= pov <= 13500)
                     d_down = (pov != 65535) and (13500 <= pov <= 22500)
@@ -211,6 +217,12 @@ def read_windows_gamepads():
                             buttons[3] = {"pressed": True, "value": 1.0}
                             buttons[5] = {"pressed": True, "value": 1.0}
 
+                    has_u = bool(caps.wCaps & 0x04)
+                    has_v = bool(caps.wCaps & 0x08)
+                    pad_axes = [lx, ly, rx, ry]
+                    if has_u or is_flysky: pad_axes.append(u)
+                    if has_v or is_flysky: pad_axes.append(v)
+
                     pads.append({
                         "index": len(pads),
                         "id": f"{dev_name} #{len(pads) + 1} (DirectInput)",
@@ -218,7 +230,7 @@ def read_windows_gamepads():
                         "mapping": "flysky" if is_flysky else "standard",
                         "isFlySky": is_flysky,
                         "buttons": buttons,
-                        "axes": [lx, ly, rx, ry, u, v],
+                        "axes": pad_axes,
                         "packet": 1,
                     })
 
@@ -271,7 +283,7 @@ class BattleBotRequestHandler(SimpleHTTPRequestHandler):
 # DUAL-STACK SERVER & LAUNCHER
 # ========================================================
 class DualStackHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = True
+    allow_reuse_address = False if sys.platform == "win32" else True
     address_family = socket.AF_INET6
 
     def server_bind(self):
@@ -282,7 +294,26 @@ class DualStackHTTPServer(ThreadingHTTPServer):
             pass
         return super().server_bind()
 
+def free_port_if_busy(port=DEFAULT_PORT):
+    """If an orphaned process is holding the port, terminate it cleanly so BATTLEBOTx always gets port 8080."""
+    if sys.platform != "win32":
+        return
+    try:
+        import subprocess
+        my_pid = os.getpid()
+        cmd = f'powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"'
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3, shell=True)
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                pid = int(line)
+                if pid > 0 and pid != my_pid:
+                    subprocess.run(f"taskkill /F /PID {pid}", capture_output=True, shell=True)
+    except Exception:
+        pass
+
 def find_available_server(start_port=DEFAULT_PORT, max_attempts=10):
+    free_port_if_busy(start_port)
     for port in range(start_port, start_port + max_attempts):
         try:
             server = DualStackHTTPServer(("::", port), BattleBotRequestHandler)
@@ -320,6 +351,7 @@ if __name__ == "__main__":
     print("=" * 62)
     print(f"  [STATUS]   : ONLINE (Active)")
     print(f"  [URL]      : {url}")
+    print(f"  [URL (IP)] : http://127.0.0.1:{port}/index.html")
     print(f"  [CONTROLS] : Xbox / PS4 / USB Gamepads + Keyboard")
     if sys.platform == "win32":
         print(f"  [BRIDGE]   : Windows XInput / DirectInput Fallback Active")
