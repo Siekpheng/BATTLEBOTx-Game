@@ -101,8 +101,8 @@
         priority = 5; // Innermost structural spine remains until the absolute core
       } else if (isGenuineWheel) {
         category = 'wheel';
-        // 2WD bots (Robot 3, Robot 5) protect their vital drive wheels behind side armor/hubs:
-        priority = (bot.type === 'robot3' || bot.type === 'robot5') ? 2 : 1;
+        // Protect vital drive wheels behind outer armor & exterior cladding so robots keep mobility longer
+        priority = 3;
       } else if (isArmor) {
         category = 'armor';
         priority = 1; // Outermost armor panels, wedges & bumpers take initial exterior impacts
@@ -137,10 +137,10 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    // Standardized base HP across all robots for identical baseline durability
+    // Standardized 3x base HP across all robots for longer battles
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
-      : 300;
+      : 900;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
@@ -656,6 +656,21 @@
         // Divert impact shockwave to rip off exterior armor or wheels instead of breaking the primary weapon
         nonWeaponPool.sort((a, b) => a.priority - b.priority);
         chosen = nonWeaponPool[0];
+      }
+    }
+
+    // Drive Mobility Protection:
+    // Keep the robot's last 2 drive wheels attached while exterior armor and chassis panels remain so matches don't end prematurely!
+    if (chosen && chosen.category === 'wheel') {
+      const attachedWheelCount = bot.wheels
+        ? bot.wheels.filter(w => w.attached).length
+        : remaining.filter(p => p.category === 'wheel').length;
+      if (attachedWheelCount <= 2) {
+        const armorOrChassisPool = remaining.filter(p => p.category !== 'wheel' && p.category !== 'weapon' && p.category !== 'chassis_core');
+        if (armorOrChassisPool.length > 0) {
+          armorOrChassisPool.sort((a, b) => a.priority - b.priority);
+          chosen = armorOrChassisPool[0];
+        }
       }
     }
 

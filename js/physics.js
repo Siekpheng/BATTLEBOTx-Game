@@ -906,13 +906,14 @@
         }
 
         // Continuous gradual health wear & part-shearing progress (weapon keeps spinning without stalling!)
+        // Tuned for 3x longer battles: ~3.30s of continuous grinding per part detached (~4.65s for Robot 6)
         if (pSpinningContact) {
           const pGrindRate = 0.40 + 0.60 * pRpmRatio;
           playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
-          const pContinuousDps = (playerBot.type === 'robot6') ? 4.5 : 8.0;
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 300) - pContinuousDps * pGrindRate * 0.016);
+          const pContinuousDps = (playerBot.type === 'robot6') ? 3.0 : 5.5;
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - pContinuousDps * pGrindRate * 0.016);
 
-          const pGrindInterval = (playerBot.type === 'robot6') ? 1.55 : 1.10;
+          const pGrindInterval = (playerBot.type === 'robot6') ? 4.65 : 3.30;
           if (playerBot._grindContactTimer >= pGrindInterval) {
             playerBot._grindContactTimer -= pGrindInterval;
             AudioSys.weaponSliceSound();
@@ -928,10 +929,10 @@
         if (eSpinningContact) {
           const eGrindRate = 0.40 + 0.60 * eRpmRatio;
           enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
-          const eContinuousDps = (enemyBot.type === 'robot6') ? 4.5 : 8.0;
-          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 300) - eContinuousDps * eGrindRate * 0.016);
+          const eContinuousDps = (enemyBot.type === 'robot6') ? 3.0 : 5.5;
+          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - eContinuousDps * eGrindRate * 0.016);
 
-          const eGrindInterval = (enemyBot.type === 'robot6') ? 1.55 : 1.10;
+          const eGrindInterval = (enemyBot.type === 'robot6') ? 4.65 : 3.30;
           if (enemyBot._grindContactTimer >= eGrindInterval) {
             enemyBot._grindContactTimer -= eGrindInterval;
             AudioSys.weaponSliceSound();
@@ -1128,33 +1129,26 @@
             NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          // Parts detachment scaled by each robot's unique combat archetype:
-          if (playerBot.type === 'robot3' && wasPSpinFast) {
-            // Robot 3 (KineticBar): Wide horizontal bar shreds multiple exterior parts on full-RPM strike
-            const isHighImpact = (impactSpeed > 5.5 || canFlipEnemy);
-            const shredRatio = isHighImpact ? 0.14 : 0.12;
-            const shredCount = Math.max(2, Math.ceil((enemyBot.totalInitialParts || 30) * shredRatio));
-            for (let s = 0; s < shredCount; s++) {
-              if (enemyBot.isEntirelyDestroyed) break;
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            }
-          } else if (playerBot.type === 'robot4' && wasPSpinFast && (canFlipEnemy || impactSpeed > 5.5)) {
-            // Robot 4 (VertForce): Heavy vertical uppercut disc rips off 2 parts on solid high-impact strike
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          } else if (playerBot.type === 'robot6') {
-            // Robot 6 (Vortex): Smallest weapon deals the least damage per hit (only 28% chance to detach 1 part, or 55% on a max-speed charge)
-            const r6DetachProb = (wasPSpinFast && impactSpeed > 6.5) ? 0.55 : pSpecs.partDamageChance;
-            if (Math.random() < r6DetachProb) {
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            }
+          // Parts detachment scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
+          let pStrikeWear = 0.35;
+          if (playerBot.type === 'robot6') {
+            pStrikeWear = (wasPSpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
+          } else if (playerBot.type === 'robot3') {
+            pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.52 : 0.38;
+          } else if (playerBot.type === 'robot4') {
+            pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.46 : 0.36;
+          } else if (playerBot.type === 'robot2') {
+            pStrikeWear = (canFlipEnemy || impactSpeed > 6.0) ? 0.36 : 0.30;
           } else {
-            // Robot 1, 2, 5: Unique part detachment probabilities & high-impact guarantees
-            if (canFlipEnemy || impactSpeed > 6.0) {
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            } else if (Math.random() < pSpecs.partDamageChance) {
-              detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-            }
+            pStrikeWear = (canFlipEnemy || impactSpeed > 6.0) ? 0.40 : 0.33;
+          }
+          // Heavy armored tank (Robot 2) absorbs 15% more structural punishment
+          if (enemyBot.type === 'robot2') pStrikeWear *= 0.85;
+
+          enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + pStrikeWear;
+          if (enemyBot._weaponPartWear >= 1.0) {
+            enemyBot._weaponPartWear -= 1.0;
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
           }
 
           if (enemyBot.isEntirelyDestroyed) {
@@ -1275,33 +1269,26 @@
 
           triggerDamageVignette();
 
-          // Parts detachment scaled by each robot's unique combat archetype:
-          if (enemyBot.type === 'robot3' && wasESpinFast) {
-            // Robot 3 (KineticBar): Wide horizontal bar shreds multiple exterior parts on full-RPM strike
-            const isHighImpact = (impactSpeed > 5.5 || canFlipPlayer);
-            const shredRatio = isHighImpact ? 0.14 : 0.12;
-            const shredCount = Math.max(2, Math.ceil((playerBot.totalInitialParts || 30) * shredRatio));
-            for (let s = 0; s < shredCount; s++) {
-              if (playerBot.isEntirelyDestroyed) break;
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
-          } else if (enemyBot.type === 'robot4' && wasESpinFast && (canFlipPlayer || impactSpeed > 5.5)) {
-            // Robot 4 (VertForce): Heavy vertical uppercut disc rips off 2 parts on solid high-impact strike
-            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-          } else if (enemyBot.type === 'robot6') {
-            // Robot 6 (Vortex): Smallest weapon deals the least damage per hit (only 28% chance to detach 1 part, or 55% on a max-speed charge)
-            const r6DetachProb = (wasESpinFast && impactSpeed > 6.5) ? 0.55 : eSpecs.partDamageChance;
-            if (Math.random() < r6DetachProb) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
+          // Parts detachment scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
+          let eStrikeWear = 0.35;
+          if (enemyBot.type === 'robot6') {
+            eStrikeWear = (wasESpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
+          } else if (enemyBot.type === 'robot3') {
+            eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.52 : 0.38;
+          } else if (enemyBot.type === 'robot4') {
+            eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.46 : 0.36;
+          } else if (enemyBot.type === 'robot2') {
+            eStrikeWear = (canFlipPlayer || impactSpeed > 6.0) ? 0.36 : 0.30;
           } else {
-            // Robot 1, 2, 5: Unique part detachment probabilities & high-impact guarantees
-            if (canFlipPlayer || impactSpeed > 6.0) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            } else if (Math.random() < eSpecs.partDamageChance) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
+            eStrikeWear = (canFlipPlayer || impactSpeed > 6.0) ? 0.40 : 0.33;
+          }
+          // Heavy armored tank (Robot 2) absorbs 15% more structural punishment
+          if (playerBot.type === 'robot2') eStrikeWear *= 0.85;
+
+          playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + eStrikeWear;
+          if (playerBot._weaponPartWear >= 1.0) {
+            playerBot._weaponPartWear -= 1.0;
+            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
           }
 
           if (playerBot.isEntirelyDestroyed) {
@@ -1334,16 +1321,16 @@
             }
           }
 
-          // Helper: Non-weapon high-speed ram counter (requires 3 to 4 hard rams before 1 piece flies off!)
+          // Helper: Non-weapon high-speed ram counter (requires 5 to 6 hard rams before 1 piece flies off!)
           const applyRamHitCounter = (victimBot, dirX, dirZ) => {
             if (!victimBot) return;
             victimBot.ramHitCount = (victimBot.ramHitCount || 0) + 1;
             if (!victimBot.ramHitsRequired) {
-              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 3 : 4; // 3–4 hard rams per part
+              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 5 : 6; // 5–6 hard rams per part
             }
             if (victimBot.ramHitCount >= victimBot.ramHitsRequired) {
               victimBot.ramHitCount = 0;
-              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 3 : 4;
+              victimBot.ramHitsRequired = (Math.random() < 0.5) ? 5 : 6;
               detachSinglePart(victimBot, { x: dirX, z: dirZ }, midPos, null, true);
             }
           };
