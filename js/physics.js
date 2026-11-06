@@ -173,10 +173,27 @@
 
     const botSpecs = (typeof getBotCombatSpecs === 'function')
       ? getBotCombatSpecs(bot.type)
-      : { maxSpeed: (bot.type === 'robot6' ? 19.5 : 15.0), turnRate: (bot.type === 'robot6' ? 4.6 : 3.4), accel: (bot.type === 'robot6' ? 68.0 : 46.0) };
+      : { maxSpeed: (bot.type === 'robot6' ? 19.5 : 15.0), turnRate: (bot.type === 'robot6' ? 4.6 : 3.4), accel: (bot.type === 'robot6' ? 68.0 : 46.0), wallRadius: (bot.type === 'robot6' ? 0.95 : 1.32), gyroFactor: 1.0 };
     const maxSpeed = botSpecs.maxSpeed * (0.35 + 0.65 * bot.drivePower);
-    const turnRate = botSpecs.turnRate * (0.35 + 0.65 * bot.drivePower);
+    let turnRate = botSpecs.turnRate * (0.35 + 0.65 * bot.drivePower);
     const accel = botSpecs.accel * bot.drivePower;
+
+    const hasSpinningWeapon = (bot.weaponMesh && !bot.weaponDestroyed && (bot.weaponSpinSpeed || 0) > 15.0);
+    const spinFactor = hasSpinningWeapon ? Math.min(1.0, bot.weaponSpinSpeed / (botSpecs.maxWeaponRpm || 95.0)) : 0;
+    const isVertSpinner = (bot.type === 'robot1' || bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6');
+    const gyroMult = botSpecs.gyroFactor || 1.0;
+
+    // Realistic BattleBots Gyroscopic Turn Resistance:
+    // When a vertical spinner is spinning at high RPM and turning hard, gyroscopic precession lifts the inside wheel,
+    // reducing effective steering bite by up to ~18% (drivers can feather steering or throttle for tighter flat turns)
+    if (hasSpinningWeapon && isVertSpinner && Math.abs(bot.steerInput || 0) > 0.25) {
+      const gyroTurnPenalty = Math.min(0.24, Math.abs(bot.steerInput) * spinFactor * 0.16 * gyroMult);
+      turnRate *= (1.0 - gyroTurnPenalty);
+    }
+
+    // Differential Skid-Steer Power Sharing:
+    // When turning hard while accelerating, left/right drive motors split effort between yaw rotation and forward thrust
+    const diffThrustShare = 1.0 - Math.abs(bot.steerInput || 0) * 0.14;
 
     // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
     if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
@@ -186,30 +203,50 @@
         bot.yaw -= (bot.steerInput * turnRate + asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
+        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
       } else if (rightWheels > 0 && leftWheels === 0) {
         // Only right wheels: counter-steerable asymmetric drag
         const asymmetricPull = 0.75 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate + asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
+        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
       } else if (leftWheels > 0 && rightWheels > 0) {
         // Both sides have wheels
         const asymmetricPull = (leftWheels - rightWheels) * 0.25 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate - asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * diffThrustShare * dt;
+        bot.vz += forwardZ * bot.throttleInput * accel * diffThrustShare * dt;
       }
     }
 
-    // Velocity Damping
-    bot.vx *= Math.pow(0.18, dt);
-    bot.vz *= Math.pow(0.18, dt);
+    // Anisotropic Tire Grip & Rolling Friction (Authentic RC Combat Robot Handling on Steel Floor):
+    // Decompose velocity into longitudinal (wheel rolling axis) and lateral (sideways tire scrub axis).
+    // Rubber tires roll easily forward/backward, but resist sideways sliding with high lateral grip!
+    if (!bot.flipped && totalWheels > 0 && (!bot.airY || bot.airY <= 0.05)) {
+      const fwdX = Math.sin(bot.yaw);
+      const fwdZ = Math.cos(bot.yaw);
+      const latX = Math.cos(bot.yaw);
+      const latZ = -Math.sin(bot.yaw);
+
+      const vForward = bot.vx * fwdX + bot.vz * fwdZ;
+      const vLateral = bot.vx * latX + bot.vz * latZ;
+
+      const forwardDamped = vForward * Math.pow(0.18, dt);
+      // High lateral tire grip at normal speeds, with controlled drift if knocked sideways hard (> 5.5 m/s)
+      const lateralGripBase = (Math.abs(vLateral) > 5.5) ? 0.085 : 0.028;
+      const lateralDamped = vLateral * Math.pow(lateralGripBase, dt);
+
+      bot.vx = fwdX * forwardDamped + latX * lateralDamped;
+      bot.vz = fwdZ * forwardDamped + latZ * lateralDamped;
+    } else {
+      bot.vx *= Math.pow(0.18, dt);
+      bot.vz *= Math.pow(0.18, dt);
+    }
 
     const speed = Math.hypot(bot.vx, bot.vz);
     if (speed > maxSpeed) {
@@ -225,8 +262,8 @@
     bot.x += bot.vx * dt;
     bot.z += bot.vz * dt;
 
-    // 4. Arena Wall Collision (Square 4x4m battlebox enclosure)
-    const botRadius = 1.35;
+    // 4. Arena Wall Collision (Square 4x4m battlebox enclosure with per-robot CAD wallRadius)
+    const botRadius = botSpecs.wallRadius || 1.32;
     const maxBound = ARENA_HALF - botRadius;
     const walls = [
       { nx: 0, nz: 1, dist: bot.z + maxBound, axis: 'z', push: 1 },  // North wall at z = -ARENA_HALF
@@ -292,16 +329,12 @@
     const inAir = (bot.airY > 0.05 || bot.vy > 0);
 
     // 2.2 WEAPON GYROSCOPIC PRECESSION & ANGULAR INERTIA (BattleBots Authentic Kinematics)
-    const hasSpinningWeapon = (bot.weaponMesh && !bot.weaponDestroyed && (bot.weaponSpinSpeed || 0) > 15.0);
-    const spinFactor = hasSpinningWeapon ? Math.min(1.0, bot.weaponSpinSpeed / 95.0) : 0;
-    const isVertSpinner = (bot.type === 'robot1' || bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6');
-
     if (inAir) {
       if (hasSpinningWeapon) {
         if (isVertSpinner) {
           // Vertical Spinner / Drum: Angular momentum is transverse (Pitch axis).
           // Mid-air pitch flip couples with yaw/roll precession, creating authentic dynamic roll twist
-          const gyroRollPrecession = -Math.sign(bot.pitchVel || 1) * spinFactor * 4.2;
+          const gyroRollPrecession = -Math.sign(bot.pitchVel || 1) * spinFactor * 4.2 * gyroMult;
           bot.rollVel += gyroRollPrecession * dt;
           // Mid-air gyroscopic pitch stiffness resists uncontrolled end-over-end pinwheeling
           bot.pitchVel *= Math.pow(0.50, dt);
@@ -326,11 +359,11 @@
       bot.pitchVel *= Math.pow(0.65, dt);
       bot.rollVel *= Math.pow(0.65, dt);
     } else {
-      // On Ground: Vertical spinners turning sharp at full RPM slightly lift an edge wheel (authentic BattleBots Gyro Dance)
+      // On Ground: Vertical spinners turning sharp at full RPM visibly lift an inside edge wheel (authentic BattleBots Gyro Dance)
       const steerVal = (bot.steerInput || 0);
-      if (hasSpinningWeapon && isVertSpinner && Math.abs(steerVal) > 0.25) {
-        const gyroDanceTilt = -steerVal * spinFactor * 0.07;
-        bot.roll = THREE.MathUtils.lerp(bot.roll, gyroDanceTilt, Math.min(1.0, 10.0 * dt));
+      if (hasSpinningWeapon && isVertSpinner && Math.abs(steerVal) > 0.22 && !bot.flipped) {
+        const gyroDanceTilt = -steerVal * spinFactor * 0.12 * gyroMult;
+        bot.roll = THREE.MathUtils.lerp(bot.roll, gyroDanceTilt, Math.min(1.0, 12.0 * dt));
       }
       // Bi-stable Pitch Physics (end-over-end frontflip/backflip on ground)
       if (bot.flipped || Math.abs(bot.pitch) > 0.04 || Math.abs(bot.pitchVel) > 0.04) {
@@ -608,23 +641,47 @@
       enemyBot.aiNoMercyDecision = undefined;
     }
 
-    const weaponReady = (enemyBot.weaponSpinSpeed >= 60.0) || enemyBot.weaponDestroyed;
+    const eSpecsAI = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { maxWeaponRpm: 95 };
+    const pSpecsAI = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { maxWeaponRpm: 95 };
+    const weaponReady = (enemyBot.weaponSpinSpeed >= (eSpecsAI.maxWeaponRpm || 95) * 0.62) || enemyBot.weaponDestroyed;
+    const playerWeaponDangerous = (playerBot.weaponActive !== false && (playerBot.weaponSpinSpeed || 0) >= (pSpecsAI.maxWeaponRpm || 95) * 0.55 && !playerBot.weaponDestroyed);
 
-    // Realistic combat driver tactics:
-    // If weapon stalled on impact and too close to player, back off or circle to build RPM
-    if (!weaponReady && distToPlayer < 3.2) {
-      enemyBot.throttleInput = -0.60;
-      enemyBot.steerInput = Math.sin(performance.now() * 0.0025) > 0 ? 0.65 : -0.65;
+    // Authentic BattleBots RC Pilot Tactics:
+    // 1. Box-Rush Opportunity: If player's weapon is stalled or still spinning up (< 55% RPM) and AI is close/mid-range,
+    //    commit to an aggressive box-rush to pin/stifle the player before their weapon reaches lethal RPM!
+    const boxRushOpportunity = !playerWeaponDangerous && (enemyBot.weaponSpinSpeed >= 35.0 || enemyBot.type === 'robot2');
+
+    // 2. Spin-Up Repositioning: If AI's weapon stalled on impact while player's weapon IS spinning dangerously,
+    //    angle away toward open arena center to let the brushless weapon motor spin back up!
+    if (!weaponReady && !boxRushOpportunity && distToPlayer < 4.2) {
+      const centerYaw = Math.atan2(-enemyBot.x, -enemyBot.z);
+      let escapeDiff = centerYaw - enemyBot.yaw;
+      while (escapeDiff > Math.PI) escapeDiff -= Math.PI * 2;
+      while (escapeDiff < -Math.PI) escapeDiff += Math.PI * 2;
+      enemyBot.throttleInput = -0.68;
+      enemyBot.steerInput = Math.max(-1, Math.min(1, escapeDiff * 1.6));
     } else {
-      const steerTarget = Math.max(-1, Math.min(1, -diff * 1.8));
-      // Damped steering interpolation
-      enemyBot.steerInput += (steerTarget - enemyBot.steerInput) * Math.min(1, dt * 8.0);
+      // 3. Tactical Flanking / Wheel-Sniping for agile robots (Robot 6 Vortex, Robot 1 Razor, Robot 5 BlueThunder):
+      //    When approaching from mid-range (2.3m - 6.5m) while player faces AI head-on, aim slightly toward player's side wheels!
+      let aimDiff = diff;
+      const isAgileFlanker = (enemyBot.type === 'robot6' || enemyBot.type === 'robot1' || enemyBot.type === 'robot5');
+      if (isAgileFlanker && distToPlayer > 2.3 && distToPlayer < 6.5 && playerWeaponDangerous) {
+        const pFacingAI = -(Math.sin(playerBot.yaw) * (dx / (distToPlayer || 1)) + Math.cos(playerBot.yaw) * (dz / (distToPlayer || 1)));
+        if (pFacingAI > 0.65) {
+          const flankSide = (Math.sin(performance.now() * 0.0008) >= 0) ? 1 : -1;
+          const flankAngle = (enemyBot.type === 'robot6') ? 0.34 : 0.22;
+          aimDiff += flankSide * flankAngle;
+        }
+      }
 
-      // Throttle scaling: commit full charge only when aligned and spun up
-      if (weaponReady && Math.abs(diff) < 0.45) {
+      const steerTarget = Math.max(-1, Math.min(1, -aimDiff * 1.9));
+      enemyBot.steerInput += (steerTarget - enemyBot.steerInput) * Math.min(1, dt * 8.5);
+
+      // Throttle scaling: commit full charge when aligned and spun up (or during a box-rush)
+      if ((weaponReady || boxRushOpportunity) && Math.abs(aimDiff) < 0.48) {
         enemyBot.throttleInput = 1.0; // High-speed kinetic charge (100% full speed, equal to P1)
-      } else if (Math.abs(diff) < 1.0) {
-        enemyBot.throttleInput = 0.75; // Controlled pacing
+      } else if (Math.abs(aimDiff) < 1.0) {
+        enemyBot.throttleInput = 0.78; // Controlled pacing
       } else {
         enemyBot.throttleInput = 0.45; // Turning into alignment
       }
@@ -633,20 +690,32 @@
 
   function handleBotCollision() {
     if (!playerBot || !enemyBot) return;
+    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
+
     const dx = enemyBot.x - playerBot.x;
     const dz = enemyBot.z - playerBot.z;
     const dist = Math.hypot(dx, dz);
-    const minDist = 2.25;
+    const pRad = pSpecs.collisionRadius || 1.12;
+    const eRad = eSpecs.collisionRadius || 1.12;
+    const minDist = pRad + eRad;
 
     if (dist < minDist && dist > 0.0001) {
       const nx = dx / dist;
       const nz = dz / dist;
       const overlap = minDist - dist;
 
-      playerBot.x -= nx * overlap * 0.5;
-      playerBot.z -= nz * overlap * 0.5;
-      enemyBot.x += nx * overlap * 0.5;
-      enemyBot.z += nz * overlap * 0.5;
+      // Mass-weighted separation (heavier armored tanks yield less than compact lightweight bots)
+      const pWeight = (pSpecs.maxHealth || 300) * (pSpecs.pushTractionMult || 1.0);
+      const eWeight = (eSpecs.maxHealth || 300) * (eSpecs.pushTractionMult || 1.0);
+      const totalWeight = pWeight + eWeight || 1;
+      const pMoveRatio = eWeight / totalWeight;
+      const eMoveRatio = pWeight / totalWeight;
+
+      playerBot.x -= nx * overlap * pMoveRatio;
+      playerBot.z -= nz * overlap * pMoveRatio;
+      enemyBot.x += nx * overlap * eMoveRatio;
+      enemyBot.z += nz * overlap * eMoveRatio;
 
       const rvx = playerBot.vx - enemyBot.vx;
       const rvz = playerBot.vz - enemyBot.vz;
@@ -672,10 +741,6 @@
       // Relative normal velocity (closing speed along collision normal)
       const relNormalVel = (playerBot.vx - enemyBot.vx) * nx + (playerBot.vz - enemyBot.vz) * nz;
 
-      // Check weapon readiness & per-robot specs for kinetic energy strike:
-      const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1 };
-      const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { weaponReach: 0.35, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1 };
-
       const pFwdDot = Math.sin(playerBot.yaw) * nx + Math.cos(playerBot.yaw) * nz;
       const eFwdDot = -(Math.sin(enemyBot.yaw) * nx + Math.cos(enemyBot.yaw) * nz);
       const minWpSpin = 40.0;
@@ -689,10 +754,10 @@
       if (isKineticStrike) {
         // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
         const kineticRecoil = Math.min(4.8, impactSpeed * 0.42);
-        playerBot.vx -= nx * kineticRecoil;
-        playerBot.vz -= nz * kineticRecoil;
-        enemyBot.vx += nx * kineticRecoil;
-        enemyBot.vz += nz * kineticRecoil;
+        playerBot.vx -= nx * kineticRecoil * pMoveRatio * 2.0;
+        playerBot.vz -= nz * kineticRecoil * pMoveRatio * 2.0;
+        enemyBot.vx += nx * kineticRecoil * eMoveRatio * 2.0;
+        enemyBot.vz += nz * kineticRecoil * eMoveRatio * 2.0;
       } else {
         // ========================================================
         // 2.1 HEAD-ON BUMPER SPRING DAMPING (Eliminates Jitter & Ping-Pong Bouncing)
@@ -701,11 +766,11 @@
         // ========================================================
         if (relNormalVel > 0.04) {
           const restitution = 0.08; // 8% minimal bounce (solid steel energy absorption)
-          const dampedNormalImpulse = (1.0 + restitution) * relNormalVel * 0.50;
-          playerBot.vx -= nx * dampedNormalImpulse;
-          playerBot.vz -= nz * dampedNormalImpulse;
-          enemyBot.vx += nx * dampedNormalImpulse;
-          enemyBot.vz += nz * dampedNormalImpulse;
+          const dampedNormalImpulse = (1.0 + restitution) * relNormalVel;
+          playerBot.vx -= nx * dampedNormalImpulse * pMoveRatio;
+          playerBot.vz -= nz * dampedNormalImpulse * pMoveRatio;
+          enemyBot.vx += nx * dampedNormalImpulse * eMoveRatio;
+          enemyBot.vz += nz * dampedNormalImpulse * eMoveRatio;
         }
 
         // Tangential contact friction: prevents frictionless sliding when locked horns
@@ -713,14 +778,17 @@
         const tz = nx;
         const relTangentialVel = (playerBot.vx - enemyBot.vx) * tx + (playerBot.vz - enemyBot.vz) * tz;
         const frictionImpulse = relTangentialVel * 0.24;
-        playerBot.vx -= tx * frictionImpulse;
-        playerBot.vz -= tz * frictionImpulse;
-        enemyBot.vx += tx * frictionImpulse;
-        enemyBot.vz += tz * frictionImpulse;
+        playerBot.vx -= tx * frictionImpulse * pMoveRatio * 2.0;
+        playerBot.vz -= tz * frictionImpulse * pMoveRatio * 2.0;
+        enemyBot.vx += tx * frictionImpulse * eMoveRatio * 2.0;
+        enemyBot.vz += tz * frictionImpulse * eMoveRatio * 2.0;
 
-        // Continuous Head-on Pushing Traction Contest:
-        // When both robots are grinding bumpers and applying throttle,
-        // the robot with more drive power, intact drive wheels, and chassis pushing traction (e.g. Robot 2 IronClad Tank) pushes the opponent backward!
+        // ========================================================
+        // 2.1B AUTHENTIC WEDGE / GROUND-GAME & DIRECTIONAL PUSHING CONTEST
+        // - Wheels can only push along the robot's heading (`|FwdDot|`); a T-boned sideways robot cannot push sideways!
+        // - Low-profile front wedges (`wedgeRating`) slide underneath opponents when driving forward (`FwdDot > 0.65`),
+        //   slightly lifting the opponent's edge and reducing their wheel traction!
+        // ========================================================
         const pWheels = (playerBot.wheels && playerBot.wheels.length > 0)
           ? playerBot.wheels.filter(w => w.attached !== false).length
           : ((playerBot.detachableParts && playerBot.detachableParts.length > 0)
@@ -731,11 +799,30 @@
           : ((enemyBot.detachableParts && enemyBot.detachableParts.length > 0)
             ? enemyBot.detachableParts.filter(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent).length
             : 2);
-        const pTraction = ((playerBot.type === 'robot3' || playerBot.type === 'robot5') ? Math.min(2.0, pWheels) : (pWheels / 2)) * (pSpecs.pushTractionMult || 1.0);
-        const eTraction = ((enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? Math.min(2.0, eWheels) : (eWheels / 2)) * (eSpecs.pushTractionMult || 1.0);
+
+        const pWheelAlignment = 0.18 + 0.82 * Math.abs(pFwdDot);
+        const eWheelAlignment = 0.18 + 0.82 * Math.abs(eFwdDot);
+
+        const pWedgeScore = (pFwdDot > 0.65 && (playerBot.throttleInput || 0) > 0.25 && !playerBot.flipped) ? (pSpecs.wedgeRating || 1.0) * pFwdDot : 0;
+        const eWedgeScore = (!isPrac && eFwdDot > 0.65 && (enemyBot.throttleInput || 0) > 0.25 && !enemyBot.flipped) ? (eSpecs.wedgeRating || 1.0) * eFwdDot : 0;
+
+        let pWedgeGripPenalty = 1.0;
+        let eWedgeGripPenalty = 1.0;
+        if (pWedgeScore > eWedgeScore + 0.12 && !enemyBot.flipped) {
+          // Player's wedge gets underneath Enemy: lift Enemy slightly and reduce Enemy's wheel traction by 35%
+          eWedgeGripPenalty = 0.65;
+          enemyBot.pitch = THREE.MathUtils.lerp(enemyBot.pitch || 0, -0.11 * Math.sign(eFwdDot || 1), 0.18);
+        } else if (eWedgeScore > pWedgeScore + 0.12 && !playerBot.flipped) {
+          // Enemy's wedge gets underneath Player: lift Player slightly and reduce Player's wheel traction by 35%
+          pWedgeGripPenalty = 0.65;
+          playerBot.pitch = THREE.MathUtils.lerp(playerBot.pitch || 0, -0.11 * Math.sign(pFwdDot || 1), 0.18);
+        }
+
+        const pTraction = ((playerBot.type === 'robot3' || playerBot.type === 'robot5') ? Math.min(2.0, pWheels) : (pWheels / 2)) * (pSpecs.pushTractionMult || 1.0) * pWheelAlignment * pWedgeGripPenalty;
+        const eTraction = ((enemyBot.type === 'robot3' || enemyBot.type === 'robot5') ? Math.min(2.0, eWheels) : (eWheels / 2)) * (eSpecs.pushTractionMult || 1.0) * eWheelAlignment * eWedgeGripPenalty;
         const pDriveForce = (playerBot.throttleInput || 0) * (playerBot.drivePower || 0) * pTraction;
         const eDriveForce = (enemyBot.throttleInput || 0) * (enemyBot.drivePower || 0) * eTraction;
-        const netPushTraction = (pDriveForce - eDriveForce) * 2.4 * 0.016;
+        const netPushTraction = (pDriveForce - eDriveForce) * 2.6 * 0.016;
 
         playerBot.vx += nx * netPushTraction;
         playerBot.vz += nz * netPushTraction;
@@ -748,7 +835,8 @@
       playerBot.yaw += yawTorque;
       enemyBot.yaw -= yawTorque;
 
-      const midPos = new THREE.Vector3((playerBot.x + enemyBot.x) * 0.5, 0.3, (playerBot.z + enemyBot.z) * 0.5);
+      // Exact hull contact interface between the two robots (accurate even when Robot 6 collides with a full-size bot)
+      const midPos = new THREE.Vector3(playerBot.x + nx * pRad, 0.3, playerBot.z + nz * pRad);
       // Only play collision audio when there is an actual closing impact (not silent pushing/grinding)
       if (impactSpeed > 1.8) {
         AudioSys.metalClashSound(Math.min(2.6, 0.65 + impactSpeed * 0.26), impactSpeed > 5.0);
@@ -1060,6 +1148,18 @@
             enemyBot.vx += nx * pFling;
             enemyBot.vz += nz * pFling;
 
+            // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
+            // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
+            if (playerBot.type === 'robot3') {
+              const tangKick = 3.2;
+              enemyBot.vx += (-nz) * tangKick;
+              enemyBot.vz += nx * tangKick;
+              enemyBot.yaw -= 0.26;
+              playerBot.vx -= (-nz) * (tangKick * 0.45);
+              playerBot.vz -= nx * (tangKick * 0.45);
+              playerBot.yaw += 0.14;
+            }
+
             if (isFrontalOrRear) {
               enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
               enemyBot.rollVel = 0;
@@ -1192,6 +1292,18 @@
             const eFling = eSpecs.flingBase + impactSpeed * eSpecs.flingSpeedMult;
             playerBot.vx -= nx * eFling;
             playerBot.vz -= nz * eFling;
+
+            // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
+            // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
+            if (enemyBot.type === 'robot3') {
+              const tangKick = 3.2;
+              playerBot.vx -= (-nz) * tangKick;
+              playerBot.vz -= nx * tangKick;
+              playerBot.yaw -= 0.26;
+              enemyBot.vx += (-nz) * (tangKick * 0.45);
+              enemyBot.vz += nx * (tangKick * 0.45);
+              enemyBot.yaw += 0.14;
+            }
 
             if (isFrontalOrRear) {
               playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);

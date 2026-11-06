@@ -587,7 +587,7 @@
     },
 
     isCombatAudioAllowed() {
-      return (typeof matchState !== 'undefined' && matchState !== 'menu');
+      return (typeof matchState !== 'undefined' && matchState !== 'menu' && matchState !== 'paused' && matchState !== 'gameover');
     },
 
     updateCombatAudio(pBot, eBot, matchState, dt) {

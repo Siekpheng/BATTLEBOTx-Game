@@ -31,7 +31,11 @@
       pushTractionMult: 1.05,
       partDamageChance: 0.60,
       partDamageHigh: 1,
-      partDivisor: 18
+      partDivisor: 18,
+      collisionRadius: 1.12,
+      wallRadius: 1.32,
+      gyroFactor: 0.95,
+      wedgeRating: 1.25      // Angled front wedge forks excel at getting underneath opponents
     },
     robot2: {
       name: 'IronClad',
@@ -52,7 +56,11 @@
       pushTractionMult: 1.45,// Superior 4WD pushing power in bumper-to-bumper shoving matches
       partDamageChance: 0.55,
       partDamageHigh: 1,
-      partDivisor: 22        // Reinforced armor plates absorb more hits before depleting HP
+      partDivisor: 22,       // Reinforced armor plates absorb more hits before depleting HP
+      collisionRadius: 1.14,
+      wallRadius: 1.35,
+      gyroFactor: 0.75,
+      wedgeRating: 1.20      // Heavy armored front plow
     },
     robot3: {
       name: 'KineticBar',
@@ -73,7 +81,11 @@
       pushTractionMult: 1.0,
       partDamageChance: 0.75,
       partDamageHigh: 2,     // Shreds multiple exterior parts on high-RPM strikes
-      partDivisor: 18
+      partDivisor: 18,
+      collisionRadius: 1.15,
+      wallRadius: 1.35,
+      gyroFactor: 1.20,      // High horizontal rotational inertia
+      wedgeRating: 0.65
     },
     robot4: {
       name: 'VertForce',
@@ -94,7 +106,11 @@
       pushTractionMult: 1.15,
       partDamageChance: 0.65,
       partDamageHigh: 2,     // Heavy vertical disc rips off 2 parts on full-power strikes
-      partDivisor: 19
+      partDivisor: 19,
+      collisionRadius: 1.12,
+      wallRadius: 1.32,
+      gyroFactor: 1.35,      // Strongest vertical gyroscopic precession ("gyro dance") on sharp turns
+      wedgeRating: 1.10
     },
     robot5: {
       name: 'BlueThunder',
@@ -115,7 +131,11 @@
       pushTractionMult: 1.15,
       partDamageChance: 0.70,// Consistent relentless part grinding
       partDamageHigh: 1,
-      partDivisor: 19
+      partDivisor: 19,
+      collisionRadius: 1.10,
+      wallRadius: 1.30,
+      gyroFactor: 1.05,
+      wedgeRating: 0.95
     },
     robot6: {
       name: 'Vortex',
@@ -136,7 +156,11 @@
       pushTractionMult: 0.72,// Light weight means less shoving force in slow pushing contests
       partDamageChance: 0.28,// Deals the least damage per hit (only 28% chance to detach 1 part on normal hit, max 1 on heavy hit)
       partDamageHigh: 1,
-      partDivisor: 18
+      partDivisor: 18,
+      collisionRadius: 0.78, // Compact footprint matches Robot 6's smaller CAD chassis & weapon
+      wallRadius: 0.95,
+      gyroFactor: 0.45,      // Small blade has minimal gyro lift, keeping cornering flat and agile
+      wedgeRating: 0.85
     }
   };
   window.ROBOT_COMBAT_SPECS = ROBOT_COMBAT_SPECS;
@@ -2278,7 +2302,8 @@
           const bdx = d.mesh.position.x - b.x;
           const bdz = d.mesh.position.z - b.z;
           const bDist = Math.hypot(bdx, bdz);
-          const hitRad = 1.38;
+          const bSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(b.type) : null;
+          const hitRad = ((bSpecs && bSpecs.collisionRadius) ? bSpecs.collisionRadius : 1.12) + 0.24;
           if (bDist < hitRad && bDist > 0.001) {
             const pushNx = bdx / bDist;
             const pushNz = bdz / bDist;
