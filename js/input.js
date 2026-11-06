@@ -8,7 +8,6 @@
   function setPlayerWeaponState(bot = playerBot, active = true) {
     const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
     if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
-    if (active && targetBot.weaponStallTimer > 0) return;
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     if (targetBot.weaponActive === !!active) return;
     targetBot.weaponActive = !!active;
@@ -29,10 +28,6 @@
   function togglePlayerWeapon(bot = playerBot) {
     const targetBot = (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && enemyBot && bot === playerBot) ? enemyBot : bot;
     if (!targetBot || targetBot.weaponDestroyed || targetBot.isEntirelyDestroyed) return;
-    if (targetBot.weaponStallTimer > 0) {
-      if (typeof AudioSys !== 'undefined' && AudioSys.beep) AudioSys.beep(220, 0.12); // Low warning buzz: stalled!
-      return;
-    }
     if (typeof matchState !== 'undefined' && matchState === 'menu') return;
     targetBot.weaponActive = (targetBot.weaponActive === false) ? true : false;
     if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && !NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {

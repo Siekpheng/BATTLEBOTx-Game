@@ -260,16 +260,15 @@
           triggerGamepadRumble(Math.min(0.55, 0.2 + Math.abs(velDot) * 0.08), 120, bot);
         }
 
-        // Wall weapon collision: if front strikes arena wall with spinning weapon, stop weapon
+        // Wall weapon collision: if front strikes arena wall with spinning weapon, stall weapon briefly
         const wallFrontDot = Math.sin(bot.yaw) * outNx + Math.cos(bot.yaw) * outNz;
         const minWallStallSpin = 45.0; // Equal threshold for both robots
         if (wallFrontDot > 0.4 && bot.weaponSpinSpeed >= minWallStallSpin) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(outNx * 0.8, 0.3, outNz * 0.8)), 25);
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             AudioSys.metalClashSound(1.6, true);
-            bot.weaponSpinSpeed = 0; // Stops weapon on wall impact!
-            bot.weaponActive = false;
-            bot.weaponStallTimer = 2.0;
+            bot.weaponSpinSpeed = 0; // Stalls weapon briefly on wall impact, then automatically spins back up!
+            bot.weaponStallTimer = 1.0;
             AudioSys.weaponStallSound();
           }
         }
@@ -406,12 +405,9 @@
         bot.weaponStallTimer = Math.max(0, bot.weaponStallTimer - dt);
       }
 
-      // 2. CRITICAL DAMAGE WEAPON FAILURE:
-      // If robot is damaged very hard (driveHealth <= 40% of max, or entirely destroyed, or driveHealth <= 0):
-      // The weapon motor/ESC burns out permanently!
-      const maxHp = bot.maxDriveHealth || 300;
-      const hpRatio = (bot.driveHealth !== undefined) ? (bot.driveHealth / maxHp) : 1.0;
-      if (!isMenu && !bot.weaponDestroyed && (hpRatio <= 0.40 || bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
+      // 2. TOTAL DEMOLITION WEAPON SHUTDOWN:
+      // Only shut down the weapon permanently when the robot itself is completely destroyed (driveHealth <= 0 or isEntirelyDestroyed)
+      if (!isMenu && !bot.weaponDestroyed && (bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
         bot.weaponDestroyed = true;
         bot.weaponActive = false;
         bot.weaponSpinSpeed = 0;
@@ -435,10 +431,9 @@
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(0, 0.35, 0)), 1);
         }
       } else if (!isMenu && bot.flipped) {
-        // Flipped upside down: weapon immediately stalls down to 0 and cuts active power
+        // Flipped upside down: weapon stalls down to 0 while inverted (resumes automatically if righted)
         const spinDownDecel = 45.0;
         bot.weaponSpinSpeed = Math.max(0, bot.weaponSpinSpeed - spinDownDecel * dt);
-        bot.weaponActive = false;
       } else if (!isMenu && bot.weaponStallTimer > 0) {
         // Weapon currently stalled from heavy impact/shock: remains stopped at 0 RPM
         const spinDownDecel = 60.0;
@@ -801,17 +796,9 @@
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             playerBot.weaponSpinSpeed = 0;
             enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponActive = false;
-            enemyBot.weaponActive = false;
-            playerBot.weaponStallTimer = 2.5;
-            enemyBot.weaponStallTimer = 2.5;
+            playerBot.weaponStallTimer = 1.2;
+            enemyBot.weaponStallTimer = 1.2;
             AudioSys.weaponStallSound();
-            const pMax = playerBot.maxDriveHealth || 300;
-            const eMax = enemyBot.maxDriveHealth || 300;
-            if (impactSpeed > 6.5 || canClashFlip) {
-              if (playerBot.driveHealth < pMax * 0.65 || Math.random() < 0.25) playerBot.weaponDestroyed = true;
-              if (enemyBot.driveHealth < eMax * 0.65 || Math.random() < 0.25) enemyBot.weaponDestroyed = true;
-            }
           } else {
             playerBot.weaponSpinSpeed = 95.0;
             enemyBot.weaponSpinSpeed = 95.0;
@@ -971,21 +958,9 @@
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             playerBot.weaponSpinSpeed = 0;
             enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponStallTimer = 1.2;
-
-            // Victim (Enemy) struck by spinning weapon: stall & cut motor power immediately
-            enemyBot.weaponActive = false;
-            enemyBot.weaponStallTimer = 3.5;
+            playerBot.weaponStallTimer = 0.8;
+            enemyBot.weaponStallTimer = 1.2;
             AudioSys.weaponStallSound();
-
-            const eMaxHp = enemyBot.maxDriveHealth || 300;
-            const isHardHit = canFlipEnemy || (impactSpeed >= 5.5) || (pSpeedBefore >= 5.0);
-            const isDamagedHard = (enemyBot.driveHealth <= eMaxHp * 0.65);
-            if (isHardHit && (isDamagedHard || Math.random() < 0.45)) {
-              enemyBot.weaponDestroyed = true;
-              enemyBot.weaponSpinSpeed = 0;
-              spawnCollisionSparks(midPos, 35);
-            }
           } else {
             playerBot.weaponSpinSpeed = 95.0;
             enemyBot.weaponSpinSpeed = 95.0;
@@ -1116,21 +1091,9 @@
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             enemyBot.weaponSpinSpeed = 0;
             playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponStallTimer = 1.2;
-
-            // Victim (Player) struck by spinning weapon: stall & cut motor power immediately
-            playerBot.weaponActive = false;
-            playerBot.weaponStallTimer = 3.5;
+            enemyBot.weaponStallTimer = 0.8;
+            playerBot.weaponStallTimer = 1.2;
             AudioSys.weaponStallSound();
-
-            const pMaxHp = playerBot.maxDriveHealth || 300;
-            const isHardHit = canFlipPlayer || (impactSpeed >= 5.5) || (eSpeedBefore >= 5.0);
-            const isDamagedHard = (playerBot.driveHealth <= pMaxHp * 0.65);
-            if (isHardHit && (isDamagedHard || Math.random() < 0.45)) {
-              playerBot.weaponDestroyed = true;
-              playerBot.weaponSpinSpeed = 0;
-              spawnCollisionSparks(midPos, 35);
-            }
           } else {
             enemyBot.weaponSpinSpeed = 95.0;
             playerBot.weaponSpinSpeed = 95.0;
@@ -1207,8 +1170,7 @@
               }
               if (impactSpeed > 4.5) {
                 enemyBot.weaponSpinSpeed = 0;
-                enemyBot.weaponActive = false;
-                enemyBot.weaponStallTimer = 2.0;
+                enemyBot.weaponStallTimer = 1.0;
               }
               if (enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
@@ -1224,8 +1186,7 @@
               }
               if (impactSpeed > 4.5) {
                 playerBot.weaponSpinSpeed = 0;
-                playerBot.weaponActive = false;
-                playerBot.weaponStallTimer = 2.0;
+                playerBot.weaponStallTimer = 1.0;
               }
               if (playerBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
@@ -1238,11 +1199,9 @@
               }
               if (impactSpeed > 4.5) {
                 playerBot.weaponSpinSpeed = 0;
-                playerBot.weaponActive = false;
-                playerBot.weaponStallTimer = 2.0;
+                playerBot.weaponStallTimer = 1.0;
                 enemyBot.weaponSpinSpeed = 0;
-                enemyBot.weaponActive = false;
-                enemyBot.weaponStallTimer = 2.0;
+                enemyBot.weaponStallTimer = 1.0;
               }
               if (playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
                 if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);

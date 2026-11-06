@@ -723,10 +723,10 @@
       bot.vz = 0;
     }
 
-    // Check if weapon part on the robot is detached or all weapon parts are gone
+    // Check if ALL weapon parts on the robot are now detached
     const hadWeaponParts = bot.detachableParts.some(p => p.category === 'weapon');
     const remainingWeaponParts = bot.detachableParts.filter(p => p.category === 'weapon' && p.attached && p.mesh && p.mesh.parent).length;
-    if (chosen.category === 'weapon' || (hadWeaponParts && remainingWeaponParts === 0)) {
+    if (hadWeaponParts && remainingWeaponParts === 0) {
       bot.weaponDestroyed = true;
       bot.weaponSpinSpeed = 0;
       bot.weaponActive = false;
@@ -778,19 +778,6 @@
     const detachedCount = (bot.totalInitialParts - remainingCount);
     const healthLoss = (detachedCount / effectivePartDivisor) * bot.maxDriveHealth;
     bot.driveHealth = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
-
-    // Critical damage weapon failure: if robot is damaged very hard (<= 40% health or <= 35% parts remaining)
-    const curHpRatio = bot.driveHealth / (bot.maxDriveHealth || 300);
-    const partsRatio = remainingCount / Math.max(1, bot.totalInitialParts);
-    if ((curHpRatio <= 0.40 || partsRatio <= 0.35) && !bot.weaponDestroyed) {
-      bot.weaponDestroyed = true;
-      bot.weaponActive = false;
-      bot.weaponSpinSpeed = 0;
-      if (typeof AudioSys !== 'undefined' && AudioSys.weaponStallSound) {
-        AudioSys.weaponStallSound();
-      }
-      spawnCollisionSparks(worldPos, 30);
-    }
 
     // If remaining parts dropped to <= 20%, trigger explosion immediately so ALL remaining parts fly out all at once!
     if (remainingCount <= threshold20) {
