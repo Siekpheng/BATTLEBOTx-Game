@@ -197,36 +197,46 @@
 
     // Driving ONLY if not flipped, has drive power, AND has at least 1 wheel attached!
     if (!bot.flipped && bot.drivePower > 0 && totalWheels > 0) {
+      if ((bot.recoilLockTimer || 0) > 0) {
+        bot.recoilLockTimer = Math.max(0, bot.recoilLockTimer - dt);
+      }
+      const recoilDriveFactor = ((bot.recoilLockTimer || 0) > 0) ? Math.max(0.0, 1.0 - (bot.recoilLockTimer / 0.28)) : 1.0;
+
       if (leftWheels > 0 && rightWheels === 0) {
         // Only left wheels: counter-steerable asymmetric drag
         const asymmetricPull = -0.75 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate + asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt * recoilDriveFactor;
+        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt * recoilDriveFactor;
       } else if (rightWheels > 0 && leftWheels === 0) {
         // Only right wheels: counter-steerable asymmetric drag
         const asymmetricPull = 0.75 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate + asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * 0.80 * diffThrustShare * dt * recoilDriveFactor;
+        bot.vz += forwardZ * bot.throttleInput * accel * 0.80 * diffThrustShare * dt * recoilDriveFactor;
       } else if (leftWheels > 0 && rightWheels > 0) {
         // Both sides have wheels
         const asymmetricPull = (leftWheels - rightWheels) * 0.25 * bot.throttleInput;
         bot.yaw -= (bot.steerInput * turnRate - asymmetricPull) * dt;
         const forwardX = Math.sin(bot.yaw);
         const forwardZ = Math.cos(bot.yaw);
-        bot.vx += forwardX * bot.throttleInput * accel * diffThrustShare * dt;
-        bot.vz += forwardZ * bot.throttleInput * accel * diffThrustShare * dt;
+        bot.vx += forwardX * bot.throttleInput * accel * diffThrustShare * dt * recoilDriveFactor;
+        bot.vz += forwardZ * bot.throttleInput * accel * diffThrustShare * dt * recoilDriveFactor;
+      }
+    } else {
+      if ((bot.recoilLockTimer || 0) > 0) {
+        bot.recoilLockTimer = Math.max(0, bot.recoilLockTimer - dt);
       }
     }
 
     // Anisotropic Tire Grip & Rolling Friction (Authentic RC Combat Robot Handling on Steel Floor):
     // Decompose velocity into longitudinal (wheel rolling axis) and lateral (sideways tire scrub axis).
     // Rubber tires roll easily forward/backward, but resist sideways sliding with high lateral grip!
+    const isRecoiling = ((bot.recoilLockTimer || 0) > 0);
     if (!bot.flipped && totalWheels > 0 && (!bot.airY || bot.airY <= 0.05)) {
       const fwdX = Math.sin(bot.yaw);
       const fwdZ = Math.cos(bot.yaw);
@@ -236,22 +246,25 @@
       const vForward = bot.vx * fwdX + bot.vz * fwdZ;
       const vLateral = bot.vx * latX + bot.vz * latZ;
 
-      const forwardDamped = vForward * Math.pow(0.18, dt);
+      const fwdDampBase = isRecoiling ? 0.68 : 0.18;
+      const forwardDamped = vForward * Math.pow(fwdDampBase, dt);
       // High lateral tire grip at normal speeds, with controlled drift if knocked sideways hard (> 5.5 m/s)
-      const lateralGripBase = (Math.abs(vLateral) > 5.5) ? 0.085 : 0.028;
+      const lateralGripBase = (Math.abs(vLateral) > 5.5 || isRecoiling) ? 0.095 : 0.028;
       const lateralDamped = vLateral * Math.pow(lateralGripBase, dt);
 
       bot.vx = fwdX * forwardDamped + latX * lateralDamped;
       bot.vz = fwdZ * forwardDamped + latZ * lateralDamped;
     } else {
-      bot.vx *= Math.pow(0.18, dt);
-      bot.vz *= Math.pow(0.18, dt);
+      const dampBase = isRecoiling ? 0.68 : 0.18;
+      bot.vx *= Math.pow(dampBase, dt);
+      bot.vz *= Math.pow(dampBase, dt);
     }
 
     const speed = Math.hypot(bot.vx, bot.vz);
-    if (speed > maxSpeed) {
-      bot.vx = (bot.vx / speed) * maxSpeed;
-      bot.vz = (bot.vz / speed) * maxSpeed;
+    const currentMaxSpeed = isRecoiling ? Math.max(maxSpeed, 24.0) : maxSpeed;
+    if (speed > currentMaxSpeed) {
+      bot.vx = (bot.vx / speed) * currentMaxSpeed;
+      bot.vz = (bot.vz / speed) * currentMaxSpeed;
     }
 
     if ((totalWheels === 0 || bot.driveHealth <= 0 || remainingParts <= threshold20 || bot.isEntirelyDestroyed) && (!bot.airY || bot.airY <= 0.05)) {
@@ -786,23 +799,30 @@
       const pReach = pSpecs.weaponReach;
       const eReach = eSpecs.weaponReach;
 
-      // Discrete high-speed weapon strike ONLY occurs on a fresh high-speed closing collision (!wasInContactRecently)
-      // when the weapon is spinning (>= 30 RPM or >= 40% maxWeaponRpm).
-      // When ramming, pushing, or winding up in close contact, the weapon NEVER stalls — it winds up to 100% and grinds continuously!
-      const pHighSpinThreshold = Math.min((pSpecs.maxWeaponRpm || 95) * 0.40, 30.0);
-      const eHighSpinThreshold = Math.min((eSpecs.maxWeaponRpm || 95) * 0.40, 30.0);
-      const isFreshHighSpeedCharge = (!wasInContactRecently && relNormalVel > 4.2 && impactSpeed > 5.0);
-      const isPWeaponImpact = isFreshHighSpeedCharge && (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
-      const isEWeaponImpact = isFreshHighSpeedCharge && (!isPrac && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
-      const isKineticStrike = isPWeaponImpact || isEWeaponImpact;
+      // Spinning weapon strike evaluation:
+      // High-spin strike thresholds (~28 RPM):
+      const pHighSpinThreshold = Math.min((pSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
+      const eHighSpinThreshold = Math.min((eSpecs.maxWeaponRpm || 95) * 0.38, 28.0);
+
+      const pWeaponCanStrike = (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
+      const eWeaponCanStrike = (!isPrac && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+
+      // WEAPON-TO-WEAPON CLASH: When both bots face each other with spinning weapons,
+      // it is ALWAYS an explosive weapon-to-weapon clash with separation! NEVER soft continuous grinding!
+      const isBothWeaponClash = pWeaponCanStrike && eWeaponCanStrike;
+
+      // SINGLE WEAPON IMPACT: One spinning weapon hits opponent hull/armor/wedge
+      const isPWeaponImpact = isBothWeaponClash || (pWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || playerBot.weaponSpinSpeed >= (pSpecs.maxWeaponRpm || 95) * 0.80));
+      const isEWeaponImpact = isBothWeaponClash || (eWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || enemyBot.weaponSpinSpeed >= (eSpecs.maxWeaponRpm || 95) * 0.80));
+      const isKineticStrike = isBothWeaponClash || isPWeaponImpact || isEWeaponImpact;
 
       if (isKineticStrike) {
         // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
-        const kineticRecoil = Math.min(4.8, impactSpeed * 0.42);
-        playerBot.vx -= nx * kineticRecoil * pMoveRatio * 2.0;
-        playerBot.vz -= nz * kineticRecoil * pMoveRatio * 2.0;
-        enemyBot.vx += nx * kineticRecoil * eMoveRatio * 2.0;
-        enemyBot.vz += nz * kineticRecoil * eMoveRatio * 2.0;
+        const kineticRecoil = Math.min(3.6, impactSpeed * 0.30);
+        playerBot.vx -= nx * kineticRecoil * pMoveRatio;
+        playerBot.vz -= nz * kineticRecoil * pMoveRatio;
+        enemyBot.vx += nx * kineticRecoil * eMoveRatio;
+        enemyBot.vz += nz * kineticRecoil * eMoveRatio;
       } else {
         // ========================================================
         // 2.1 HEAD-ON BUMPER SPRING DAMPING (Eliminates Jitter & Ping-Pong Bouncing)
@@ -1076,39 +1096,44 @@
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
 
-          // Knockback matches the crisp, solid side-hit feel (pFling on Enemy, eFling on Player):
-          // Controlled solid hit: heavy pushback on wheels, no floaty air flinging!
-          playerBot.vy = 0;
-          playerBot.airY = 0;
-          enemyBot.vy = 0;
-          enemyBot.airY = 0;
+          // Natural vertical pop / hop on clash
+          playerBot.vy = 2.1 + Math.random() * 0.4;
+          playerBot.airY = 0.16;
+          enemyBot.vy = 2.1 + Math.random() * 0.4;
+          enemyBot.airY = 0.16;
 
-          const pFlingOnEnemy = (pSpecs.flingBase || 4.0) + impactSpeed * (pSpecs.flingSpeedMult || 0.45);
-          const eFlingOnPlayer = (eSpecs.flingBase || 4.0) + impactSpeed * (eSpecs.flingSpeedMult || 0.45);
+          // Recoil slide timers so both robots slide apart across the arena floor
+          playerBot.recoilLockTimer = 0.30;
+          enemyBot.recoilLockTimer = 0.30;
 
-          playerBot.vx -= nx * eFlingOnPlayer;
-          playerBot.vz -= nz * eFlingOnPlayer;
-          enemyBot.vx += nx * pFlingOnEnemy;
-          enemyBot.vz += nz * pFlingOnEnemy;
+          // Weighted explosive knockback impulse separating bots (~1.5–2.5m)
+          const baseClashFling = 8.2;
+          const pFlingOnEnemy = (baseClashFling + (pSpecs.flingBase || 4.0) * 0.5 + impactSpeed * 0.45) * (0.80 + 0.40 * pSpinRatio);
+          const eFlingOnPlayer = (baseClashFling + (eSpecs.flingBase || 4.0) * 0.5 + impactSpeed * 0.45) * (0.80 + 0.40 * eSpinRatio);
+
+          playerBot.vx -= nx * eFlingOnPlayer * pMoveRatio * 1.5;
+          playerBot.vz -= nz * eFlingOnPlayer * pMoveRatio * 1.5;
+          enemyBot.vx += nx * pFlingOnEnemy * eMoveRatio * 1.5;
+          enemyBot.vz += nz * pFlingOnEnemy * eMoveRatio * 1.5;
 
           // Horizontal Bar Spinner (Robot 3) sideways kick if involved
           if (playerBot.type === 'robot3') {
-            const tangKick = 2.4;
+            const tangKick = 3.2;
             enemyBot.vx += (-nz) * tangKick;
             enemyBot.vz += nx * tangKick;
-            enemyBot.yaw -= 0.20;
+            enemyBot.yaw -= 0.28;
           }
           if (enemyBot.type === 'robot3') {
-            const tangKick = 2.4;
+            const tangKick = 3.2;
             playerBot.vx -= (-nz) * tangKick;
             playerBot.vz += nx * tangKick;
-            playerBot.yaw += 0.20;
+            playerBot.yaw += 0.28;
           }
 
-          playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);
-          enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
-          playerBot.rollVel = 0;
-          enemyBot.rollVel = 0;
+          playerBot.pitchVel = (pHitForward > 0 ? -3.4 : 3.4);
+          enemyBot.pitchVel = (eHitForward > 0 ? -3.4 : 3.4);
+          playerBot.rollVel = (Math.random() - 0.5) * 1.5;
+          enemyBot.rollVel = (Math.random() - 0.5) * 1.5;
 
           spawnCollisionSparks(midPos, 65);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
@@ -1212,7 +1237,9 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
-            const pFling = pSpecs.flingBase + impactSpeed * pSpecs.flingSpeedMult;
+            enemyBot.recoilLockTimer = 0.28;
+            playerBot.recoilLockTimer = 0.16;
+            const pFling = Math.max(7.2, (pSpecs.flingBase || 4.0) * 1.35 + impactSpeed * (pSpecs.flingSpeedMult || 0.45));
             enemyBot.vx += nx * pFling;
             enemyBot.vz += nz * pFling;
 
@@ -1345,7 +1372,9 @@
             // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
-            const eFling = eSpecs.flingBase + impactSpeed * eSpecs.flingSpeedMult;
+            playerBot.recoilLockTimer = 0.28;
+            enemyBot.recoilLockTimer = 0.16;
+            const eFling = Math.max(7.2, (eSpecs.flingBase || 4.0) * 1.35 + impactSpeed * (eSpecs.flingSpeedMult || 0.45));
             playerBot.vx -= nx * eFling;
             playerBot.vz -= nz * eFling;
 

@@ -9,34 +9,36 @@
   const detachedDebris = [];
 
   // Shared GPU geometry and materials for sparks to eliminate per-spark WebGL buffer/shader allocations
-  const SHARED_SPARK_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-  const SHARED_SPARK_MAT_YELLOW = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-  const SHARED_SPARK_MAT_ORANGE = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+  const SHARED_SPARK_GEO = new THREE.BoxGeometry(0.048, 0.048, 0.048);
+  const SHARED_SPARK_MAT_WHITE = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const SHARED_SPARK_MAT_YELLOW = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+  const SHARED_SPARK_MAT_ORANGE = new THREE.MeshBasicMaterial({ color: 0xff6600 });
 
   function spawnCollisionSparks(pos, count = 26) {
     if (typeof triggerImpactFlash === 'function') {
       triggerImpactFlash(pos, Math.min(4.8, 1.6 + count * 0.10));
     }
     // Cap total active sparks in scene to prevent draw-call spikes
-    const maxActiveSparks = 220;
+    const maxActiveSparks = 240;
     while (sparks.length + count > maxActiveSparks && sparks.length > 0) {
       const oldest = sparks.shift();
       if (oldest && oldest.mesh) scene.remove(oldest.mesh);
     }
     for (let i = 0; i < count; i++) {
-      const mat = Math.random() > 0.35 ? SHARED_SPARK_MAT_YELLOW : SHARED_SPARK_MAT_ORANGE;
+      const rMat = Math.random();
+      const mat = rMat > 0.60 ? SHARED_SPARK_MAT_WHITE : (rMat > 0.25 ? SHARED_SPARK_MAT_YELLOW : SHARED_SPARK_MAT_ORANGE);
       const m = new THREE.Mesh(SHARED_SPARK_GEO, mat);
       m.position.copy(pos);
       m.position.y += 0.45;
       const angle = Math.random() * Math.PI * 2;
-      const speed = 3.5 + Math.random() * 9.5;
+      const speed = 4.0 + Math.random() * 11.0;
       scene.add(m);
       sparks.push({
         mesh: m,
         vx: Math.cos(angle) * speed,
-        vy: 3.0 + Math.random() * 6.5,
+        vy: 3.2 + Math.random() * 6.5,
         vz: Math.sin(angle) * speed,
-        life: 0.4 + Math.random() * 0.35
+        life: 0.35 + Math.random() * 0.30
       });
     }
   }

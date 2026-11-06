@@ -45,6 +45,25 @@
   }
 
   const keys = {};
+
+  // Auto-hide mouse cursor during active matches after 2 seconds of inactivity
+  let _lastMouseMoveTime = performance.now();
+  window.addEventListener('mousemove', () => {
+    _lastMouseMoveTime = performance.now();
+    if (document.body.style.cursor === 'none') {
+      document.body.style.cursor = 'default';
+    }
+  });
+  setInterval(() => {
+    if (typeof matchState !== 'undefined' && (matchState === 'playing' || matchState === 'countdown')) {
+      if (performance.now() - _lastMouseMoveTime > 2000 && document.body.style.cursor !== 'none') {
+        document.body.style.cursor = 'none';
+      }
+    } else if (document.body.style.cursor === 'none') {
+      document.body.style.cursor = 'default';
+    }
+  }, 500);
+
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if ((e.code === 'Escape' || e.code === 'KeyP') && (matchState === 'playing' || matchState === 'paused')) {
