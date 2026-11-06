@@ -1413,7 +1413,6 @@
           if (!wasPlayerFlipped && playerBot.flipped) {
             AudioSys.crowdGasp(0.8);
           }
-        }
         } else {
           // ========================================================
           // CHASSIS / BUMPER / WEDGE COLLISION (RAMMING WITHOUT SPINNING WEAPON)
