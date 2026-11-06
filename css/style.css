@@ -235,7 +235,8 @@
       gap: 11px;
     }
 
-    .mode-btn {
+    .mode-btn,
+    .mode-btn.primary {
       width: 100%;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: var(--slate-btn);
@@ -249,24 +250,24 @@
       transition: all 0.15s ease;
       font-family: inherit;
       text-align: left;
+      box-shadow: none;
     }
 
-    .mode-btn:hover {
-      background: var(--slate-btn-hover);
-      border-color: rgba(255, 255, 255, 0.28);
+    .mode-btn:hover,
+    .mode-btn.primary:hover,
+    .mode-btn.gamepad-focus,
+    .mode-btn.primary.gamepad-focus {
+      background: var(--coral) !important;
+      border-color: rgba(255, 255, 255, 0.32) !important;
+      color: #ffffff !important;
       transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      box-shadow: 0 8px 24px var(--coral-glow) !important;
+      outline: none !important;
     }
 
-    .mode-btn.primary {
-      background: var(--coral);
-      border-color: rgba(255, 255, 255, 0.25);
-      box-shadow: 0 8px 24px var(--coral-glow);
-    }
-
-    .mode-btn.primary:hover {
-      background: var(--coral-hover);
-      box-shadow: 0 10px 28px rgba(224, 83, 83, 0.6);
+    .mode-btn:hover .mode-btn-text small,
+    .mode-btn.gamepad-focus .mode-btn-text small {
+      color: rgba(255, 255, 255, 0.85) !important;
     }
 
     .mode-btn-text strong {
@@ -584,6 +585,12 @@
       align-items: center;
       gap: 10px;
       pointer-events: auto;
+    }
+
+    .hud-top-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .timer-pill {
@@ -1420,6 +1427,16 @@
       z-index: 35 !important;
       position: relative;
     }
+    /* Mode Buttons (Main Menu & 1v1 Modal) Gamepad Focus: Highlight Red matching Hover */
+    .mode-btn.gamepad-focus,
+    .mode-btn.primary.gamepad-focus {
+      background: var(--coral) !important;
+      border-color: rgba(255, 255, 255, 0.35) !important;
+      color: #ffffff !important;
+      outline: none !important;
+      box-shadow: 0 8px 24px var(--coral-glow) !important;
+      transform: translateY(-2px) !important;
+    }
     /* P1 Robot Cards Gamepad Focus (Luminous Electric Cyan Selector Ring & Lift) */
     #p1-bot-selector .bot-card.gamepad-focus {
       outline: 3px solid #38bdf8 !important;
@@ -1592,8 +1609,47 @@
     }
     body.splitscreen-mode .touch-slider-throttle,
     body.splitscreen-mode .touch-slider-steer,
-    body.splitscreen-mode .mobile-action-bar {
+    body.splitscreen-mode .mobile-action-bar,
+    body.splitscreen-mode #btn-toggle-touch,
+    body.splitscreen-mode #btn-dock-toggle {
       display: none !important;
+    }
+
+    body.splitscreen-mode .hud-top-bar {
+      left: 0;
+      right: 0;
+      width: 100%;
+      transform: none;
+      height: 44px;
+      justify-content: center;
+    }
+
+    body.splitscreen-mode #hud-timer {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    body.splitscreen-mode .hud-top-left-group {
+      position: absolute;
+      right: calc(50% + 68px);
+      top: 0;
+      justify-content: flex-end;
+    }
+
+    body.splitscreen-mode .hud-top-right-group {
+      position: absolute;
+      left: calc(50% + 68px);
+      top: 0;
+      justify-content: flex-start;
+    }
+
+    body.splitscreen-mode .controls-bottom {
+      left: 22px !important;
+      right: auto !important;
+      align-items: flex-start !important;
     }
 
 

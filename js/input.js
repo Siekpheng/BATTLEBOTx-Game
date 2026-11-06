@@ -845,17 +845,15 @@
 
   window.addEventListener('gamepadconnected', (e) => {
     console.log(`🎮 Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
-    const hint = document.getElementById('hint-controls-text');
-    if (hint) {
-      hint.innerHTML = `<span style="color:#38bdf8;">🎮 CONTROLLER READY:</span> <kbd>RT</kbd> Drive · <kbd>LT</kbd> Rev · Stick: Steer · <kbd>A</kbd>/<kbd>X</kbd>/<kbd>LB</kbd> Weapon · <kbd>Y</kbd>/<kbd>RB</kbd> Cam`;
+    if (typeof updateControlsHint === 'function') {
+      updateControlsHint();
     }
   });
 
   window.addEventListener('gamepaddisconnected', (e) => {
     console.log(`🎮 Gamepad disconnected from index ${e.gamepad.index}`);
-    const hint = document.getElementById('hint-controls-text');
-    if (hint) {
-      hint.innerHTML = `<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF`;
+    if (typeof updateControlsHint === 'function') {
+      updateControlsHint();
     }
   });
 
@@ -1355,6 +1353,7 @@
   const GamepadUINav = {
     focusedEl: null,
     activeContainerId: null,
+    gamepadNavActive: false,
     navCooldown: 0,
     p2NavCooldown: 0,
     modalEnterCooldown: 0,
@@ -1713,8 +1712,15 @@
         if (this.focusedEl) {
           this.clearFocus();
         }
+      } else if (container.id === 'menu-screen' || container.id === 'modal-1v1') {
+        // On Main Menu and 1v1 Mode Menu, only highlight an option when actively navigating with a controller
+        if (this.gamepadNavActive && pads.length > 0) {
+          this.ensureValidFocus();
+        } else if (this.focusedEl) {
+          this.clearFocus();
+        }
       } else {
-        // In single-player modes (VS BOT, Practice, Main Menu), always keep a valid visible focus selector
+        // In single-player modes (VS BOT, Practice), always keep a valid visible focus selector
         this.ensureValidFocus();
       }
 
@@ -1921,17 +1927,25 @@
         // ========================================================
         if (dir) {
           if (dir !== prev.dir || this.navCooldown <= 0) {
-            this.moveFocus(dir);
+            if (!this.gamepadNavActive) {
+              this.gamepadNavActive = true;
+              this.ensureValidFocus();
+            } else {
+              this.moveFocus(dir);
+            }
             this.navCooldown = (dir !== prev.dir) ? 0.26 : 0.16;
           }
         }
         if (aPressed && !prev.a) {
+          this.gamepadNavActive = true;
           this.confirmSelection();
         }
         if (bPressed && !prev.b) {
+          this.gamepadNavActive = true;
           this.cancelOrBack();
         }
         if (startPressed && !prev.start && container.id === 'modal-select') {
+          this.gamepadNavActive = true;
           const startBtn = document.getElementById('btn-start-match');
           if (startBtn) startBtn.click();
         }
@@ -1946,6 +1960,16 @@
       }
     }
   };
+
+  window.addEventListener('pointermove', () => {
+    if (GamepadUINav.gamepadNavActive) {
+      GamepadUINav.gamepadNavActive = false;
+      const container = GamepadUINav.getActiveContainer();
+      if (container && (container.id === 'menu-screen' || container.id === 'modal-1v1')) {
+        GamepadUINav.clearFocus();
+      }
+    }
+  }, { passive: true });
 
   function updateGamepadMenuNavigation(dt) {
     GamepadUINav.update(dt || 0.016);

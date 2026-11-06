@@ -627,27 +627,48 @@
 
   function updateControlsHint() {
     const hint = document.getElementById('hint-controls-text');
+    const subHint = document.getElementById('hint-sub-text');
+    const rpmLabel = document.getElementById('p1-weapon-rpm-label');
     if (!hint) return;
     const pads = (typeof getConnectedGamepadsList === 'function') ? getConnectedGamepadsList() : [];
     const hasFlySky = (typeof window.flySkyProfileActive !== 'undefined' && window.flySkyProfileActive) ||
                       pads.some(p => typeof isFlySkyPad === 'function' && isFlySkyPad(p));
 
+    if (gameMode === '1v1') {
+      if (rpmLabel) rpmLabel.textContent = 'P1 WEAPON RPM';
+      hint.innerHTML = '<strong>P1:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon · <kbd>C</kbd> Cam';
+      if (subHint) {
+        subHint.innerHTML = '🎮 Controller 1: <kbd>RT</kbd>/<kbd>LT</kbd> Drive · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Cam';
+      }
+      return;
+    }
+
+    if (rpmLabel) rpmLabel.textContent = 'WEAPON RPM';
+
     if (hasFlySky) {
       hint.innerHTML = '<span style="color:#34d399;font-weight:800;">📻 FLYSKY FS-i6 RC:</span> Right Stick: <strong>Drive &amp; Steer</strong> · SWA: <strong>Arm Weapon [A]</strong> · SWB: <strong>Camera [Y]</strong> · Left Stick: <strong>Throttle</strong>';
+      if (subHint) {
+        subHint.innerHTML = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon · <kbd>C</kbd> Camera';
+      }
       return;
     }
     if (pads.length > 0) {
       hint.innerHTML = '<span style="color:#38bdf8;font-weight:700;">🎮 CONTROLLER READY:</span> <kbd>RT</kbd> Drive · <kbd>LT</kbd> Rev · Stick: Steer · <kbd>A</kbd>/<kbd>X</kbd>/<kbd>LB</kbd> Weapon · <kbd>Y</kbd>/<kbd>RB</kbd> Cam';
+      if (subHint) {
+        subHint.innerHTML = 'Keyboard: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF · <kbd>C</kbd> Camera';
+      }
       return;
     }
-    if (gameMode === '1v1') {
-      hint.innerHTML = '<strong>P1:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · Auto Weapon Wind-Up &nbsp;|&nbsp; <strong>P2:</strong> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>';
-    } else if (gameMode === 'practice') {
-      hint.innerHTML = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> · Auto Weapon Wind-Up (Practice Dummy)';
+    if (gameMode === 'practice') {
+      hint.innerHTML = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF · <kbd>C</kbd> Cam (Practice Dummy)';
     } else {
-      hint.innerHTML = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive Controls · Auto Weapon Wind-Up';
+      hint.innerHTML = '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF · <kbd>C</kbd> Cam';
+    }
+    if (subHint) {
+      subHint.innerHTML = '🎮 Controller: <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera';
     }
   }
+  window.updateControlsHint = updateControlsHint;
 
   let selectedP2BotType = 'robot2';
 
@@ -1172,6 +1193,7 @@
     totalDestructionCelebrationTimer = 0.0;
     pendingGameOverData = null;
     if (typeof GamepadMapper !== 'undefined') GamepadMapper.updateUI();
+    updateControlsHint();
     updateTimerDisplay();
     document.getElementById('flip-warning-container').classList.add('hidden');
     hud.classList.remove('hidden');

@@ -54,12 +54,12 @@
   </script>
 
   <!-- Custom Game Styles & Keyframe Animations -->
-  <link rel="stylesheet" href="css/style.css?v=20261106_v141" />
+  <link rel="stylesheet" href="css/style.css?v=20261106_v142" />
 </head>
 <body class="hide-touch-controls">
 <div id="app">
   <!-- PERSISTENT BOTTOM-LEFT VERSION INDICATOR -->
-  <div id="game-version-tag" class="game-version-tag">v1.4.1</div>
+  <div id="game-version-tag" class="game-version-tag">v1.4.2</div>
 
   <!-- INITIAL FULL-SCREEN ASSET & SHADER LOADING SCREEN -->
   <div id="initial-loading-screen" class="initial-loading-screen">
@@ -110,7 +110,7 @@
       </div>
 
       <nav class="menu-actions" aria-label="Game modes">
-        <button class="mode-btn primary" type="button" data-mode="bot">
+        <button class="mode-btn" type="button" data-mode="bot">
           <div class="mode-btn-text">
             <strong>VS AI BOT</strong>
             <small>SINGLE PLAYER</small>
@@ -156,23 +156,23 @@
         <h2>1V1 BATTLE MODE</h2>
         <button class="close-btn" id="btn-1v1-close" type="button">✕</button>
       </div>
-      <button class="mode-btn primary" type="button" id="btn-1v1-local">
+      <button class="mode-btn" type="button" id="btn-1v1-local">
         <div class="mode-btn-text">
           <strong>Local 2-Player (Split Screen)</strong>
           <small>2 CONTROLLERS OR KEYBOARD · WASD VS ARROWS</small>
         </div>
         <span>➔</span>
       </button>
-      <button class="mode-btn" type="button" id="btn-1v1-create-room" style="border-color: rgba(56, 189, 248, 0.45);">
+      <button class="mode-btn" type="button" id="btn-1v1-create-room">
         <div class="mode-btn-text">
-          <strong style="color:#38bdf8;">Create Online Room</strong>
-          <small>GENERATE CODE & INVITE A FRIEND</small>
+          <strong>Create Online Room</strong>
+          <small>GENERATE CODE &amp; INVITE A FRIEND</small>
         </div>
         <span>➔</span>
       </button>
-      <button class="mode-btn" type="button" id="btn-1v1-join-room" style="border-color: rgba(34, 197, 94, 0.45);">
+      <button class="mode-btn" type="button" id="btn-1v1-join-room">
         <div class="mode-btn-text">
-          <strong style="color:#4ade80;">Join Online Room</strong>
+          <strong>Join Online Room</strong>
           <small>ENTER A CODE TO BATTLE</small>
         </div>
         <span>➔</span>
@@ -682,15 +682,19 @@
   <!-- GAMEPLAY HUD -->
   <div id="hud" class="hidden">
     <div class="hud-top-bar">
+      <div class="hud-top-group hud-top-left-group">
+        <button class="hud-icon-btn" id="btn-hud-music" type="button" title="Toggle Background Music">🎵</button>
+        <button class="hud-icon-btn" id="btn-pause" type="button" title="Pause Game">II</button>
+        <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam [C]</button>
+      </div>
       <div class="timer-pill" id="hud-timer">03:00</div>
-      <button class="hud-icon-btn" id="btn-hud-music" type="button" title="Toggle Background Music">🎵</button>
-      <button class="hud-icon-btn" id="btn-pause" type="button" title="Pause Game">II</button>
-      <button class="hud-icon-btn" id="btn-cam-mode" type="button">🎥 Cam [C]</button>
-      <button class="hud-icon-btn hidden" id="btn-cam-mode-p2" type="button" title="Cycle Player 2 Camera Angle">🎥 P2 Cam [M]</button>
-      <button class="hud-icon-btn" id="btn-cam-down" type="button" title="Lower Camera">Cam -</button>
-      <button class="hud-icon-btn" id="btn-cam-up" type="button" title="Raise Camera">Cam +</button>
-      <button class="hud-icon-btn" id="btn-toggle-touch" type="button" title="Toggle Touch Controls">🎮 Touch: OFF</button>
-      <button class="hud-icon-btn" id="btn-fullscreen" type="button" title="Fullscreen Toggle">⛶</button>
+      <div class="hud-top-group hud-top-right-group">
+        <button class="hud-icon-btn hidden" id="btn-cam-mode-p2" type="button" title="Cycle Player 2 Camera Angle">🎥 P2 Cam [M]</button>
+        <button class="hud-icon-btn" id="btn-cam-down" type="button" title="Lower Camera">Cam -</button>
+        <button class="hud-icon-btn" id="btn-cam-up" type="button" title="Raise Camera">Cam +</button>
+        <button class="hud-icon-btn" id="btn-toggle-touch" type="button" title="Toggle Touch Controls">🎮 Touch: OFF</button>
+        <button class="hud-icon-btn" id="btn-fullscreen" type="button" title="Fullscreen Toggle">⛶</button>
+      </div>
     </div>
 
     <!-- Mobile Quick Action Buttons (Thumb friendly) -->
@@ -716,7 +720,7 @@
         <div class="weapon-rpm-wrap" id="weapon-rpm-wrap">
           <div class="weapon-rpm-header">
             <span style="display:flex; align-items:center; gap:6px;">
-              <span style="color:#00e5ff;">⚡</span> WEAPON RPM
+              <span style="color:#00e5ff;">⚡</span> <span id="p1-weapon-rpm-label">WEAPON RPM</span>
             </span>
             <div style="display:flex; align-items:center; gap:8px;">
               <strong id="weapon-rpm-text">0%</strong>
@@ -728,10 +732,10 @@
           </div>
         </div>
         <div id="hint-controls-text">
-          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive · <kbd>SPACE</kbd> Weapon ON/OFF · <kbd>C</kbd> Cam
         </div>
-        <div style="margin-top:6px; font-size:0.71rem; color:#64748b; line-height:1.4;">
-          <kbd>C</kbd> Camera · 🎮 Controller: <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera
+        <div id="hint-sub-text" style="margin-top:6px; font-size:0.71rem; color:#64748b; line-height:1.4;">
+          🎮 Controller: <kbd>RT</kbd> Forward · <kbd>LT</kbd> Reverse · Stick: Steer · <kbd>LB</kbd> Weapon · <kbd>RB</kbd> Camera
         </div>
       </div>
 
@@ -749,7 +753,6 @@
       <div class="splitscreen-badge p1-badge">🔵 P1 · CONTROLLER 1 / WASD</div>
       <div class="splitscreen-badge p2-badge">🔴 P2 · CONTROLLER 2 / ARROWS</div>
       <div class="p2-hud-panel" id="p2-hud-panel">
-        <button type="button" class="p2-cam-toggle-btn" id="btn-p2-cam" title="Cycle Player 2 Camera Angle (Key M / Controller RB)">🎥 P2 Cam: Follow Direction [M]</button>
         <div class="desktop-hint p2-hint-card">
           <div class="weapon-rpm-wrap" id="p2-weapon-rpm-wrap" title="Click or press [Right Shift] / Controller 2 [LB] to toggle P2 weapon">
             <div class="weapon-rpm-header">
@@ -840,14 +843,14 @@
 
 
   <!-- Modular Game Engine Scripts -->
-  <script src="js/state.js?v=20261106_v141"></script>
-  <script src="js/audio.js?v=20261106_v141"></script>
-  <script src="js/arena.js?v=20261106_v141"></script>
-  <script src="js/particles.js?v=20261106_v141"></script>
-  <script src="js/robots.js?v=20261106_v141"></script>
-  <script src="js/physics.js?v=20261106_v141"></script>
-  <script src="js/input.js?v=20261106_v141"></script>
-  <script src="js/network.js?v=20261106_v141"></script>
-  <script src="js/game.js?v=20261106_v141"></script>
+  <script src="js/state.js?v=20261106_v142"></script>
+  <script src="js/audio.js?v=20261106_v142"></script>
+  <script src="js/arena.js?v=20261106_v142"></script>
+  <script src="js/particles.js?v=20261106_v142"></script>
+  <script src="js/robots.js?v=20261106_v142"></script>
+  <script src="js/physics.js?v=20261106_v142"></script>
+  <script src="js/input.js?v=20261106_v142"></script>
+  <script src="js/network.js?v=20261106_v142"></script>
+  <script src="js/game.js?v=20261106_v142"></script>
 </body>
 </html>
