@@ -481,10 +481,10 @@
         }
       }
 
-      if (isCountdown || bot.weaponDestroyed) {
-        // Weapon blade remains completely stationary (0 RPM) during countdown or if destroyed!
+      if (bot.weaponDestroyed) {
+        // Weapon blade remains completely stationary (0 RPM) when destroyed!
         bot.weaponSpinSpeed = 0;
-        if (bot.weaponDestroyed) bot.weaponActive = false;
+        bot.weaponActive = false;
       } else if (!isMenu && gameMode === 'practice' && bot === enemyBot) {
         // Practice dummy weapon stays completely disarmed & inactive (0 RPM)
         bot.weaponSpinSpeed = 0;
@@ -789,10 +789,10 @@
       const eReach = eSpecs.weaponReach;
 
       // Discrete high-speed weapon strike ONLY occurs on a fresh high-speed closing collision (!wasInContactRecently)
-      // when the weapon is already spun up near max RPM (>= 78% maxWeaponRpm).
+      // when the weapon is spinning (>= 30 RPM or >= 40% maxWeaponRpm).
       // When ramming, pushing, or winding up in close contact, the weapon NEVER stalls — it winds up to 100% and grinds continuously!
-      const pHighSpinThreshold = (pSpecs.maxWeaponRpm || 95) * 0.78;
-      const eHighSpinThreshold = (eSpecs.maxWeaponRpm || 95) * 0.78;
+      const pHighSpinThreshold = Math.min((pSpecs.maxWeaponRpm || 95) * 0.40, 30.0);
+      const eHighSpinThreshold = Math.min((eSpecs.maxWeaponRpm || 95) * 0.40, 30.0);
       const isFreshHighSpeedCharge = (!wasInContactRecently && relNormalVel > 4.2 && impactSpeed > 5.0);
       const isPWeaponImpact = isFreshHighSpeedCharge && (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
       const isEWeaponImpact = isFreshHighSpeedCharge && (!isPrac && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
