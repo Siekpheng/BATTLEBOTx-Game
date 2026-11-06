@@ -754,16 +754,24 @@
       const isPrac = (gameMode === 'practice');
       const pReach = pSpecs.weaponReach;
       const eReach = eSpecs.weaponReach;
+      const pHeadOnReach = Math.max(0.35, pReach);
+      const eHeadOnReach = Math.max(0.35, eReach);
 
-      // Discrete high-speed weapon strike ONLY occurs on a fresh high-speed closing collision (!wasInContactRecently)
-      // when the weapon is already spun up near max RPM (>= 78% maxWeaponRpm).
-      // When ramming, pushing, or winding up in close contact, the weapon NEVER stalls — it winds up to 100% and grinds continuously!
+      const minWeaponSpin = 12.0;
+      const isPWeaponSpinning = (playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && (playerBot.weaponSpinSpeed || 0) >= minWeaponSpin);
+      const isEWeaponSpinning = (!isPrac && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && (enemyBot.weaponSpinSpeed || 0) >= minWeaponSpin);
+
+      // Head-on weapon-to-weapon clash: BOTH robots have spinning weapons AND are facing each other head-on.
+      // Instead of grinding each other and both taking damage, head-on spinning weapons knock both robots back!
+      const isHeadOnWeaponClash = (isPWeaponSpinning && pFwdDot > pHeadOnReach) && (isEWeaponSpinning && eFwdDot > eHeadOnReach);
+
+      // One-sided high-speed kinetic strike (only when NOT a head-on weapon clash):
       const pHighSpinThreshold = (pSpecs.maxWeaponRpm || 95) * 0.78;
       const eHighSpinThreshold = (eSpecs.maxWeaponRpm || 95) * 0.78;
       const isFreshHighSpeedCharge = (!wasInContactRecently && relNormalVel > 4.2 && impactSpeed > 5.0);
-      const isPWeaponImpact = isFreshHighSpeedCharge && (playerBot.weaponActive !== false && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
-      const isEWeaponImpact = isFreshHighSpeedCharge && (!isPrac && enemyBot.weaponActive !== false && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
-      const isKineticStrike = isPWeaponImpact || isEWeaponImpact;
+      const isPWeaponImpact = !isHeadOnWeaponClash && isFreshHighSpeedCharge && (isPWeaponSpinning && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
+      const isEWeaponImpact = !isHeadOnWeaponClash && isFreshHighSpeedCharge && (isEWeaponSpinning && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+      const isKineticStrike = isHeadOnWeaponClash || isPWeaponImpact || isEWeaponImpact;
 
       if (isKineticStrike) {
         // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
@@ -869,16 +877,17 @@
 
       // ========================================================
       // CONTINUOUS WEAPON WIND-UP & GRINDING DAMAGE DURING RAMMING / PUSHING
-      // - Whenever robots are ramming/pushing in close contact (!isKineticStrike), weapons NEVER stall!
-      // - The weapon winds up smoothly all the way to 100% RPM and stays spinning continuously while grinding.
-      // - Deals continuous gradual health wear every frame and detaches 1 part every ~1.10s of continuous grinding
-      //   (~1.55s for Robot 6's small weapon) without stalling the weapon or flinging the opponent away!
+      // - Grind-ramming ONLY happens if:
+      //   1. The attacker's weapon is hitting the SIDE or REAR of the other robot (`otherFwdDot <= headOnReach`), OR
+      //   2. The other robot's weapon ISN'T spinning (`!isOtherWeaponSpinning`).
+      // - When both robots go head-on with spinning weapons (`isHeadOnWeaponClash`), they NEVER grind — they knock back!
       // ========================================================
-      const minGrindSpin = 12.0;
       const pReachGrind = pSpecs.weaponReach;
       const eReachGrind = eSpecs.weaponReach;
-      const pSpinningContact = (!isKineticStrike && playerBot.weaponActive !== false && (playerBot.weaponStallTimer || 0) <= 0 && pForwardDot > pReachGrind && playerBot.weaponSpinSpeed >= minGrindSpin);
-      const eSpinningContact = (!isKineticStrike && !isPractice && enemyBot.weaponActive !== false && (enemyBot.weaponStallTimer || 0) <= 0 && eForwardDot > eReachGrind && enemyBot.weaponSpinSpeed >= minGrindSpin);
+      const isPHittingESideOrRear = (eForwardDot <= eHeadOnReach);
+      const isEHittingPSideOrRear = (pForwardDot <= pHeadOnReach);
+      const pSpinningContact = (!isKineticStrike && isPWeaponSpinning && pForwardDot > pReachGrind && (isPHittingESideOrRear || !isEWeaponSpinning));
+      const eSpinningContact = (!isKineticStrike && isEWeaponSpinning && eForwardDot > eReachGrind && (isEHittingPSideOrRear || !isPWeaponSpinning));
 
       if (pSpinningContact || eSpinningContact) {
         const pRpmRatio = pSpinningContact ? Math.min(1.0, playerBot.weaponSpinSpeed / (pSpecs.maxWeaponRpm || 95)) : 0;
@@ -947,92 +956,67 @@
       if (isKineticStrike || (impactSpeed > 1.8 && !pSpinningContact && !eSpinningContact)) {
         const isPWeaponHit = isPWeaponImpact;
         const isEWeaponHit = isEWeaponImpact;
-        const isBothWeaponClash = isPWeaponHit && isEWeaponHit;
+        const isBothWeaponClash = isHeadOnWeaponClash;
 
         if (isBothWeaponClash) {
           // ========================================================
-          // TRUE WEAPON-TO-WEAPON HEAD-ON KINETIC CLASH
+          // HEAD-ON WEAPON-TO-WEAPON CLASH: KNOCK BACK WITHOUT MUTUAL GRIND DAMAGE
+          // When both robots go head-on with spinning weapons, their blades deflect off each other
+          // and knock both robots back cleanly without dealing overpowered mutual part damage!
           // ========================================================
-          AudioSys.metalClashSound(2.5, true);
+          window._lastBotContactPerf = 0;
+          AudioSys.metalClashSound(2.4, true);
           AudioSys.weaponSliceSound();
-          AudioSys.weaponStallSound();
-          AudioSys.crowdCheer(0.95, 1.9);
-          addCameraTrauma(0.95);
-          triggerGamepadRumble(1.0, 420);
-          triggerHitStop(0.065);
+          addCameraTrauma(0.75);
+          triggerGamepadRumble(0.95, 340);
+          triggerHitStop(0.045);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: 2.5, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: 2.4, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
-            NetworkSys.queueEvent({ t: 'stall' });
           }
 
-          // Record pre-impact weapon spin speeds BEFORE stalling them to 0!
-          const bothWeaponsMax = (playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.90 && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.90);
-          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0);
-          const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
+          const pSpinRatio = Math.min(1.0, (playerBot.weaponSpinSpeed || 0) / (pSpecs.maxWeaponRpm || 95));
+          const eSpinRatio = Math.min(1.0, (enemyBot.weaponSpinSpeed || 0) / (eSpecs.maxWeaponRpm || 95));
+          const avgSpinRatio = (pSpinRatio + eSpinRatio) * 0.5;
 
+          // Keep weapons spinning after blade deflection (~60% RPM) so repeated head-on charges always knock back
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponStallTimer = pSpecs.defendStall;
-            enemyBot.weaponStallTimer = eSpecs.defendStall;
-            AudioSys.weaponStallSound();
+            playerBot.weaponSpinSpeed = Math.max(24.0, (playerBot.weaponSpinSpeed || 0) * 0.60);
+            enemyBot.weaponSpinSpeed = Math.max(24.0, (enemyBot.weaponSpinSpeed || 0) * 0.60);
+            playerBot.weaponStallTimer = 0;
+            enemyBot.weaponStallTimer = 0;
           } else {
             playerBot.weaponSpinSpeed = pSpecs.maxWeaponRpm;
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
 
-          const clashImpulse = Math.min(8.0, 3.2 + impactSpeed * 0.45);
-          playerBot.vx -= nx * clashImpulse;
-          playerBot.vz -= nz * clashImpulse;
-          enemyBot.vx += nx * clashImpulse;
-          enemyBot.vz += nz * clashImpulse;
+          // Instant small positional separation + strong repulsive knockback velocity so both robots bounce apart
+          const sepPush = 0.10;
+          playerBot.x -= nx * sepPush * pMoveRatio;
+          playerBot.z -= nz * sepPush * pMoveRatio;
+          enemyBot.x += nx * sepPush * eMoveRatio;
+          enemyBot.z += nz * sepPush * eMoveRatio;
 
-          if (canClashFlip) {
-            playerBot.vy = 2.0 + Math.random() * 0.3;
-            enemyBot.vy = 2.0 + Math.random() * 0.3;
-            playerBot.airY = 0.15;
-            enemyBot.airY = 0.15;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
-            playerBot.flipped = true;
-            enemyBot.flipped = true;
-          } else {
-            // Keep both robots firmly planted on the floor during non-flip head-on clash (no jumpy hop!)
-            playerBot.vy = 0;
-            enemyBot.vy = 0;
-            playerBot.airY = 0;
-            enemyBot.airY = 0;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
-          }
+          const clashKnockback = Math.max(7.8, Math.min(13.5, 6.5 + avgSpinRatio * 4.5 + impactSpeed * 0.35));
+          playerBot.vx = -nx * clashKnockback * (0.5 + pMoveRatio);
+          playerBot.vz = -nz * clashKnockback * (0.5 + pMoveRatio);
+          enemyBot.vx = nx * clashKnockback * (0.5 + eMoveRatio);
+          enemyBot.vz = nz * clashKnockback * (0.5 + eMoveRatio);
 
-          spawnCollisionSparks(midPos, 65);
+          // Slight angular deflection / pitch recoil on wheels (no random self-destruction or part loss)
+          playerBot.vy = 0;
+          enemyBot.vy = 0;
+          playerBot.airY = 0;
+          enemyBot.airY = 0;
+          playerBot.pitchVel = -1.4;
+          enemyBot.pitchVel = -1.4;
+          const deflectYaw = (Math.random() < 0.5 ? 1 : -1) * 0.14;
+          playerBot.yaw += deflectYaw;
+          enemyBot.yaw -= deflectYaw;
+
+          spawnCollisionSparks(midPos, 55);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 65 });
-          }
-          triggerDamageVignette();
-
-          // Head-on clash damage scaled by each robot's weapon damage capability (Robot 6 deals least damage)
-          if (!isPractice) {
-            if (eSpecs.partDamageChance >= 0.45 && impactSpeed > 6.5) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            } else if (Math.random() < eSpecs.partDamageChance) {
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
-          }
-          if (pSpecs.partDamageChance >= 0.45 && impactSpeed > 6.5) {
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          } else if (Math.random() < pSpecs.partDamageChance) {
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          }
-
-          if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
-          } else if (!isPractice && playerBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
-          } else if (enemyBot.isEntirelyDestroyed) {
-            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
+            NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 55 });
           }
         } else if (isPWeaponHit) {
           // ========================================================
