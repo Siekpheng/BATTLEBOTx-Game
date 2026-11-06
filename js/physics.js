@@ -703,13 +703,35 @@
 
     const nowPerf = performance.now();
     const wasInContactRecently = !!(window._lastBotContactPerf && (nowPerf - window._lastBotContactPerf < 320));
-    const grindEnvelope = wasInContactRecently ? 0.14 : 0.0;
+    const eMaxBound = ARENA_HALF - (eSpecs.wallRadius || 1.32);
+    const pMaxBound = ARENA_HALF - (pSpecs.wallRadius || 1.32);
+    const wallPinMargin = 0.75;
+    const isNearAnyWallPre =
+      Math.abs(enemyBot.x) >= (eMaxBound - wallPinMargin) ||
+      Math.abs(enemyBot.z) >= (eMaxBound - wallPinMargin) ||
+      Math.abs(playerBot.x) >= (pMaxBound - wallPinMargin) ||
+      Math.abs(playerBot.z) >= (pMaxBound - wallPinMargin);
+    const grindEnvelope = (wasInContactRecently && isNearAnyWallPre) ? 0.14 : 0.0;
 
     if (dist < (minDist + grindEnvelope) && dist > 0.0001) {
       window._lastBotContactPerf = nowPerf;
       const nx = dx / dist;
       const nz = dz / dist;
       const overlap = Math.max(0, minDist - dist);
+
+      // Wall-Pin Detection:
+      // Grinding & continuous ram-pinning ONLY happen when the victim robot is pushed against the arena wall!
+      const isEnemyPinnedToWall =
+        (enemyBot.x >= eMaxBound - wallPinMargin && nx > 0.22) ||
+        (enemyBot.x <= -eMaxBound + wallPinMargin && nx < -0.22) ||
+        (enemyBot.z >= eMaxBound - wallPinMargin && nz > 0.22) ||
+        (enemyBot.z <= -eMaxBound + wallPinMargin && nz < -0.22);
+
+      const isPlayerPinnedToWall =
+        (playerBot.x >= pMaxBound - wallPinMargin && -nx > 0.22) ||
+        (playerBot.x <= -pMaxBound + wallPinMargin && -nx < -0.22) ||
+        (playerBot.z >= pMaxBound - wallPinMargin && -nz > 0.22) ||
+        (playerBot.z <= -pMaxBound + wallPinMargin && -nz < -0.22);
 
       // Mass-weighted separation (heavier armored tanks yield less than compact lightweight bots)
       const pWeight = (pSpecs.maxHealth || 300) * (pSpecs.pushTractionMult || 1.0);
@@ -765,13 +787,23 @@
       // Instead of grinding each other and both taking damage, head-on spinning weapons knock both robots back!
       const isHeadOnWeaponClash = (isPWeaponSpinning && pFwdDot > pHeadOnReach) && (isEWeaponSpinning && eFwdDot > eHeadOnReach);
 
-      // One-sided high-speed kinetic strike (only when NOT a head-on weapon clash):
-      const pHighSpinThreshold = (pSpecs.maxWeaponRpm || 95) * 0.78;
-      const eHighSpinThreshold = (eSpecs.maxWeaponRpm || 95) * 0.78;
-      const isFreshHighSpeedCharge = (!wasInContactRecently && relNormalVel > 4.2 && impactSpeed > 5.0);
-      const isPWeaponImpact = !isHeadOnWeaponClash && isFreshHighSpeedCharge && (isPWeaponSpinning && pFwdDot > pReach && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
-      const isEWeaponImpact = !isHeadOnWeaponClash && isFreshHighSpeedCharge && (isEWeaponSpinning && eFwdDot > eReach && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
+      // Wall-Pinned Continuous Grinding vs. Open-Arena Knockback:
+      // - Grinding & ramming ONLY happen when the victim robot is pushed against the arena wall (`isEnemyPinnedToWall` / `isPlayerPinnedToWall`)
+      //   AND it's not a head-on spinning weapon clash.
+      // - Whenever the victim is NOT pinned against the wall (open arena), hitting the opponent from ANY side with a spinning weapon
+      //   always triggers a kinetic knockback strike (`isPWeaponImpact` / `isEWeaponImpact`)!
+      const isPHittingESideOrRearPre = (eFwdDot <= eHeadOnReach);
+      const isEHittingPSideOrRearPre = (pFwdDot <= pHeadOnReach);
+      const pWallGrindActive = (!isHeadOnWeaponClash && isEnemyPinnedToWall && isPWeaponSpinning && pFwdDot > pReach && (isPHittingESideOrRearPre || !isEWeaponSpinning));
+      const eWallGrindActive = (!isHeadOnWeaponClash && isPlayerPinnedToWall && isEWeaponSpinning && eFwdDot > eReach && (isEHittingPSideOrRearPre || !isPWeaponSpinning));
+
+      const canTriggerKineticStrike = (!window._lastKineticStrikePerf || (nowPerf - window._lastKineticStrikePerf > 170));
+      const isPWeaponImpact = !isHeadOnWeaponClash && !pWallGrindActive && canTriggerKineticStrike && (isPWeaponSpinning && pFwdDot > pReach);
+      const isEWeaponImpact = !isHeadOnWeaponClash && !eWallGrindActive && canTriggerKineticStrike && (isEWeaponSpinning && eFwdDot > eReach);
       const isKineticStrike = isHeadOnWeaponClash || isPWeaponImpact || isEWeaponImpact;
+      if (isKineticStrike) {
+        window._lastKineticStrikePerf = nowPerf;
+      }
 
       if (isKineticStrike) {
         // High-energy kinetic strikes apply explosive repulsive impulse below in weapon strike blocks
@@ -782,12 +814,28 @@
         enemyBot.vz += nz * kineticRecoil * eMoveRatio * 2.0;
       } else {
         // ========================================================
-        // 2.1 HEAD-ON BUMPER SPRING DAMPING (Eliminates Jitter & Ping-Pong Bouncing)
-        // Inelastic steel crunch (e = 0.08) absorbs relative approach speed cleanly,
-        // turning high-speed head-on rams into solid, crunchy, weighted collisions!
+        // 2.1 BUMPER SPRING DAMPING & OPEN-ARENA CHASSIS KNOCKBACK
+        // - When pinned against the wall (`isEnemyPinnedToWall || isPlayerPinnedToWall`), low restitution (0.08)
+        //   absorbs bounce so the attacker can pin and grind the opponent against the wall.
+        // - In the open arena (not pinned to the wall), hitting a robot from ANY side produces realistic
+        //   elastic steel knockback so robots rebound cleanly on impact instead of sticking together!
         // ========================================================
-        if (overlap > 0 && relNormalVel > 0.04) {
-          const restitution = 0.08; // 8% minimal bounce (solid steel energy absorption)
+        const isWallPinning = (isEnemyPinnedToWall || isPlayerPinnedToWall);
+        if (!isWallPinning && (relNormalVel > 0.25 || impactSpeed > 1.2)) {
+          window._lastBotContactPerf = 0;
+          const sepChassis = 0.06;
+          playerBot.x -= nx * sepChassis * pMoveRatio;
+          playerBot.z -= nz * sepChassis * pMoveRatio;
+          enemyBot.x += nx * sepChassis * eMoveRatio;
+          enemyBot.z += nz * sepChassis * eMoveRatio;
+
+          const chassisKnockback = Math.max(3.2, Math.min(6.8, 2.2 + Math.max(relNormalVel, impactSpeed) * 0.62));
+          playerBot.vx = -nx * chassisKnockback * (0.45 + pMoveRatio);
+          playerBot.vz = -nz * chassisKnockback * (0.45 + pMoveRatio);
+          enemyBot.vx = nx * chassisKnockback * (0.45 + eMoveRatio);
+          enemyBot.vz = nz * chassisKnockback * (0.45 + eMoveRatio);
+        } else if (overlap > 0 && relNormalVel > 0.04) {
+          const restitution = 0.08; // 8% minimal bounce when pinning against the wall
           const dampedNormalImpulse = (1.0 + restitution) * relNormalVel;
           playerBot.vx -= nx * dampedNormalImpulse * pMoveRatio;
           playerBot.vz -= nz * dampedNormalImpulse * pMoveRatio;
@@ -876,18 +924,14 @@
       const isPractice = (gameMode === 'practice');
 
       // ========================================================
-      // CONTINUOUS WEAPON WIND-UP & GRINDING DAMAGE DURING RAMMING / PUSHING
-      // - Grind-ramming ONLY happens if:
-      //   1. The attacker's weapon is hitting the SIDE or REAR of the other robot (`otherFwdDot <= headOnReach`), OR
-      //   2. The other robot's weapon ISN'T spinning (`!isOtherWeaponSpinning`).
-      // - When both robots go head-on with spinning weapons (`isHeadOnWeaponClash`), they NEVER grind — they knock back!
+      // CONTINUOUS WEAPON WIND-UP & GRINDING DAMAGE DURING WALL-PINNING ONLY
+      // - Grind-ramming ONLY happens when:
+      //   1. The victim robot is pushed/pinned against the arena wall (`isEnemyPinnedToWall` / `isPlayerPinnedToWall`), AND
+      //   2. The attacker's weapon is hitting the SIDE/REAR of the other robot OR the other robot's weapon isn't spinning.
+      // - In the open arena (not against the wall), hitting from ANY side always knocks back (`isPWeaponImpact` / `isEWeaponImpact` or chassis knockback)!
       // ========================================================
-      const pReachGrind = pSpecs.weaponReach;
-      const eReachGrind = eSpecs.weaponReach;
-      const isPHittingESideOrRear = (eForwardDot <= eHeadOnReach);
-      const isEHittingPSideOrRear = (pForwardDot <= pHeadOnReach);
-      const pSpinningContact = (!isKineticStrike && isPWeaponSpinning && pForwardDot > pReachGrind && (isPHittingESideOrRear || !isEWeaponSpinning));
-      const eSpinningContact = (!isKineticStrike && isEWeaponSpinning && eForwardDot > eReachGrind && (isEHittingPSideOrRear || !isPWeaponSpinning));
+      const pSpinningContact = pWallGrindActive;
+      const eSpinningContact = eWallGrindActive;
 
       if (pSpinningContact || eSpinningContact) {
         const pRpmRatio = pSpinningContact ? Math.min(1.0, playerBot.weaponSpinSpeed / (pSpecs.maxWeaponRpm || 95)) : 0;
@@ -1110,11 +1154,13 @@
           }
         } else if (isPWeaponHit) {
           // ========================================================
-          // PLAYER WEAPON STRIKE ON ENEMY
-          // (Enemy takes kinetic damage, sparks, flings. Player takes 0 damage!)
+          // PLAYER WEAPON STRIKE ON ENEMY (Open-Arena Knockback Hit from Any Side)
+          // (Enemy takes kinetic damage, sparks, flings away. Player recoils & takes 0 damage!)
           // ========================================================
+          window._lastBotContactPerf = 0;
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
-          
+          const pSpinRatioHit = Math.min(1.0, (playerBot.weaponSpinSpeed || 0) / (pSpecs.maxWeaponRpm || 95));
+
           const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.90);
           const wasPSpinFast = (playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78);
           const isPTravelFast = (pSpeedBefore >= 6.2 && (pApproach >= 4.2 || impactSpeed >= 7.6));
@@ -1138,10 +1184,16 @@
             triggerGamepadRumble(0.80, 240, 1);
           }
 
-          // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
-          const pRecoil = canFlipEnemy ? 3.4 : (playerBot.type === 'robot6' ? 1.2 : 1.8);
-          playerBot.vx -= nx * pRecoil;
-          playerBot.vz -= nz * pRecoil;
+          // Instant positional separation + Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          const sepHitP = 0.08;
+          playerBot.x -= nx * sepHitP * pMoveRatio;
+          playerBot.z -= nz * sepHitP * pMoveRatio;
+          enemyBot.x += nx * sepHitP * eMoveRatio;
+          enemyBot.z += nz * sepHitP * eMoveRatio;
+
+          const pRecoil = canFlipEnemy ? 3.8 : (playerBot.type === 'robot6' ? 2.2 : 3.0);
+          playerBot.vx = -nx * pRecoil * (0.5 + pMoveRatio);
+          playerBot.vz = -nz * pRecoil * (0.5 + pMoveRatio);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canFlipEnemy ? 2.2 : 1.8, h: true });
@@ -1152,8 +1204,8 @@
             // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
             enemyBot.vy = 2.1 + Math.random() * 0.35;
             enemyBot.airY = 0.15;
-            enemyBot.vx += nx * (5.5 + impactSpeed * 0.40);
-            enemyBot.vz += nz * (5.5 + impactSpeed * 0.40);
+            enemyBot.vx = nx * (6.2 + impactSpeed * 0.42);
+            enemyBot.vz = nz * (6.2 + impactSpeed * 0.42);
 
             if (isFrontalOrRear) {
               enemyBot.pitchVel = (eHitForward > 0 ? -8.5 : 8.5);
@@ -1169,12 +1221,12 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
+            // CONTROLLED SOLID HIT: HEAVY KNOCKBACK ON WHEELS FROM ANY SIDE, NO FLIP & NO JUMPY HOP!
             enemyBot.vy = 0;
             enemyBot.airY = 0;
-            const pFling = pSpecs.flingBase + impactSpeed * pSpecs.flingSpeedMult;
-            enemyBot.vx += nx * pFling;
-            enemyBot.vz += nz * pFling;
+            const pFling = Math.max(5.8, (pSpecs.flingBase || 4.0) * (0.75 + 0.45 * pSpinRatioHit) + impactSpeed * (pSpecs.flingSpeedMult || 0.45));
+            enemyBot.vx = nx * pFling * (0.55 + eMoveRatio);
+            enemyBot.vz = nz * pFling * (0.55 + eMoveRatio);
 
             // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
             // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
@@ -1205,20 +1257,16 @@
           }
 
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponStallTimer = pSpecs.attackStall;
-            enemyBot.weaponStallTimer = eSpecs.defendStall;
-            AudioSys.weaponStallSound();
+            // Retain ~55% weapon RPM after an open-arena knockback hit so the weapon immediately winds back up
+            // and can either knock back again or transition smoothly into wall-grinding once the opponent hits the wall!
+            playerBot.weaponSpinSpeed = Math.max(24.0, (playerBot.weaponSpinSpeed || 0) * 0.55);
+            playerBot.weaponStallTimer = 0;
           } else {
             playerBot.weaponSpinSpeed = pSpecs.maxWeaponRpm;
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
-          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'stall' });
-          }
 
-          // Parts detachment scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
+          // Parts detachment & HP damage scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
           let pStrikeWear = 0.35;
           if (playerBot.type === 'robot6') {
             pStrikeWear = (wasPSpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
@@ -1234,6 +1282,7 @@
           // Heavy armored tank (Robot 2) absorbs 15% more structural punishment
           if (enemyBot.type === 'robot2') pStrikeWear *= 0.85;
 
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - Math.round(28 * pStrikeWear));
           enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + pStrikeWear;
           if (enemyBot._weaponPartWear >= 1.0) {
             enemyBot._weaponPartWear -= 1.0;
@@ -1249,9 +1298,11 @@
           // Player takes strictly ZERO damage!
         } else if (isEWeaponHit) {
           // ========================================================
-          // ENEMY WEAPON STRIKE ON PLAYER (Non-practice mode only — 100% Symmetric with P1!)
+          // ENEMY WEAPON STRIKE ON PLAYER (Open-Arena Knockback Hit from Any Side — 100% Symmetric with P1!)
           // ========================================================
+          window._lastBotContactPerf = 0;
           const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
+          const eSpinRatioHit = Math.min(1.0, (enemyBot.weaponSpinSpeed || 0) / (eSpecs.maxWeaponRpm || 95));
 
           const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.90);
           const wasESpinFast = (enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78);
@@ -1276,10 +1327,16 @@
             triggerGamepadRumble(0.80, 240, 0);
           }
 
-          // Attacker Weapon Recoil (Newton's 3rd Law counter-force — strictly horizontal so attacker stays grounded)
-          const eRecoil = canFlipPlayer ? 3.4 : (enemyBot.type === 'robot6' ? 1.2 : 1.8);
-          enemyBot.vx += nx * eRecoil;
-          enemyBot.vz += nz * eRecoil;
+          // Instant positional separation + Attacker Weapon Recoil (Newton's 3rd Law counter-force)
+          const sepHitE = 0.08;
+          playerBot.x -= nx * sepHitE * pMoveRatio;
+          playerBot.z -= nz * sepHitE * pMoveRatio;
+          enemyBot.x += nx * sepHitE * eMoveRatio;
+          enemyBot.z += nz * sepHitE * eMoveRatio;
+
+          const eRecoil = canFlipPlayer ? 3.8 : (enemyBot.type === 'robot6' ? 2.2 : 3.0);
+          enemyBot.vx = nx * eRecoil * (0.5 + eMoveRatio);
+          enemyBot.vz = nz * eRecoil * (0.5 + eMoveRatio);
 
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'clash', i: canFlipPlayer ? 2.2 : 1.8, h: true });
@@ -1290,8 +1347,8 @@
             // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
             playerBot.vy = 2.1 + Math.random() * 0.35;
             playerBot.airY = 0.15;
-            playerBot.vx -= nx * (5.5 + impactSpeed * 0.40);
-            playerBot.vz -= nz * (5.5 + impactSpeed * 0.40);
+            playerBot.vx = -nx * (6.2 + impactSpeed * 0.42);
+            playerBot.vz = -nz * (6.2 + impactSpeed * 0.42);
 
             if (isFrontalOrRear) {
               playerBot.pitchVel = (pHitForward > 0 ? -8.5 : 8.5);
@@ -1307,12 +1364,12 @@
               NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 45 });
             }
           } else {
-            // CONTROLLED SOLID HIT: HEAVY PUSHBACK ON WHEELS, NO FLIP & NO JUMPY HOP!
+            // CONTROLLED SOLID HIT: HEAVY KNOCKBACK ON WHEELS FROM ANY SIDE, NO FLIP & NO JUMPY HOP!
             playerBot.vy = 0;
             playerBot.airY = 0;
-            const eFling = eSpecs.flingBase + impactSpeed * eSpecs.flingSpeedMult;
-            playerBot.vx -= nx * eFling;
-            playerBot.vz -= nz * eFling;
+            const eFling = Math.max(5.8, (eSpecs.flingBase || 4.0) * (0.75 + 0.45 * eSpinRatioHit) + impactSpeed * (eSpecs.flingSpeedMult || 0.45));
+            playerBot.vx = -nx * eFling * (0.55 + pMoveRatio);
+            playerBot.vz = -nz * eFling * (0.55 + pMoveRatio);
 
             // Horizontal Bar Spinner Tangential Throw (Robot 3 KineticBar):
             // Spinning horizontal bar imparts a sideways tangential kick + yaw spin to the target, and opposite reaction to attacker!
@@ -1343,22 +1400,17 @@
           }
 
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
-            enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponSpinSpeed = 0;
-            enemyBot.weaponStallTimer = eSpecs.attackStall;
-            playerBot.weaponStallTimer = pSpecs.defendStall;
-            AudioSys.weaponStallSound();
+            // Retain ~55% weapon RPM after an open-arena knockback hit so the weapon immediately winds back up
+            enemyBot.weaponSpinSpeed = Math.max(24.0, (enemyBot.weaponSpinSpeed || 0) * 0.55);
+            enemyBot.weaponStallTimer = 0;
           } else {
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
             playerBot.weaponSpinSpeed = pSpecs.maxWeaponRpm;
           }
-          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'stall' });
-          }
 
           triggerDamageVignette();
 
-          // Parts detachment scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
+          // Parts detachment & HP damage scaled for 3x longer battles (~2.5 to 3 weapon hits per detached part, ~4-5 for Robot 6):
           let eStrikeWear = 0.35;
           if (enemyBot.type === 'robot6') {
             eStrikeWear = (wasESpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
@@ -1374,6 +1426,9 @@
           // Heavy armored tank (Robot 2) absorbs 15% more structural punishment
           if (playerBot.type === 'robot2') eStrikeWear *= 0.85;
 
+          if (!isPractice) {
+            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - Math.round(28 * eStrikeWear));
+          }
           playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + eStrikeWear;
           if (playerBot._weaponPartWear >= 1.0) {
             playerBot._weaponPartWear -= 1.0;
