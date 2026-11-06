@@ -961,18 +961,22 @@
 
         if (isBothWeaponClash) {
           // ========================================================
-          // HEAD-ON WEAPON-TO-WEAPON CLASH: KNOCK BACK WITHOUT MUTUAL GRIND DAMAGE
-          // When both robots go head-on with spinning weapons, their blades deflect off each other
-          // and knock both robots back cleanly without dealing overpowered mutual part damage!
+          // HEAD-ON WEAPON-TO-WEAPON CLASH: KNOCK BACK + CLASH DAMAGE + REALISTIC BELT-RIP CHANCE
+          // When both robots go head-on with spinning weapons:
+          // 1. Both robots knock back strongly (no continuous grinding while head-on).
+          // 2. Both robots take weapon clash damage (structural wear & HP damage).
+          // 3. Small realistic chance (~8%-12% on high-impact clash) that the violent shock snaps/rips
+          //    a robot's weapon drive belt, permanently stopping its weapon for the rest of the match!
           // ========================================================
           window._lastBotContactPerf = 0;
-          AudioSys.metalClashSound(2.4, true);
+          AudioSys.metalClashSound(2.5, true);
           AudioSys.weaponSliceSound();
-          addCameraTrauma(0.75);
-          triggerGamepadRumble(0.95, 340);
-          triggerHitStop(0.045);
+          addCameraTrauma(0.80);
+          triggerGamepadRumble(0.95, 360);
+          triggerHitStop(0.050);
+          triggerDamageVignette();
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: 2.4, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: 2.5, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
           }
 
@@ -980,12 +984,64 @@
           const eSpinRatio = Math.min(1.0, (enemyBot.weaponSpinSpeed || 0) / (eSpecs.maxWeaponRpm || 95));
           const avgSpinRatio = (pSpinRatio + eSpinRatio) * 0.5;
 
-          // Keep weapons spinning after blade deflection (~60% RPM) so repeated head-on charges always knock back
+          // Helper to spawn a physical ripped rubber drive belt flying off the weapon on belt failure
+          const ripWeaponBelt = (bot, dirX, dirZ) => {
+            if (!bot || bot.weaponDestroyed) return;
+            bot.weaponDestroyed = true;
+            bot.weaponBeltRipped = true;
+            bot.weaponActive = false;
+            bot.weaponSpinSpeed = 0;
+            bot.weaponStallTimer = 0;
+            if (typeof AudioSys !== 'undefined' && AudioSys.weaponStallSound) AudioSys.weaponStallSound();
+            if (typeof AudioSys !== 'undefined' && AudioSys.crowdGasp) AudioSys.crowdGasp(0.9);
+            spawnCollisionSparks(midPos, 35);
+            try {
+              if (typeof scene !== 'undefined' && typeof detachedDebris !== 'undefined') {
+                const beltGeo = new THREE.TorusGeometry(0.16, 0.024, 6, 16, Math.PI * 1.65);
+                beltGeo._isClonedDebris = true;
+                const beltMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.85, metalness: 0.1 });
+                beltMat._isClonedDebris = true;
+                const beltMesh = new THREE.Mesh(beltGeo, beltMat);
+                beltMesh.position.set(midPos.x, 0.42, midPos.z);
+                scene.add(beltMesh);
+                detachedDebris.push({
+                  mesh: beltMesh,
+                  isWheel: false,
+                  vx: dirX * (5.5 + Math.random() * 3.5) + (Math.random() - 0.5) * 3.0,
+                  vy: 5.2 + Math.random() * 3.0,
+                  vz: dirZ * (5.5 + Math.random() * 3.5) + (Math.random() - 0.5) * 3.0,
+                  rx: (Math.random() - 0.5) * 24,
+                  ry: (Math.random() - 0.5) * 24,
+                  rz: (Math.random() - 0.5) * 24
+                });
+              }
+            } catch (e) {}
+          };
+
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             playerBot.weaponSpinSpeed = Math.max(24.0, (playerBot.weaponSpinSpeed || 0) * 0.60);
             enemyBot.weaponSpinSpeed = Math.max(24.0, (enemyBot.weaponSpinSpeed || 0) * 0.60);
             playerBot.weaponStallTimer = 0;
             enemyBot.weaponStallTimer = 0;
+
+            // Realistic Weapon Belt Rip Check on High-Impact Weapon-to-Weapon Clash:
+            const isHighEnergyClash = (avgSpinRatio >= 0.55 || impactSpeed >= 4.2);
+            if (!isPractice && isHighEnergyClash) {
+              const baseBeltRipFromE = (enemyBot.type === 'robot3' || enemyBot.type === 'robot4') ? 0.12 : (enemyBot.type === 'robot6' ? 0.04 : 0.09);
+              const baseBeltRipFromP = (playerBot.type === 'robot3' || playerBot.type === 'robot4') ? 0.12 : (playerBot.type === 'robot6' ? 0.04 : 0.09);
+              const pBeltProtection = (playerBot.type === 'robot2' || playerBot.type === 'robot5') ? 0.80 : 1.0;
+              const eBeltProtection = (enemyBot.type === 'robot2' || enemyBot.type === 'robot5') ? 0.80 : 1.0;
+
+              const pRipChance = baseBeltRipFromE * eSpinRatio * pBeltProtection;
+              const eRipChance = baseBeltRipFromP * pSpinRatio * eBeltProtection;
+
+              if (Math.random() < pRipChance) {
+                ripWeaponBelt(playerBot, -nx, -nz);
+              }
+              if (Math.random() < eRipChance) {
+                ripWeaponBelt(enemyBot, nx, nz);
+              }
+            }
           } else {
             playerBot.weaponSpinSpeed = pSpecs.maxWeaponRpm;
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
@@ -1004,7 +1060,7 @@
           enemyBot.vx = nx * clashKnockback * (0.5 + eMoveRatio);
           enemyBot.vz = nz * clashKnockback * (0.5 + eMoveRatio);
 
-          // Slight angular deflection / pitch recoil on wheels (no random self-destruction or part loss)
+          // Slight angular deflection / pitch recoil on wheels
           playerBot.vy = 0;
           enemyBot.vy = 0;
           playerBot.airY = 0;
@@ -1018,6 +1074,39 @@
           spawnCollisionSparks(midPos, 55);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
             NetworkSys.queueEvent({ t: 'sparks', x: midPos.x, y: midPos.y, z: midPos.z, c: 55 });
+          }
+
+          // Head-On Weapon Clash Damage (Both robots take HP & structural part wear scaled by opponent weapon power):
+          const pClashWearBase = (playerBot.type === 'robot6') ? 0.22 : ((playerBot.type === 'robot3' || playerBot.type === 'robot4') ? 0.44 : 0.35);
+          const eClashWearBase = (enemyBot.type === 'robot6') ? 0.22 : ((enemyBot.type === 'robot3' || enemyBot.type === 'robot4') ? 0.44 : 0.35);
+
+          let wearOnEnemy = pClashWearBase * (0.55 + 0.45 * pSpinRatio);
+          let wearOnPlayer = eClashWearBase * (0.55 + 0.45 * eSpinRatio);
+          if (enemyBot.type === 'robot2') wearOnEnemy *= 0.85;
+          if (playerBot.type === 'robot2') wearOnPlayer *= 0.85;
+
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - Math.round(22 * wearOnEnemy));
+          enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + wearOnEnemy;
+          if (enemyBot._weaponPartWear >= 1.0) {
+            enemyBot._weaponPartWear -= 1.0;
+            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
+          }
+
+          if (!isPractice) {
+            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - Math.round(22 * wearOnPlayer));
+            playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + wearOnPlayer;
+            if (playerBot._weaponPartWear >= 1.0) {
+              playerBot._weaponPartWear -= 1.0;
+              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
+            }
+          }
+
+          if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, true, true, true);
+          } else if (!isPractice && playerBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);
+          } else if (enemyBot.isEntirelyDestroyed) {
+            if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
           }
         } else if (isPWeaponHit) {
           // ========================================================
