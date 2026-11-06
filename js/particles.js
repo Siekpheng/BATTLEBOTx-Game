@@ -8,16 +8,24 @@
   const sparks = [];
   const detachedDebris = [];
 
+  // Shared GPU geometry and materials for sparks to eliminate per-spark WebGL buffer/shader allocations
+  const SHARED_SPARK_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  const SHARED_SPARK_MAT_YELLOW = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+  const SHARED_SPARK_MAT_ORANGE = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+
   function spawnCollisionSparks(pos, count = 26) {
     if (typeof triggerImpactFlash === 'function') {
       triggerImpactFlash(pos, Math.min(4.8, 1.6 + count * 0.10));
     }
+    // Cap total active sparks in scene to prevent draw-call spikes
+    const maxActiveSparks = 220;
+    while (sparks.length + count > maxActiveSparks && sparks.length > 0) {
+      const oldest = sparks.shift();
+      if (oldest && oldest.mesh) scene.remove(oldest.mesh);
+    }
     for (let i = 0; i < count; i++) {
-      const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-      const mat = new THREE.MeshBasicMaterial({
-        color: Math.random() > 0.35 ? 0xfacc15 : 0xf97316
-      });
-      const m = new THREE.Mesh(geo, mat);
+      const mat = Math.random() > 0.35 ? SHARED_SPARK_MAT_YELLOW : SHARED_SPARK_MAT_ORANGE;
+      const m = new THREE.Mesh(SHARED_SPARK_GEO, mat);
       m.position.copy(pos);
       m.position.y += 0.45;
       const angle = Math.random() * Math.PI * 2;
@@ -173,6 +181,7 @@
     let localGeoCenter = new THREE.Vector3(0, 0, 0);
     if (mesh.geometry) {
       mesh.geometry = mesh.geometry.clone();
+      mesh.geometry._isClonedDebris = true;
       mesh.geometry.computeBoundingBox();
       if (mesh.geometry.boundingBox && !mesh.geometry.boundingBox.isEmpty()) {
         mesh.geometry.boundingBox.getCenter(localGeoCenter);
@@ -186,6 +195,7 @@
       mesh.children.forEach(c => {
         if ((c.name === 'CAD_Outline' || c.isLineSegments) && c.geometry) {
           c.geometry = c.geometry.clone();
+          c.geometry._isClonedDebris = true;
           c.geometry.translate(-localGeoCenter.x, -localGeoCenter.y, -localGeoCenter.z);
         }
       });
@@ -224,6 +234,7 @@
     const baseGeo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
     const posAttr = baseGeo.attributes.position;
     if (!posAttr || posAttr.count < 12) {
+      baseGeo.dispose();
       detachAndCenterMeshToScene(mesh, bot);
       return [mesh];
     }
@@ -237,6 +248,7 @@
 
     // If it's already a small individual part, just center and detach it directly
     if (triCount < 36 || maxDim < 0.38) {
+      baseGeo.dispose();
       detachAndCenterMeshToScene(mesh, bot);
       return [mesh];
     }
@@ -280,6 +292,8 @@
       }
     }
 
+    baseGeo.dispose();
+
     if (buckets.size <= 1) {
       detachAndCenterMeshToScene(mesh, bot);
       return [mesh];
@@ -288,7 +302,11 @@
     // Remove original clumped mesh from robot parent
     if (mesh.children && mesh.children.length > 0) {
       const toRemove = mesh.children.filter(c => c.name === 'CAD_Outline' || c.isLineSegments);
-      toRemove.forEach(c => mesh.remove(c));
+      toRemove.forEach(c => {
+        mesh.remove(c);
+        if (c.geometry && c.geometry._isClonedDebris) c.geometry.dispose();
+        if (c.material && (c.material._isClonedDebris || c.material._isBotInstanceClone)) c.material.dispose();
+      });
     }
     if (mesh.parent) {
       mesh.parent.remove(mesh);
@@ -299,6 +317,7 @@
     buckets.forEach((b) => {
       if (b.pos.length < 9) return;
       const subGeo = new THREE.BufferGeometry();
+      subGeo._isClonedDebris = true;
       subGeo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
       if (normAttr && b.norm.length === b.pos.length) {
         subGeo.setAttribute('normal', new THREE.Float32BufferAttribute(b.norm, 3));
@@ -333,6 +352,7 @@
       // Add crisp outline to each separated individual piece so it remains clearly visible even inside bright explosion bloom
       try {
         const edges = new THREE.EdgesGeometry(subGeo, 28);
+        edges._isClonedDebris = true;
         const lineMat = new THREE.LineBasicMaterial({
           color: 0x050a12,
           transparent: true,
@@ -340,6 +360,7 @@
           depthTest: true,
           depthWrite: false
         });
+        lineMat._isClonedDebris = true;
         const lines = new THREE.LineSegments(edges, lineMat);
         lines.name = 'CAD_Outline';
         subMesh.add(lines);
@@ -812,14 +833,35 @@
   }
   window.destroyRobotEntirely = destroyRobotEntirely;
 
+  function disposeDebrisObject3D(obj) {
+    if (!obj) return;
+    obj.traverse(node => {
+      if (node.geometry && node.geometry._isClonedDebris) {
+        node.geometry.dispose();
+      }
+      if (node.material) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(m => {
+          if (m && (m._isClonedDebris || m._isBotInstanceClone)) {
+            m.dispose();
+          }
+        });
+      }
+    });
+  }
+  window.disposeDebrisObject3D = disposeDebrisObject3D;
+
   function clearArenaDebris() {
     while (sparks.length) {
       const s = sparks.pop();
-      scene.remove(s.mesh);
+      if (s && s.mesh) scene.remove(s.mesh);
     }
     while (detachedDebris.length) {
       const d = detachedDebris.pop();
-      scene.remove(d.mesh);
+      if (d && d.mesh) {
+        scene.remove(d.mesh);
+        disposeDebrisObject3D(d.mesh);
+      }
     }
     clearBotFlames();
 
@@ -837,16 +879,21 @@
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');    // White hot core
-    grad.addColorStop(0.20, 'rgba(255, 220, 60, 0.95)');   // Intense yellow
-    grad.addColorStop(0.46, 'rgba(255, 100, 15, 0.75)');   // Fire hazard orange
-    grad.addColorStop(0.76, 'rgba(215, 30, 0, 0.35)');     // Red perimeter
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const render = () => {
+      ctx.clearRect(0, 0, 64, 64);
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');    // White hot core
+      grad.addColorStop(0.20, 'rgba(255, 220, 60, 0.95)');   // Intense yellow
+      grad.addColorStop(0.46, 'rgba(255, 100, 15, 0.75)');   // Fire hazard orange
+      grad.addColorStop(0.76, 'rgba(215, 30, 0, 0.35)');     // Red perimeter
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+    };
+    render();
     const tex = new THREE.CanvasTexture(canvas);
+    tex._redraw = () => { render(); tex.needsUpdate = true; };
     tex.needsUpdate = true;
     return tex;
   }
@@ -855,15 +902,20 @@
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0.0, 'rgba(35, 35, 40, 0.70)');
-    grad.addColorStop(0.35, 'rgba(55, 55, 60, 0.45)');
-    grad.addColorStop(0.70, 'rgba(75, 75, 80, 0.18)');
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const render = () => {
+      ctx.clearRect(0, 0, 64, 64);
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0.0, 'rgba(35, 35, 40, 0.70)');
+      grad.addColorStop(0.35, 'rgba(55, 55, 60, 0.45)');
+      grad.addColorStop(0.70, 'rgba(75, 75, 80, 0.18)');
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+    };
+    render();
     const tex = new THREE.CanvasTexture(canvas);
+    tex._redraw = () => { render(); tex.needsUpdate = true; };
     tex.needsUpdate = true;
     return tex;
   }
@@ -872,15 +924,20 @@
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    grad.addColorStop(0.0, 'rgba(255, 255, 220, 1.0)');
-    grad.addColorStop(0.35, 'rgba(255, 185, 30, 0.9)');
-    grad.addColorStop(0.80, 'rgba(255, 60, 0, 0.35)');
-    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 32, 32);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const render = () => {
+      ctx.clearRect(0, 0, 32, 32);
+      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0.0, 'rgba(255, 255, 220, 1.0)');
+      grad.addColorStop(0.35, 'rgba(255, 185, 30, 0.9)');
+      grad.addColorStop(0.80, 'rgba(255, 60, 0, 0.35)');
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 32, 32);
+    };
+    render();
     const tex = new THREE.CanvasTexture(canvas);
+    tex._redraw = () => { render(); tex.needsUpdate = true; };
     tex.needsUpdate = true;
     return tex;
   }
@@ -888,6 +945,12 @@
   const fireTex = createProceduralFireTexture();
   const smokeTex = createProceduralSmokeTexture();
   const emberTex = createProceduralEmberTexture();
+
+  window.refreshParticleTextures = function() {
+    if (fireTex && fireTex._redraw) fireTex._redraw();
+    if (smokeTex && smokeTex._redraw) smokeTex._redraw();
+    if (emberTex && emberTex._redraw) emberTex._redraw();
+  };
 
   const FIRE_POOL_SIZE = 90;
   const SMOKE_POOL_SIZE = 60;

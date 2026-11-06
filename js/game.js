@@ -146,6 +146,23 @@
   let pendingGameOverData = null;
   let activeCountdownInterval = null;
 
+  function disposeBotResources(bot) {
+    if (!bot || !bot.root) return;
+    bot.root.traverse(node => {
+      if (node.geometry && node.geometry._isClonedDebris) {
+        node.geometry.dispose();
+      }
+      if (node.material) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(m => {
+          if (m && (m._isBotInstanceClone || m._isClonedDebris)) {
+            m.dispose();
+          }
+        });
+      }
+    });
+  }
+
   function cleanupBots() {
     if (activeCountdownInterval) {
       clearInterval(activeCountdownInterval);
@@ -164,8 +181,16 @@
       const flipPill = warnContainer.querySelector('.flip-pill span');
       if (flipPill) flipPill.textContent = '⚠️ COUNTDOWN K.O. IN';
     }
-    if (playerBot) { scene.remove(playerBot.root); playerBot = null; }
-    if (enemyBot) { scene.remove(enemyBot.root); enemyBot = null; }
+    if (playerBot) {
+      disposeBotResources(playerBot);
+      scene.remove(playerBot.root);
+      playerBot = null;
+    }
+    if (enemyBot) {
+      disposeBotResources(enemyBot);
+      scene.remove(enemyBot.root);
+      enemyBot = null;
+    }
     clearArenaDebris();
     smoothCameraInitialized = false;
     smoothCameraP2Initialized = false;
@@ -1693,13 +1718,21 @@
       menuP1Type = nextP1;
       menuP2Type = nextP2;
 
-      // Spawn knockout sparks at defeated location
       const defeatedBot = pStopped ? playerBot : enemyBot;
-      if (defeatedBot && defeatedBot.root) {
-        spawnCollisionSparks(new THREE.Vector3(defeatedBot.x, 0.4, defeatedBot.z), 50);
-      }
+      const koPos = (defeatedBot && defeatedBot.root) ? new THREE.Vector3(defeatedBot.x, 0.4, defeatedBot.z) : null;
 
       cleanupBots();
+
+      // Spawn knockout sparks AFTER cleanupBots() so the KO burst remains visible in the arena!
+      if (koPos) {
+        spawnCollisionSparks(koPos, 50);
+      }
+      if (typeof window.refreshArenaTextures === 'function') {
+        window.refreshArenaTextures();
+      }
+      if (typeof window.refreshParticleTextures === 'function') {
+        window.refreshParticleTextures();
+      }
 
       playerBot = createBotInstance(menuP1Type, 0, 9.626, Math.PI);
       enemyBot = createBotInstance(menuP2Type, 0, -9.626, 0);

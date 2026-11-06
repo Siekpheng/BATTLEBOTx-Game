@@ -79,7 +79,7 @@
   }
   window.isWheelMesh = isWheelMesh;
 
-  function addRobotMeshOutline(mesh, outlineColor = 0x050a12) {
+  function addRobotMeshOutline(mesh, outlineColor = 0x050a12, isInstanceClone = false) {
     if (!mesh || !mesh.geometry) return;
     if (mesh.name === 'CAD_Outline') return;
 
@@ -105,6 +105,7 @@
     if (existingLine) {
       if (existingLine.material) {
         existingLine.material = existingLine.material.clone();
+        if (isInstanceClone) existingLine.material._isBotInstanceClone = true;
         existingLine.material.color.setHex(outlineColor);
         existingLine.material.transparent = true;
         existingLine.material.opacity = 0.95;
@@ -121,6 +122,7 @@
 
     try {
       const edges = new THREE.EdgesGeometry(mesh.geometry, 26);
+      if (isInstanceClone) edges._isClonedDebris = true;
       const lineMat = new THREE.LineBasicMaterial({
         color: outlineColor,
         transparent: true,
@@ -131,6 +133,7 @@
         polygonOffsetFactor: -1.0,
         polygonOffsetUnits: -2.0
       });
+      if (isInstanceClone) lineMat._isBotInstanceClone = true;
       const lines = new THREE.LineSegments(edges, lineMat);
       lines.name = 'CAD_Outline';
       lines.renderOrder = 1;
@@ -141,7 +144,7 @@
     }
   }
 
-  function optimizeRobotMaterial(mesh) {
+  function optimizeRobotMaterial(mesh, isInstanceClone = false) {
     if (!mesh || !mesh.material) return;
     mesh.castShadow = true;
     mesh.receiveShadow = false; // Robot casts crisp contact shadow on floor, but never self-shadows top surfaces
@@ -224,7 +227,7 @@
     // Adaptive contrast: on dark chassis/carbon (lum < 0.22), use crisp technical slate outline (0x475569)
     // On light/vibrant armor & wedges (lum >= 0.22), use dark industrial ink (0x050a12)
     const outlineCol = (maxLum < 0.22) ? 0x475569 : 0x050a12;
-    addRobotMeshOutline(mesh, outlineCol);
+    addRobotMeshOutline(mesh, outlineCol, isInstanceClone);
   }
 
   function attachCadToRobot1(bot) {

@@ -132,6 +132,12 @@
       if (typeof renderer !== 'undefined' && renderer && renderer.shadowMap) {
         renderer.shadowMap.needsUpdate = true;
       }
+      if (typeof window.refreshArenaTextures === 'function') {
+        window.refreshArenaTextures();
+      }
+      if (typeof window.refreshParticleTextures === 'function') {
+        window.refreshParticleTextures();
+      }
     } else {
       if (typeof AudioSys !== 'undefined' && AudioSys.stopCombatAudio) {
         AudioSys.stopCombatAudio();
@@ -152,6 +158,26 @@
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.80; // Dark, moody, high-contrast atmospheric arena exposure
   container.appendChild(renderer.domElement);
+
+  // Automatic WebGL Context Loss & Restore Resilience:
+  // If the GPU driver ever resets or recovers from a context loss, prevent permanent loss and redraw all procedural arena/particle textures!
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.warn('⚠️ WebGL context lost — waiting for automatic GPU context restoration...');
+  }, false);
+
+  renderer.domElement.addEventListener('webglcontextrestored', () => {
+    console.log('✅ WebGL context restored — refreshing arena floor, wall billboard, and particle textures!');
+    if (typeof window.refreshArenaTextures === 'function') {
+      window.refreshArenaTextures();
+    }
+    if (typeof window.refreshParticleTextures === 'function') {
+      window.refreshParticleTextures();
+    }
+    if (renderer.shadowMap) {
+      renderer.shadowMap.needsUpdate = true;
+    }
+  }, false);
 
   // Professional Tournament Cinema Lighting (Dark Arena Atmosphere):
   // 1. Dual-tone hemisphere light: soft sky tint (0xdbeafe, 0.22), deep floor contrast (0x0f172a, 0.16)
@@ -215,7 +241,9 @@
     const c = document.createElement('canvas');
     c.width = 2048;
     c.height = 2048;
-    const ctx = c.getContext('2d');
+    // willReadFrequently: true forces the browser to keep the 2D canvas backing store in CPU system RAM
+    // so a GPU driver reset can NEVER wipe the arena floor texture to black!
+    const ctx = c.getContext('2d', { willReadFrequently: true });
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 16;
 
@@ -530,11 +558,17 @@
       ctx.restore();
     };
 
-    bbxImg.onload = () => { renderFloor(); tex.needsUpdate = true; };
+    const refreshFloor = () => {
+      renderFloor();
+      tex.needsUpdate = true;
+    };
+
+    bbxImg.onload = refreshFloor;
     if (document.fonts) {
-      document.fonts.ready.then(() => { renderFloor(); tex.needsUpdate = true; });
+      document.fonts.ready.then(refreshFloor);
     }
-    renderFloor();
+    refreshFloor();
+    tex._redraw = refreshFloor;
 
     return tex;
   }
@@ -543,7 +577,9 @@
     const c = document.createElement('canvas');
     c.width = 2048;
     c.height = 512;
-    const ctx = c.getContext('2d');
+    // willReadFrequently: true forces the browser to keep the 2D canvas backing store in CPU system RAM
+    // so a GPU driver reset can NEVER wipe the North wall banner/logos to black!
+    const ctx = c.getContext('2d', { willReadFrequently: true });
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
 
@@ -632,9 +668,18 @@
       drawBadge(bbxImg, 1808, 256);
     };
 
-    bbxImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
-    aifarmImg.onload = () => { renderBillboard(); tex.needsUpdate = true; };
-    renderBillboard();
+    const refreshBillboard = () => {
+      renderBillboard();
+      tex.needsUpdate = true;
+    };
+
+    bbxImg.onload = refreshBillboard;
+    aifarmImg.onload = refreshBillboard;
+    if (document.fonts) {
+      document.fonts.ready.then(refreshBillboard);
+    }
+    refreshBillboard();
+    tex._redraw = refreshBillboard;
 
     return tex;
   }
@@ -832,6 +877,16 @@
   const billboard = new THREE.Mesh(billboardGeo, billboardMat);
   billboard.position.set(0, wallY, -ARENA_HALF + 0.06);
   arenaGroup.add(billboard);
+
+  // Expose helper to refresh all procedural arena textures (floor & North wall billboard)
+  window.refreshArenaTextures = function() {
+    if (floorMat && floorMat.map && typeof floorMat.map._redraw === 'function') {
+      floorMat.map._redraw();
+    }
+    if (billboardMat && billboardMat.map && typeof billboardMat.map._redraw === 'function') {
+      billboardMat.map._redraw();
+    }
+  };
 
   // 6. Overhead combat lighting is provided by roofSpot1 and roofSpot2 directly above.
 
