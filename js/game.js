@@ -2,8 +2,152 @@
 // BATTLEBOTx - GAME MANAGER, UI NAVIGATION & ANIMATION LOOP
 // ========================================================
 
+  // ========================================================
+  // UNIQUE ROBOT COMBAT SPECS & ARCHETYPES (APPLIES EQUALLY TO P1 & P2)
+  // - Robot 1 (Razor):      Tactical Wedge & Fast-Spin Overhead Blade (Fast 1.75s wind-up, higher 32% flip lift bite)
+  // - Robot 2 (IronClad):   Armored Tank & Heavy Pusher (360 HP heavy armor, 1.45x pushing traction, 40% flip resistance)
+  // - Robot 3 (KineticBar): Wide-Arc Horizontal Shredder (Wide 150° sweep reach, 102 RPM blade, shreds multiple outer parts)
+  // - Robot 4 (VertForce):  Heavy Uppercut Launcher (105 RPM high-energy vertical disc, massive knockback & 38% uppercut flip)
+  // - Robot 5 (BlueThunder):Billet Drum Brawler (110 RPM rapid eggbeater, 1.4s instant recovery, 0.45s minimal stall, reinforced core)
+  // - Robot 6 (Vortex):     Compact High-Speed Scout (Smallest & fastest chassis: 19.5 speed, 4.6 turn, 68 accel, but lowest weapon damage & knockback)
+  // ========================================================
+  const ROBOT_COMBAT_SPECS = {
+    robot1: {
+      name: 'Razor',
+      role: 'Fast Spin · Wedge Lifter',
+      maxHealth: 300,
+      maxSpeed: 15.8,
+      turnRate: 3.65,
+      accel: 50.0,
+      maxWeaponRpm: 98.0,
+      windUpRate: 56.0,      // Spins up in ~1.75s (fastest among full-size bots)
+      attackStall: 0.60,     // Quick recovery after hitting
+      defendStall: 1.00,
+      weaponReach: 0.30,
+      flingBase: 4.4,
+      flingSpeedMult: 0.46,
+      flipChance: 0.32,      // Front ramp wedges + angled blade lift opponents more easily
+      flipResistance: 1.0,
+      pushTractionMult: 1.05,
+      partDamageChance: 0.60,
+      partDamageHigh: 1,
+      partDivisor: 18
+    },
+    robot2: {
+      name: 'IronClad',
+      role: 'Heavy Armor · Juggernaut Tank',
+      maxHealth: 360,        // +20% reinforced tank hull durability
+      maxSpeed: 13.8,        // Heavier armored chassis
+      turnRate: 3.15,
+      accel: 42.0,
+      maxWeaponRpm: 92.0,
+      windUpRate: 36.0,
+      attackStall: 0.75,
+      defendStall: 0.90,
+      weaponReach: 0.34,
+      flingBase: 4.6,
+      flingSpeedMult: 0.48,
+      flipChance: 0.22,
+      flipResistance: 0.60,  // Heavy low center-of-gravity resists getting flipped by 40%
+      pushTractionMult: 1.45,// Superior 4WD pushing power in bumper-to-bumper shoving matches
+      partDamageChance: 0.55,
+      partDamageHigh: 1,
+      partDivisor: 22        // Reinforced armor plates absorb more hits before depleting HP
+    },
+    robot3: {
+      name: 'KineticBar',
+      role: 'Wide Reach · Multi-Part Shredder',
+      maxHealth: 290,
+      maxSpeed: 15.0,
+      turnRate: 3.75,
+      accel: 48.0,
+      maxWeaponRpm: 102.0,
+      windUpRate: 25.5,      // Massive 450mm bar takes 4.0s to wind up
+      attackStall: 0.95,
+      defendStall: 1.25,
+      weaponReach: 0.15,     // Wide 150-degree horizontal bar arc
+      flingBase: 6.2,
+      flingSpeedMult: 0.55,
+      flipChance: 0.18,
+      flipResistance: 1.0,
+      pushTractionMult: 1.0,
+      partDamageChance: 0.75,
+      partDamageHigh: 2,     // Shreds multiple exterior parts on high-RPM strikes
+      partDivisor: 18
+    },
+    robot4: {
+      name: 'VertForce',
+      role: 'Heavy Disc · Uppercut Launcher',
+      maxHealth: 310,
+      maxSpeed: 14.8,
+      turnRate: 3.40,
+      accel: 46.0,
+      maxWeaponRpm: 105.0,   // Heavy high-inertia vertical disc
+      windUpRate: 31.0,      // ~3.4s wind-up for massive kinetic punch
+      attackStall: 0.85,
+      defendStall: 1.15,
+      weaponReach: 0.34,
+      flingBase: 6.4,        // Highest knockback fling & vertical launch force
+      flingSpeedMult: 0.58,
+      flipChance: 0.38,      // Highest uppercut flip probability on solid vertical hits
+      flipResistance: 0.85,
+      pushTractionMult: 1.15,
+      partDamageChance: 0.65,
+      partDamageHigh: 2,     // Heavy vertical disc rips off 2 parts on full-power strikes
+      partDivisor: 19
+    },
+    robot5: {
+      name: 'BlueThunder',
+      role: 'Rapid Drum · Non-Stop Brawler',
+      maxHealth: 315,
+      maxSpeed: 15.6,
+      turnRate: 3.85,        // Snappy 2WD pivot turning
+      accel: 52.0,
+      maxWeaponRpm: 110.0,   // High-RPM compact eggbeater drum
+      windUpRate: 78.0,      // Spins up in ~1.4s and recovers almost instantly!
+      attackStall: 0.45,     // Drum barely stalls on impact — relentless rapid-fire brawling
+      defendStall: 0.80,
+      weaponReach: 0.33,
+      flingBase: 4.8,
+      flingSpeedMult: 0.48,
+      flipChance: 0.26,
+      flipResistance: 0.90,
+      pushTractionMult: 1.15,
+      partDamageChance: 0.70,// Consistent relentless part grinding
+      partDamageHigh: 1,
+      partDivisor: 19
+    },
+    robot6: {
+      name: 'Vortex',
+      role: 'Mini Speedster · Light Damage',
+      maxHealth: 265,        // Compact lightweight frame
+      maxSpeed: 19.5,        // Fastest robot in the arena
+      turnRate: 4.60,        // Ultra-nimble cornering
+      accel: 68.0,           // Instantaneous acceleration
+      maxWeaponRpm: 90.0,    // Small compact disc
+      windUpRate: 65.0,      // Fast wind-up due to small low-mass blade
+      attackStall: 0.55,
+      defendStall: 1.10,
+      weaponReach: 0.38,     // Narrower compact weapon reach
+      flingBase: 2.3,        // Least knockback force (small weapon)
+      flingSpeedMult: 0.25,
+      flipChance: 0.08,      // Rarely flips heavy full-size robots (8% only on max-speed charge)
+      flipResistance: 1.15,  // Lighter chassis is easier for big bots to toss
+      pushTractionMult: 0.72,// Light weight means less shoving force in slow pushing contests
+      partDamageChance: 0.28,// Deals the least damage per hit (only 28% chance to detach 1 part on normal hit, max 1 on heavy hit)
+      partDamageHigh: 1,
+      partDivisor: 18
+    }
+  };
+  window.ROBOT_COMBAT_SPECS = ROBOT_COMBAT_SPECS;
+
+  function getBotCombatSpecs(type) {
+    return ROBOT_COMBAT_SPECS[type] || ROBOT_COMBAT_SPECS.robot1;
+  }
+  window.getBotCombatSpecs = getBotCombatSpecs;
+
   function getBotMaxHealth(type) {
-    return 300; // Balanced 300 HP base health across all robots for identical durability
+    return getBotCombatSpecs(type).maxHealth;
   }
   window.getBotMaxHealth = getBotMaxHealth;
 
@@ -2028,7 +2172,7 @@
 
       // Update Weapon RPM Gauge in HUD (Guest in Online 1v1 controls enemyBot!)
       const myLocalBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
-      const botMaxRpm = (myLocalBot.type === 'robot3') ? 102.0 : 95.0;
+      const botMaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(myLocalBot.type).maxWeaponRpm : ((myLocalBot.type === 'robot3') ? 102.0 : 95.0);
       const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / botMaxRpm) * 100));
       const rpmText = document.getElementById('weapon-rpm-text');
       const rpmFill = document.getElementById('weapon-rpm-fill');
@@ -2249,7 +2393,7 @@
       if (splitActive) {
         splitOverlay.classList.remove('hidden');
         if (enemyBot) {
-          const p2MaxRpm = (enemyBot.type === 'robot3') ? 102.0 : 95.0;
+          const p2MaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type).maxWeaponRpm : ((enemyBot.type === 'robot3') ? 102.0 : 95.0);
           const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / p2MaxRpm) * 100));
           const p2RpmText = document.getElementById('p2-weapon-rpm-text');
           const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');

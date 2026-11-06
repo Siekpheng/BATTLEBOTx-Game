@@ -794,10 +794,10 @@
 
     // Update remaining count & driveHealth
     const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
-    // Balanced progressive health depletion:
-    // Normalize effective part divisor so robots with fewer discrete CAD meshes (e.g. Robot 5 with 7 components)
-    // do not suffer massive chunk health losses (54 HP per hit). Each component absorbs ~18-20 HP.
-    const effectivePartDivisor = Math.max(18, bot.totalInitialParts);
+    // Balanced progressive health depletion using per-robot armor part divisor:
+    const botSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(bot.type) : null;
+    const baseDivisor = (botSpecs && botSpecs.partDivisor) ? botSpecs.partDivisor : 18;
+    const effectivePartDivisor = Math.max(baseDivisor, bot.totalInitialParts);
     const detachedCount = (bot.totalInitialParts - remainingCount);
     const healthLoss = (detachedCount / effectivePartDivisor) * bot.maxDriveHealth;
     bot.driveHealth = Math.max(0, Math.round(bot.maxDriveHealth - healthLoss));
