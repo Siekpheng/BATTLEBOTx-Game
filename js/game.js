@@ -1960,6 +1960,106 @@
   // ========================================================
   // 11. MAIN ANIMATION LOOP
   // ========================================================
+  function updateWeaponRpmHUD() {
+    if (!playerBot) return;
+    const myLocalBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
+    const botMaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(myLocalBot.type).maxWeaponRpm : ((myLocalBot.type === 'robot3') ? 102.0 : 95.0);
+    const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / botMaxRpm) * 100));
+    const rpmText = document.getElementById('weapon-rpm-text');
+    const rpmFill = document.getElementById('weapon-rpm-fill');
+    if (rpmText && rpmFill) {
+      if (myLocalBot.weaponDestroyed || myLocalBot.isEntirelyDestroyed) {
+        rpmText.textContent = myLocalBot.weaponBeltRipped
+          ? '0% (BELT RIPPED — BROKEN)'
+          : (myLocalBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
+        rpmText.style.color = '#ef4444';
+        rpmFill.style.width = '0%';
+        rpmFill.classList.remove('ready');
+        rpmFill.style.background = '#475569';
+      } else if (myLocalBot.weaponStallTimer > 0) {
+        const stallSec = Math.ceil(myLocalBot.weaponStallTimer);
+        rpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
+        rpmText.style.color = '#f59e0b';
+        rpmFill.style.width = '0%';
+        rpmFill.classList.remove('ready');
+        rpmFill.style.background = '#f59e0b';
+      } else if (myLocalBot.weaponActive === false) {
+        rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
+        rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
+        rpmFill.style.width = `${rpmPct}%`;
+        rpmFill.classList.remove('ready');
+        rpmFill.style.background = rpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
+      } else if (rpmPct >= 92) {
+        rpmText.textContent = '100% (SMASH READY!)';
+        rpmText.style.color = '#34d399';
+        rpmFill.style.width = '100%';
+        rpmFill.classList.add('ready');
+        rpmFill.style.background = '';
+      } else if (rpmPct <= 5) {
+        rpmText.textContent = (matchState === 'countdown') ? `${rpmPct}% (PRE-SPINNING...)` : '0% (STALLED — WINDING UP...)';
+        rpmText.style.color = '#ef4444';
+        rpmFill.style.width = `${rpmPct}%`;
+        rpmFill.classList.remove('ready');
+        rpmFill.style.background = '';
+      } else {
+        rpmText.textContent = (matchState === 'countdown') ? `${rpmPct}% (PRE-SPINNING...)` : `${rpmPct}% (WINDING UP...)`;
+        rpmText.style.color = '#38bdf8';
+        rpmFill.style.width = `${rpmPct}%`;
+        rpmFill.classList.remove('ready');
+        rpmFill.style.background = '';
+      }
+    }
+
+    if (enemyBot) {
+      const p2MaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type).maxWeaponRpm : ((enemyBot.type === 'robot3') ? 102.0 : 95.0);
+      const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / p2MaxRpm) * 100));
+      const p2RpmText = document.getElementById('p2-weapon-rpm-text');
+      const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');
+      if (p2RpmText && p2RpmFill) {
+        if (enemyBot.weaponDestroyed || enemyBot.isEntirelyDestroyed) {
+          p2RpmText.textContent = enemyBot.weaponBeltRipped
+            ? '0% (BELT RIPPED — BROKEN)'
+            : (enemyBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
+          p2RpmText.style.color = '#ef4444';
+          p2RpmFill.style.width = '0%';
+          p2RpmFill.classList.remove('ready');
+          p2RpmFill.style.background = '#475569';
+        } else if (enemyBot.weaponStallTimer > 0) {
+          const stallSec = Math.ceil(enemyBot.weaponStallTimer);
+          p2RpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
+          p2RpmText.style.color = '#f59e0b';
+          p2RpmFill.style.width = '0%';
+          p2RpmFill.classList.remove('ready');
+          p2RpmFill.style.background = '#f59e0b';
+        } else if (enemyBot.weaponActive === false) {
+          p2RpmText.textContent = p2RpmPct > 0 ? `${p2RpmPct}% (COASTING)` : 'OFF (R-SHIFT / LB)';
+          p2RpmText.style.color = p2RpmPct > 0 ? '#f59e0b' : '#94a3b8';
+          p2RpmFill.style.width = `${p2RpmPct}%`;
+          p2RpmFill.classList.remove('ready');
+          p2RpmFill.style.background = p2RpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
+        } else if (p2RpmPct >= 92) {
+          p2RpmText.textContent = '100% (SMASH READY!)';
+          p2RpmText.style.color = '#34d399';
+          p2RpmFill.style.width = '100%';
+          p2RpmFill.classList.add('ready');
+          p2RpmFill.style.background = '';
+        } else if (p2RpmPct <= 5) {
+          p2RpmText.textContent = (matchState === 'countdown') ? `${p2RpmPct}% (PRE-SPINNING...)` : '0% (STALLED — WINDING UP...)';
+          p2RpmText.style.color = '#ef4444';
+          p2RpmFill.style.width = `${p2RpmPct}%`;
+          p2RpmFill.classList.remove('ready');
+          p2RpmFill.style.background = '';
+        } else {
+          p2RpmText.textContent = (matchState === 'countdown') ? `${p2RpmPct}% (PRE-SPINNING...)` : `${p2RpmPct}% (WINDING UP...)`;
+          p2RpmText.style.color = '#f87171';
+          p2RpmFill.style.width = `${p2RpmPct}%`;
+          p2RpmFill.classList.remove('ready');
+          p2RpmFill.style.background = '';
+        }
+      }
+    }
+  }
+
   let lastTime = performance.now();
 
   function animate(now) {
@@ -2130,17 +2230,24 @@
         updateBotPhysics(enemyBot, simDt);
         handleBotCollision();
         checkMenuBotKnockout(dt);
+        updateBotVisuals(playerBot, dt);
+        updateBotVisuals(enemyBot, dt);
       }
     } else if (matchState === 'countdown') {
-      // During the 3-second pre-match countdown, keep weapons strictly at 0 RPM so blades only begin spinning when the countdown finishes!
+      // Pre-match countdown: robot chassis stay parked in starting squares, while weapons pre-spin up to max RPM!
       if (playerBot) {
-        playerBot.weaponSpinSpeed = 0.0;
-        updateBotVisuals(playerBot, 0);
+        playerBot.throttleInput = 0;
+        playerBot.steerInput = 0;
+        updateBotPhysics(playerBot, simDt);
+        updateBotVisuals(playerBot, dt);
       }
       if (enemyBot) {
-        enemyBot.weaponSpinSpeed = 0.0;
-        updateBotVisuals(enemyBot, 0);
+        enemyBot.throttleInput = 0;
+        enemyBot.steerInput = 0;
+        updateBotPhysics(enemyBot, simDt);
+        updateBotVisuals(enemyBot, dt);
       }
+      updateWeaponRpmHUD();
     } else if ((matchState === 'playing' || matchState === 'celebrating') && playerBot && enemyBot) {
       let t = sliderThrottleVal;
       let s = sliderSteerVal;
@@ -2233,54 +2340,8 @@
         }
       }
 
-      // Update Weapon RPM Gauge in HUD (Guest in Online 1v1 controls enemyBot!)
-      const myLocalBot = (NetworkSys.isOnline && !NetworkSys.isHost && enemyBot) ? enemyBot : playerBot;
-      const botMaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(myLocalBot.type).maxWeaponRpm : ((myLocalBot.type === 'robot3') ? 102.0 : 95.0);
-      const rpmPct = Math.min(100, Math.round((myLocalBot.weaponSpinSpeed / botMaxRpm) * 100));
-      const rpmText = document.getElementById('weapon-rpm-text');
-      const rpmFill = document.getElementById('weapon-rpm-fill');
-      if (rpmText && rpmFill) {
-        if (myLocalBot.weaponDestroyed || myLocalBot.isEntirelyDestroyed) {
-          rpmText.textContent = myLocalBot.weaponBeltRipped
-            ? '0% (BELT RIPPED — BROKEN)'
-            : (myLocalBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
-          rpmText.style.color = '#ef4444';
-          rpmFill.style.width = '0%';
-          rpmFill.classList.remove('ready');
-          rpmFill.style.background = '#475569';
-        } else if (myLocalBot.weaponStallTimer > 0) {
-          const stallSec = Math.ceil(myLocalBot.weaponStallTimer);
-          rpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
-          rpmText.style.color = '#f59e0b';
-          rpmFill.style.width = '0%';
-          rpmFill.classList.remove('ready');
-          rpmFill.style.background = '#f59e0b';
-        } else if (myLocalBot.weaponActive === false) {
-          rpmText.textContent = rpmPct > 0 ? `${rpmPct}% (COASTING)` : 'OFF (SPACE / LB)';
-          rpmText.style.color = rpmPct > 0 ? '#f59e0b' : '#94a3b8';
-          rpmFill.style.width = `${rpmPct}%`;
-          rpmFill.classList.remove('ready');
-          rpmFill.style.background = rpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
-        } else if (rpmPct >= 92) {
-          rpmText.textContent = '100% (SMASH READY!)';
-          rpmText.style.color = '#34d399';
-          rpmFill.style.width = '100%';
-          rpmFill.classList.add('ready');
-          rpmFill.style.background = '';
-        } else if (rpmPct <= 5) {
-          rpmText.textContent = '0% (STALLED — WINDING UP...)';
-          rpmText.style.color = '#ef4444';
-          rpmFill.style.width = `${rpmPct}%`;
-          rpmFill.classList.remove('ready');
-          rpmFill.style.background = '';
-        } else {
-          rpmText.textContent = `${rpmPct}% (WINDING UP...)`;
-          rpmText.style.color = '#38bdf8';
-          rpmFill.style.width = `${rpmPct}%`;
-          rpmFill.classList.remove('ready');
-          rpmFill.style.background = '';
-        }
-      }
+      // Update Weapon RPM Gauge in HUD for P1 and P2
+      updateWeaponRpmHUD();
 
       if (matchState === 'playing') {
         matchTimeRemaining -= dt;
@@ -2458,54 +2519,6 @@
     if (splitOverlay) {
       if (splitActive) {
         splitOverlay.classList.remove('hidden');
-        if (enemyBot) {
-          const p2MaxRpm = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type).maxWeaponRpm : ((enemyBot.type === 'robot3') ? 102.0 : 95.0);
-          const p2RpmPct = Math.min(100, Math.round((enemyBot.weaponSpinSpeed / p2MaxRpm) * 100));
-          const p2RpmText = document.getElementById('p2-weapon-rpm-text');
-          const p2RpmFill = document.getElementById('p2-weapon-rpm-fill');
-          if (p2RpmText && p2RpmFill) {
-            if (enemyBot.weaponDestroyed || enemyBot.isEntirelyDestroyed) {
-              p2RpmText.textContent = enemyBot.weaponBeltRipped
-                ? '0% (BELT RIPPED — BROKEN)'
-                : (enemyBot.weaponMotorBroken ? '0% (BELT & MOTOR BROKEN)' : '0% (WEAPON DESTROYED)');
-              p2RpmText.style.color = '#ef4444';
-              p2RpmFill.style.width = '0%';
-              p2RpmFill.classList.remove('ready');
-              p2RpmFill.style.background = '#475569';
-            } else if (enemyBot.weaponStallTimer > 0) {
-              const stallSec = Math.ceil(enemyBot.weaponStallTimer);
-              p2RpmText.textContent = `0% (WEAPON STALLED — ${stallSec}s)`;
-              p2RpmText.style.color = '#f59e0b';
-              p2RpmFill.style.width = '0%';
-              p2RpmFill.classList.remove('ready');
-              p2RpmFill.style.background = '#f59e0b';
-            } else if (enemyBot.weaponActive === false) {
-              p2RpmText.textContent = p2RpmPct > 0 ? `${p2RpmPct}% (COASTING)` : 'OFF (R-SHIFT / LB)';
-              p2RpmText.style.color = p2RpmPct > 0 ? '#f59e0b' : '#94a3b8';
-              p2RpmFill.style.width = `${p2RpmPct}%`;
-              p2RpmFill.classList.remove('ready');
-              p2RpmFill.style.background = p2RpmPct > 0 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#475569';
-            } else if (p2RpmPct >= 92) {
-              p2RpmText.textContent = '100% (SMASH READY!)';
-              p2RpmText.style.color = '#34d399';
-              p2RpmFill.style.width = '100%';
-              p2RpmFill.classList.add('ready');
-              p2RpmFill.style.background = '';
-            } else if (p2RpmPct <= 5) {
-              p2RpmText.textContent = '0% (STALLED — WINDING UP...)';
-              p2RpmText.style.color = '#ef4444';
-              p2RpmFill.style.width = `${p2RpmPct}%`;
-              p2RpmFill.classList.remove('ready');
-              p2RpmFill.style.background = '';
-            } else {
-              p2RpmText.textContent = `${p2RpmPct}% (WINDING UP...)`;
-              p2RpmText.style.color = '#f87171';
-              p2RpmFill.style.width = `${p2RpmPct}%`;
-              p2RpmFill.classList.remove('ready');
-              p2RpmFill.style.background = '';
-            }
-          }
-        }
       } else {
         splitOverlay.classList.add('hidden');
       }
