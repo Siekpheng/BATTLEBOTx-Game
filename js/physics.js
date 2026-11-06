@@ -985,25 +985,23 @@
 
         if (isBothWeaponClash) {
           // ========================================================
-          // TRUE WEAPON-TO-WEAPON HEAD-ON KINETIC CLASH (Original 87c3892 Mechanics)
+          // TRUE WEAPON-TO-WEAPON CLASH: SIDE-HIT KNOCKBACK FEEL + BOTH WEAPONS STALLED
+          // When robot weapons hit each other:
+          // 1. Both robots take the solid, grounded knockback pushback felt during a side weapon hit (pFling / eFling).
+          // 2. Both robot weapons stall to 0 RPM with their stall timers (attackStall / defendStall).
+          // 3. Drive belt rip has a chance of happening ONLY when a robot is at less than 50% HP!
           // ========================================================
-          AudioSys.metalClashSound(2.5, true);
+          AudioSys.metalClashSound(2.2, true);
           AudioSys.weaponSliceSound();
           AudioSys.weaponStallSound();
-          AudioSys.crowdCheer(0.95, 1.9);
-          addCameraTrauma(0.95);
-          triggerGamepadRumble(1.0, 420);
-          triggerHitStop(0.065);
+          addCameraTrauma(0.55);
+          triggerGamepadRumble(0.85, 260);
+          triggerHitStop(0.045);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'clash', i: 2.5, h: true });
+            NetworkSys.queueEvent({ t: 'clash', i: 2.2, h: true });
             NetworkSys.queueEvent({ t: 'slice' });
             NetworkSys.queueEvent({ t: 'stall' });
           }
-
-          // Record pre-impact weapon spin speeds BEFORE stalling them to 0!
-          const bothWeaponsMax = (playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.90 && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.90);
-          const bothTravelFast = (impactSpeed >= 12.0 && pSpeedBefore >= 6.0 && eSpeedBefore >= 6.0);
-          const canClashFlip = bothWeaponsMax && bothTravelFast && (Math.random() < 0.15);
 
           const pSpinRatio = Math.min(1.0, (playerBot.weaponSpinSpeed || 0) / (pSpecs.maxWeaponRpm || 95));
           const eSpinRatio = Math.min(1.0, (enemyBot.weaponSpinSpeed || 0) / (eSpecs.maxWeaponRpm || 95));
@@ -1043,57 +1041,76 @@
             } catch (e) {}
           };
 
+          // Both weapons stall on impact just like a weapon hit
           if (typeof matchState === 'undefined' || matchState !== 'menu') {
             playerBot.weaponSpinSpeed = 0;
             enemyBot.weaponSpinSpeed = 0;
-            playerBot.weaponStallTimer = pSpecs.defendStall;
-            enemyBot.weaponStallTimer = eSpecs.defendStall;
+            playerBot.weaponStallTimer = pSpecs.attackStall || 0.8;
+            enemyBot.weaponStallTimer = eSpecs.attackStall || 0.8;
             AudioSys.weaponStallSound();
 
-            // Realistic Weapon Belt Rip Check on High-Impact Weapon-to-Weapon Clash:
+            // Drive Belt Rip Check: ONLY has a chance of happening when robot is less than 50% HP!
+            const maxHpP = playerBot.maxDriveHealth || 900;
+            const maxHpE = enemyBot.maxDriveHealth || 900;
+            const isPLessThan50 = (playerBot.driveHealth < maxHpP * 0.50) || (playerBot.totalInitialParts && (playerBot.detachableParts ? playerBot.detachableParts.filter(p => p.attached).length : 0) <= playerBot.totalInitialParts * 0.50);
+            const isELessThan50 = (enemyBot.driveHealth < maxHpE * 0.50) || (enemyBot.totalInitialParts && (enemyBot.detachableParts ? enemyBot.detachableParts.filter(p => p.attached).length : 0) <= enemyBot.totalInitialParts * 0.50);
+
             const isHighEnergyClash = (avgSpinRatio >= 0.55 || impactSpeed >= 4.2);
             if (!isPractice && isHighEnergyClash) {
-              const baseBeltRipFromE = (enemyBot.type === 'robot3' || enemyBot.type === 'robot4') ? 0.10 : (enemyBot.type === 'robot6' ? 0.04 : 0.08);
-              const baseBeltRipFromP = (playerBot.type === 'robot3' || playerBot.type === 'robot4') ? 0.10 : (playerBot.type === 'robot6' ? 0.04 : 0.08);
-              const pBeltProtection = (playerBot.type === 'robot2' || playerBot.type === 'robot5') ? 0.80 : 1.0;
-              const eBeltProtection = (enemyBot.type === 'robot2' || enemyBot.type === 'robot5') ? 0.80 : 1.0;
+              if (isPLessThan50) {
+                const baseBeltRipFromE = (enemyBot.type === 'robot3' || enemyBot.type === 'robot4') ? 0.09 : (enemyBot.type === 'robot6' ? 0.03 : 0.06);
+                const pBeltProtection = (playerBot.type === 'robot2' || playerBot.type === 'robot5') ? 0.80 : 1.0;
+                if (Math.random() < baseBeltRipFromE * eSpinRatio * pBeltProtection) {
+                  ripWeaponBelt(playerBot, -nx, -nz);
+                }
+              }
 
-              const pRipChance = baseBeltRipFromE * eSpinRatio * pBeltProtection;
-              const eRipChance = baseBeltRipFromP * pSpinRatio * eBeltProtection;
-
-              if (Math.random() < pRipChance) ripWeaponBelt(playerBot, -nx, -nz);
-              if (Math.random() < eRipChance) ripWeaponBelt(enemyBot, nx, nz);
+              if (isELessThan50) {
+                const baseBeltRipFromP = (playerBot.type === 'robot3' || playerBot.type === 'robot4') ? 0.09 : (playerBot.type === 'robot6' ? 0.03 : 0.06);
+                const eBeltProtection = (enemyBot.type === 'robot2' || enemyBot.type === 'robot5') ? 0.80 : 1.0;
+                if (Math.random() < baseBeltRipFromP * pSpinRatio * eBeltProtection) {
+                  ripWeaponBelt(enemyBot, nx, nz);
+                }
+              }
             }
           } else {
             playerBot.weaponSpinSpeed = pSpecs.maxWeaponRpm;
             enemyBot.weaponSpinSpeed = eSpecs.maxWeaponRpm;
           }
 
-          // Exact original 87c3892 clash knockback impulse:
-          const clashImpulse = Math.min(8.0, 3.2 + impactSpeed * 0.45);
-          playerBot.vx -= nx * clashImpulse;
-          playerBot.vz -= nz * clashImpulse;
-          enemyBot.vx += nx * clashImpulse;
-          enemyBot.vz += nz * clashImpulse;
+          // Knockback matches the crisp, solid side-hit feel (pFling on Enemy, eFling on Player):
+          // Controlled solid hit: heavy pushback on wheels, no floaty air flinging!
+          playerBot.vy = 0;
+          playerBot.airY = 0;
+          enemyBot.vy = 0;
+          enemyBot.airY = 0;
 
-          if (canClashFlip) {
-            playerBot.vy = 2.0 + Math.random() * 0.3;
-            enemyBot.vy = 2.0 + Math.random() * 0.3;
-            playerBot.airY = 0.15;
-            enemyBot.airY = 0.15;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -8.2 : 8.2);
-            playerBot.flipped = true;
-            enemyBot.flipped = true;
-          } else {
-            // Keep both robots firmly planted on the floor during non-flip head-on clash (no jumpy hop!)
-            playerBot.vy = 0;
-            enemyBot.vy = 0;
-            playerBot.airY = 0;
-            enemyBot.airY = 0;
-            playerBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
-            enemyBot.pitchVel = (Math.random() < 0.5 ? -1.1 : 1.1);
+          const pFlingOnEnemy = (pSpecs.flingBase || 4.0) + impactSpeed * (pSpecs.flingSpeedMult || 0.45);
+          const eFlingOnPlayer = (eSpecs.flingBase || 4.0) + impactSpeed * (eSpecs.flingSpeedMult || 0.45);
+
+          playerBot.vx -= nx * eFlingOnPlayer;
+          playerBot.vz -= nz * eFlingOnPlayer;
+          enemyBot.vx += nx * pFlingOnEnemy;
+          enemyBot.vz += nz * pFlingOnEnemy;
+
+          // Horizontal Bar Spinner (Robot 3) sideways kick if involved
+          if (playerBot.type === 'robot3') {
+            const tangKick = 2.4;
+            enemyBot.vx += (-nz) * tangKick;
+            enemyBot.vz += nx * tangKick;
+            enemyBot.yaw -= 0.20;
           }
+          if (enemyBot.type === 'robot3') {
+            const tangKick = 2.4;
+            playerBot.vx -= (-nz) * tangKick;
+            playerBot.vz += nx * tangKick;
+            playerBot.yaw += 0.20;
+          }
+
+          playerBot.pitchVel = (pHitForward > 0 ? -1.2 : 1.2);
+          enemyBot.pitchVel = (eHitForward > 0 ? -1.2 : 1.2);
+          playerBot.rollVel = 0;
+          enemyBot.rollVel = 0;
 
           spawnCollisionSparks(midPos, 65);
           if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
