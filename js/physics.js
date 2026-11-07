@@ -304,11 +304,12 @@
           triggerGamepadRumble(Math.min(0.55, 0.2 + Math.abs(velDot) * 0.08), 120, bot);
         }
 
-        // Wall weapon collision: ONLY stall weapon if front crashes into arena wall at high speed (velDot > 5.2)
-        // Pressing/sliding along the wall or pinning an opponent against the wall will NOT stall the weapon!
+        // Wall weapon collision: ONLY stall weapon if front crashes into arena wall at high speed in open arena.
+        // Pinning an opponent against the wall or grinding from the side/back will NEVER stall the weapon!
+        const isPinningOrInRobotContact = !!(window._lastBotContactPerf && (performance.now() - window._lastBotContactPerf < 450));
         const wallFrontDot = Math.sin(bot.yaw) * outNx + Math.cos(bot.yaw) * outNz;
         const minWallStallSpin = 55.0; // Equal threshold for both robots
-        if (velDot > 5.2 && wallFrontDot > 0.45 && bot.weaponSpinSpeed >= minWallStallSpin) {
+        if (!isPinningOrInRobotContact && velDot > 6.2 && wallFrontDot > 0.50 && bot.weaponSpinSpeed >= minWallStallSpin) {
           spawnCollisionSparks(bot.root.position.clone().add(new THREE.Vector3(outNx * 0.8, 0.3, outNz * 0.8)), 25);
           AudioSys.metalClashSound(1.6, true);
           bot.weaponSpinSpeed = 0; // Stalls weapon briefly on hard wall crash, then automatically spins back up!
@@ -797,12 +798,33 @@
       const pWeaponCanStrike = (pWeaponAligned && playerBot.weaponActive !== false && !playerBot.weaponDestroyed && (playerBot.weaponStallTimer || 0) <= 0 && playerBot.weaponSpinSpeed >= pHighSpinThreshold);
       const eWeaponCanStrike = (!isPractice && eWeaponAligned && enemyBot.weaponActive !== false && !enemyBot.weaponDestroyed && (enemyBot.weaponStallTimer || 0) <= 0 && enemyBot.weaponSpinSpeed >= eHighSpinThreshold);
 
+      // Precise Hit Location Relative to Opponent Heading:
+      // eHitForward <= 0.35 means Player's weapon is contacting Enemy's SIDE FLANKS or REAR BACK (not front weapon!)
+      // pHitForward <= 0.35 means Enemy's weapon is contacting Player's SIDE FLANKS or REAR BACK
+      const isHitOnEnemySideOrBack = (eHitForward <= 0.35 || !eWeaponAligned);
+      const isHitOnPlayerSideOrBack = (pHitForward <= 0.35 || !pWeaponAligned);
+
+      // Check if closing contact is a high-speed initial slam from a distance (kinetic fling)
+      // vs pressing/pushing/pinning at the wall (continuous grinding)
+      const isHardPCharge = (!wasInContactRecently && (relNormalVel > 2.6 || impactSpeed > 4.6));
+      const isHardECharge = (!wasInContactRecently && (relNormalVel > 2.6 || impactSpeed > 4.6));
+
       // WEAPON-TO-WEAPON CLASH: Both weapons must physically align and strike each other!
       const isBothWeaponClash = pWeaponCanStrike && eWeaponCanStrike;
 
-      // SINGLE WEAPON IMPACT: One weapon physically connects with the other robot's body/corner
-      const isPWeaponImpact = isBothWeaponClash || (pWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || playerBot.weaponSpinSpeed >= (pSpecs.maxWeaponRpm || 95) * 0.80));
-      const isEWeaponImpact = isBothWeaponClash || (eWeaponCanStrike && (!wasInContactRecently || relNormalVel > 1.2 || impactSpeed > 2.0 || enemyBot.weaponSpinSpeed >= (eSpecs.maxWeaponRpm || 95) * 0.80));
+      // SINGLE WEAPON IMPACT (Kinetic Strike):
+      // - Direct head-to-head weapon clashes always trigger full kinetic recoil.
+      // - Frontal hits into the opponent with closing speed trigger a kinetic strike.
+      // - Grinding at the SIDE or BACK (or pinning at the wall) is CONTINUOUS GRINDING, NOT a kinetic strike!
+      // - Side/rear hits ONLY trigger an initial kinetic strike on a high-speed hard charge from afar!
+      const isPWeaponImpact = isBothWeaponClash || (pWeaponCanStrike && (
+        (!isHitOnEnemySideOrBack && (!wasInContactRecently || relNormalVel > 1.6 || impactSpeed > 2.8)) ||
+        (isHitOnEnemySideOrBack && isHardPCharge)
+      ));
+      const isEWeaponImpact = isBothWeaponClash || (eWeaponCanStrike && (
+        (!isHitOnPlayerSideOrBack && (!wasInContactRecently || relNormalVel > 1.6 || impactSpeed > 2.8)) ||
+        (isHitOnPlayerSideOrBack && isHardECharge)
+      ));
       const isKineticStrike = isBothWeaponClash || isPWeaponImpact || isEWeaponImpact;
 
       if (isKineticStrike) {
@@ -931,40 +953,51 @@
         }
 
         // Continuous gradual health wear & part-shearing progress (weapon keeps spinning without stalling!)
-        // Tuned for 3x longer battles: ~3.30s of continuous grinding per part detached (~4.65s for Robot 6)
+        // Grinding at the side or rear tears off armor panels every ~1.75s (~2.4s for Robot 6)
         if (pSpinningContact) {
+          playerBot.weaponStallTimer = 0; // Weapon NEVER stalls while grinding into the opponent!
           const pGrindRate = 0.40 + 0.60 * pRpmRatio;
           playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
-          const pContinuousDps = (playerBot.type === 'robot6') ? 3.0 : 5.5;
+          const pBaseDps = (playerBot.type === 'robot6') ? 5.5 : 9.5;
+          const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.4) : pBaseDps;
           enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - pContinuousDps * pGrindRate * 0.016);
 
-          const pGrindInterval = (playerBot.type === 'robot6') ? 4.65 : 3.30;
+          const pGrindInterval = isHitOnEnemySideOrBack
+            ? ((playerBot.type === 'robot6') ? 2.4 : 1.75)
+            : ((playerBot.type === 'robot6') ? 4.2 : 3.0);
+
           if (playerBot._grindContactTimer >= pGrindInterval) {
             playerBot._grindContactTimer -= pGrindInterval;
             AudioSys.weaponSliceSound();
-            const burstSparksP = (playerBot.type === 'robot6') ? 10 : 16;
+            const burstSparksP = (playerBot.type === 'robot6') ? 12 : 20;
             spawnCollisionSparks(midPos, burstSparksP);
+            triggerGamepadRumble(0.35, 120, 0);
             // Subtle grinding vibration jolt (does NOT fling opponent away or stall weapon!)
-            enemyBot.vx += nx * 0.35;
-            enemyBot.vz += nz * 0.35;
+            enemyBot.vx += nx * 0.28;
+            enemyBot.vz += nz * 0.28;
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
           }
         }
 
         if (eSpinningContact) {
+          enemyBot.weaponStallTimer = 0; // Opponent weapon NEVER stalls while grinding!
           const eGrindRate = 0.40 + 0.60 * eRpmRatio;
           enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
-          const eContinuousDps = (enemyBot.type === 'robot6') ? 3.0 : 5.5;
+          const eBaseDps = (enemyBot.type === 'robot6') ? 5.5 : 9.5;
+          const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.4) : eBaseDps;
           playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - eContinuousDps * eGrindRate * 0.016);
 
-          const eGrindInterval = (enemyBot.type === 'robot6') ? 4.65 : 3.30;
+          const eGrindInterval = isHitOnPlayerSideOrBack
+            ? ((enemyBot.type === 'robot6') ? 2.4 : 1.75)
+            : ((enemyBot.type === 'robot6') ? 4.2 : 3.0);
+
           if (enemyBot._grindContactTimer >= eGrindInterval) {
             enemyBot._grindContactTimer -= eGrindInterval;
             AudioSys.weaponSliceSound();
-            const burstSparksE = (enemyBot.type === 'robot6') ? 10 : 16;
+            const burstSparksE = (enemyBot.type === 'robot6') ? 12 : 20;
             spawnCollisionSparks(midPos, burstSparksE);
-            playerBot.vx -= nx * 0.35;
-            playerBot.vz -= nz * 0.35;
+            playerBot.vx -= nx * 0.28;
+            playerBot.vz -= nz * 0.28;
             triggerDamageVignette();
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
           }
@@ -1259,13 +1292,32 @@
             }
           }
 
-          playerBot.weaponSpinSpeed = 0;
-          enemyBot.weaponSpinSpeed = 0;
-          playerBot.weaponStallTimer = pSpecs.attackStall;
-          enemyBot.weaponStallTimer = eSpecs.defendStall;
-          AudioSys.weaponStallSound();
-          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'stall' });
+          if (!isHitOnEnemySideOrBack) {
+            // Frontal impact into opponent wedge/plow: stalls weapon on hard frontal hit
+            playerBot.weaponSpinSpeed = 0;
+            playerBot.weaponStallTimer = pSpecs.attackStall;
+            AudioSys.weaponStallSound();
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'stall' });
+            }
+          } else {
+            // SIDE OR REAR IMPACT: Weapon slices cleanly through side armor / wheels!
+            // Attacker's weapon NEVER stalls to 0, NEVER sets stall timer, NEVER plays stall buzzer!
+            playerBot.weaponSpinSpeed = Math.max(pHighSpinThreshold, playerBot.weaponSpinSpeed * 0.90);
+            playerBot.weaponStallTimer = 0;
+            AudioSys.weaponSliceSound();
+          }
+
+          // Enemy weapon reaction when hit by player:
+          if (canFlipEnemy) {
+            enemyBot.weaponSpinSpeed = 0;
+            enemyBot.weaponStallTimer = eSpecs.defendStall;
+          } else if (!isHitOnEnemySideOrBack) {
+            enemyBot.weaponSpinSpeed = 0;
+            enemyBot.weaponStallTimer = eSpecs.defendStall;
+          } else {
+            enemyBot.weaponSpinSpeed = Math.max(0, (enemyBot.weaponSpinSpeed || 0) * 0.75);
+            enemyBot.weaponStallTimer = 0.20;
           }
 
           // Multi-hit wear & health damage tuned for 3x longer battles (~3 hits per detached part, ~4-5 for Robot 6):
@@ -1394,13 +1446,32 @@
             }
           }
 
-          enemyBot.weaponSpinSpeed = 0;
-          playerBot.weaponSpinSpeed = 0;
-          enemyBot.weaponStallTimer = eSpecs.attackStall;
-          playerBot.weaponStallTimer = pSpecs.defendStall;
-          AudioSys.weaponStallSound();
-          if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
-            NetworkSys.queueEvent({ t: 'stall' });
+          if (!isHitOnPlayerSideOrBack) {
+            // Frontal impact into opponent wedge/plow: stalls weapon on hard frontal hit
+            enemyBot.weaponSpinSpeed = 0;
+            enemyBot.weaponStallTimer = eSpecs.attackStall;
+            AudioSys.weaponStallSound();
+            if (typeof NetworkSys !== 'undefined' && NetworkSys.isOnline && NetworkSys.isHost) {
+              NetworkSys.queueEvent({ t: 'stall' });
+            }
+          } else {
+            // SIDE OR REAR IMPACT: Weapon slices cleanly through side armor / wheels!
+            // Attacker's weapon NEVER stalls to 0, NEVER sets stall timer, NEVER plays stall buzzer!
+            enemyBot.weaponSpinSpeed = Math.max(eHighSpinThreshold, enemyBot.weaponSpinSpeed * 0.90);
+            enemyBot.weaponStallTimer = 0;
+            AudioSys.weaponSliceSound();
+          }
+
+          // Player weapon reaction when hit by enemy:
+          if (canFlipPlayer) {
+            playerBot.weaponSpinSpeed = 0;
+            playerBot.weaponStallTimer = pSpecs.defendStall;
+          } else if (!isHitOnPlayerSideOrBack) {
+            playerBot.weaponSpinSpeed = 0;
+            playerBot.weaponStallTimer = pSpecs.defendStall;
+          } else {
+            playerBot.weaponSpinSpeed = Math.max(0, (playerBot.weaponSpinSpeed || 0) * 0.75);
+            playerBot.weaponStallTimer = 0.20;
           }
 
           triggerDamageVignette();
