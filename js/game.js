@@ -16,7 +16,7 @@
       name: 'Razor',
       role: 'Fast Spin · Wedge Lifter',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 900,
+      maxHealth: 600,        // Calibrated ~2-minute match duration (2x baseline HP)
       maxSpeed: 15.8,
       turnRate: 3.65,
       accel: 50.0,
@@ -34,7 +34,7 @@
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.35,
       partDamageHigh: 1,
-      partDivisor: 28,
+      partDivisor: 20,
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 0.95,
@@ -44,7 +44,7 @@
       name: 'IronClad',
       role: 'Heavy Armor · Juggernaut Tank',
       mass: 250,             // Standard 250 lb combat heavyweight (equal physical weight to Robots 1, 3, 4, 5)
-      maxHealth: 1080,       // +20% reinforced tank hull durability (3x baseline HP)
+      maxHealth: 720,        // +20% reinforced tank hull durability (~2-minute pacing)
       maxSpeed: 13.8,        // Heavier armored chassis
       turnRate: 3.15,
       accel: 42.0,
@@ -62,7 +62,7 @@
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots (no longer bulldozes)
       partDamageChance: 0.32,
       partDamageHigh: 1,
-      partDivisor: 34,       // Reinforced armor plates absorb more hits before depleting HP
+      partDivisor: 24,       // Reinforced armor plates absorb more hits before depleting HP
       collisionRadius: 1.14,
       wallRadius: 1.35,
       gyroFactor: 0.75,
@@ -72,7 +72,7 @@
       name: 'KineticBar',
       role: 'Wide Reach · Multi-Part Shredder',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 870,
+      maxHealth: 580,        // Calibrated ~2-minute match duration
       maxSpeed: 15.0,
       turnRate: 3.75,
       accel: 48.0,
@@ -90,7 +90,7 @@
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.65,// Shreds armor pieces on contact (was 0.45)
       partDamageHigh: 1,
-      partDivisor: 28,
+      partDivisor: 19,
       collisionRadius: 1.15,
       wallRadius: 1.35,
       gyroFactor: 1.20,      // High horizontal rotational inertia
@@ -100,7 +100,7 @@
       name: 'VertForce',
       role: 'Heavy Disc · Uppercut Launcher',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 930,
+      maxHealth: 620,        // Calibrated ~2-minute match duration
       maxSpeed: 14.8,
       turnRate: 3.40,
       accel: 46.0,
@@ -117,7 +117,7 @@
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.42,
       partDamageHigh: 1,
-      partDivisor: 30,
+      partDivisor: 21,
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 1.35,      // Strongest vertical gyroscopic precession ("gyro dance") on sharp turns
@@ -127,7 +127,7 @@
       name: 'BlueThunder',
       role: 'Rapid Drum · Non-Stop Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 945,
+      maxHealth: 630,        // Calibrated ~2-minute match duration
       maxSpeed: 15.6,
       turnRate: 3.85,        // Snappy 2WD pivot turning
       accel: 52.0,
@@ -145,7 +145,7 @@
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.38,// Consistent relentless part grinding
       partDamageHigh: 1,
-      partDivisor: 30,
+      partDivisor: 21,
       collisionRadius: 1.10,
       wallRadius: 1.30,
       gyroFactor: 1.05,
@@ -155,7 +155,7 @@
       name: 'Vortex',
       role: 'Mini Speedster · Light Damage',
       mass: 160,             // Compact lightweight frame (only lightweight bot at 160 lb)
-      maxHealth: 795,        // Compact lightweight frame (3x baseline HP)
+      maxHealth: 530,        // Compact lightweight frame (calibrated ~2-minute pacing)
       maxSpeed: 19.5,        // Fastest robot in the arena
       turnRate: 4.60,        // Ultra-nimble cornering
       accel: 68.0,           // Instantaneous acceleration
@@ -173,7 +173,7 @@
       pushTractionMult: 0.72,// Light weight means less shoving force in slow pushing contests
       partDamageChance: 0.22,// Deals the least damage per hit
       partDamageHigh: 1,
-      partDivisor: 28,
+      partDivisor: 18,
       collisionRadius: 0.78, // Compact footprint matches Robot 6's smaller CAD chassis & weapon
       wallRadius: 0.95,
       gyroFactor: 0.45,      // Small blade has minimal gyro lift, keeping cornering flat and agile

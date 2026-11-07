@@ -422,7 +422,7 @@
       // 2. >70% DAMAGE WEAPON MOTOR & BELT BREAKDOWN + TOTAL DEMOLITION SHUTDOWN:
       // Once a robot suffers over 70% damage (<= 30% HP or <= 30% parts remaining), its weapon belt and motor break
       // permanently so the weapon can no longer spin!
-      const maxHpWeaponCheck = bot.maxDriveHealth || 900;
+      const maxHpWeaponCheck = bot.maxDriveHealth || 600;
       const threshold30Parts = (bot.totalInitialParts && bot.totalInitialParts > 0)
         ? Math.max(1, Math.floor(bot.totalInitialParts * 0.30))
         : 2;
@@ -960,7 +960,7 @@
           playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
           const pBaseDps = (playerBot.type === 'robot6') ? 2.5 : 4.0;
           const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.35) : pBaseDps;
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - pContinuousDps * pGrindRate * 0.016);
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 600) - pContinuousDps * pGrindRate * 0.016);
 
           const pGrindInterval = isHitOnEnemySideOrBack
             ? ((playerBot.type === 'robot6') ? 4.20 : 3.20)
@@ -985,7 +985,7 @@
           enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
           const eBaseDps = (enemyBot.type === 'robot6') ? 2.5 : 4.0;
           const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.35) : eBaseDps;
-          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - eContinuousDps * eGrindRate * 0.016);
+          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 600) - eContinuousDps * eGrindRate * 0.016);
 
           const eGrindInterval = isHitOnPlayerSideOrBack
             ? ((enemyBot.type === 'robot6') ? 4.20 : 3.20)
@@ -1084,8 +1084,8 @@
             AudioSys.weaponStallSound();
 
             // Drive Belt Rip Check: ONLY has a chance of happening when robot is less than 50% HP!
-            const maxHpP = playerBot.maxDriveHealth || 900;
-            const maxHpE = enemyBot.maxDriveHealth || 900;
+            const maxHpP = playerBot.maxDriveHealth || 600;
+            const maxHpE = enemyBot.maxDriveHealth || 600;
             const isPLessThan50 = (playerBot.driveHealth < maxHpP * 0.50) || (playerBot.totalInitialParts && (playerBot.detachableParts ? playerBot.detachableParts.filter(p => p.attached).length : 0) <= playerBot.totalInitialParts * 0.50);
             const isELessThan50 = (enemyBot.driveHealth < maxHpE * 0.50) || (enemyBot.totalInitialParts && (enemyBot.detachableParts ? enemyBot.detachableParts.filter(p => p.attached).length : 0) <= enemyBot.totalInitialParts * 0.50);
 
@@ -1171,7 +1171,7 @@
           if (enemyBot.type === 'robot2') wearOnEnemy *= 0.85;
           if (playerBot.type === 'robot2') wearOnPlayer *= 0.85;
 
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - Math.round(22 * wearOnEnemy));
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 600) - Math.round(22 * wearOnEnemy));
           enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + wearOnEnemy;
           if (enemyBot._weaponPartWear >= 1.0) {
             enemyBot._weaponPartWear -= 1.0;
@@ -1179,7 +1179,7 @@
           }
 
           if (!isPractice) {
-            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - Math.round(22 * wearOnPlayer));
+            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 600) - Math.round(22 * wearOnPlayer));
             playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + wearOnPlayer;
             if (playerBot._weaponPartWear >= 1.0) {
               playerBot._weaponPartWear -= 1.0;
@@ -1335,7 +1335,7 @@
           }
           if (enemyBot.type === 'robot2') pStrikeWear *= 0.85;
 
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - Math.round(28 * pStrikeWear));
+          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 600) - Math.round(28 * pStrikeWear));
           enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + pStrikeWear;
           if (enemyBot._weaponPartWear >= 1.0) {
             enemyBot._weaponPartWear -= 1.0;
@@ -1492,7 +1492,7 @@
           if (playerBot.type === 'robot2') eStrikeWear *= 0.85;
 
           if (!isPractice) {
-            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - Math.round(28 * eStrikeWear));
+            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 600) - Math.round(28 * eStrikeWear));
           }
           playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + eStrikeWear;
           if (playerBot._weaponPartWear >= 1.0) {

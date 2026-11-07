@@ -95,7 +95,17 @@
         name.includes('Wedge') || name.includes('Shield') ||
         name.includes('Bumper') || name.includes('Skirt')
       );
-      const isCore = (name === 'Chassis_Mesh' || name === 'Chassis_Mesh_1' || name === 'Chassis_Core');
+      const isCore = (
+        name === 'Chassis' ||
+        name === 'Chassis_Mesh' ||
+        name === 'Chassis_Mesh_1' ||
+        name === 'Chassis_Core' ||
+        name === 'Chassis_Frame' ||
+        name === 'Frame' ||
+        name === 'Main_Chassis' ||
+        name.startsWith('Chassis_Core') ||
+        (bot.type === 'robot5' && (name === 'Chassis' || name === 'Chassis_Mesh'))
+      );
 
       // Realistic outside-to-inside progression:
       // Priority 1: Outermost boundary elements — Wheels, exterior armor panels, wedges, shields, bumpers
@@ -147,10 +157,10 @@
     });
 
     bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
-    // Standardized 3x base HP across all robots for longer battles
+    // Calibrated ~2-minute match duration (2x baseline HP across all robots)
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
-      : 900;
+      : 600;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
@@ -656,6 +666,21 @@
       const pool = remaining.filter(p => p.priority === minPriority);
       pool.sort((a, b) => (b.radialDist || 0) - (a.radialDist || 0));
       chosen = pool[0];
+    }
+
+    // Core Chassis Spine Protection:
+    // The central robot chassis frame NEVER detaches on its own while mobile!
+    // (Prevents ghost floating weapon/motor moving without a robot body)
+    if (chosen && (chosen.category === 'chassis_core' || chosen.name === 'Chassis' || chosen.name.startsWith('Chassis_Core'))) {
+      const nonCorePool = remaining.filter(p => p.category !== 'chassis_core' && p.name !== 'Chassis' && !p.name.startsWith('Chassis_Core'));
+      if (nonCorePool.length > 0) {
+        nonCorePool.sort((a, b) => a.priority - b.priority);
+        chosen = nonCorePool[0];
+      } else {
+        // If literally only the bare chassis frame remains, explode cleanly:
+        explodeRobot(bot, impactDir, hitPoint);
+        return null;
+      }
     }
 
     // Weapon Retention Protection for all combat robots:
