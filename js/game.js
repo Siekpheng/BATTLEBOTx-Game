@@ -38,7 +38,7 @@
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 0.95,
-      wedgeRating: 1.25      // Angled front wedge forks excel at getting underneath opponents
+      wedgeRating: 1.10      // Angled front wedge forks (normalized from 1.25)
     },
     robot2: {
       name: 'IronClad',
@@ -77,18 +77,18 @@
       turnRate: 3.75,
       accel: 48.0,
       maxWeaponRpm: 102.0,
-      windUpRate: 25.5,      // Massive 450mm bar takes 4.0s to wind up
-      attackStall: 0.95,
-      defendStall: 1.25,
+      windUpRate: 41.0,      // Faster wind-up (~2.5s) to stay competitive against rushers
+      attackStall: 0.70,     // Reduced stall on attack (was 0.95)
+      defendStall: 0.75,     // Faster recovery from defense impacts (was 1.25)
       weaponReach: 0.15,     // Wide 150-degree horizontal bar arc
       weaponWidth: 1.35,     // Wide 1.35m horizontal spinning bar
       weaponHalfWidth: 0.675,
-      flingBase: 6.2,
+      flingBase: 7.4,        // Devastating horizontal slap knockback (was 6.2)
       flingSpeedMult: 0.55,
       flipChance: 0.18,
       flipResistance: 1.0,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
-      partDamageChance: 0.45,
+      partDamageChance: 0.65,// Shreds armor pieces on contact (was 0.45)
       partDamageHigh: 1,
       partDivisor: 28,
       collisionRadius: 1.15,
@@ -105,13 +105,13 @@
       turnRate: 3.40,
       accel: 46.0,
       maxWeaponRpm: 105.0,   // Heavy high-inertia vertical disc
-      windUpRate: 31.0,      // ~3.4s wind-up for massive kinetic punch
-      attackStall: 0.85,
-      defendStall: 1.15,
+      windUpRate: 44.0,      // ~2.4s wind-up (was 31.0 / 3.4s) to hit full lethal punch quicker
+      attackStall: 0.55,     // Quick disc recovery after landing hits (was 0.85)
+      defendStall: 0.80,     // Better resistance against defense stalling (was 1.15)
       weaponReach: 0.34,
       weaponWidth: 0.38,     // Central vertical flywheel disc
       weaponHalfWidth: 0.190,
-      flingBase: 6.4,        // Highest knockback fling & vertical launch force
+      flingBase: 7.2,        // Terrifying uppercut launcher knockback (was 6.4)
       flipChance: 0.38,      // Highest uppercut flip probability on solid vertical hits
       flipResistance: 0.85,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots

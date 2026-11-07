@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-06T23:59:31.827Z",
+  "timestamp": "2026-11-07T00:07:42.140Z",
   "champion": "Razor",
   "championId": "robot1",
   "sortedStandings": [
@@ -8,102 +8,102 @@
       "name": "Razor",
       "role": "Fast Spin \u00b7 Wedge Lifter",
       "matches": 25,
-      "wins": 21,
-      "losses": 4,
+      "wins": 17,
+      "losses": 8,
       "draws": 0,
-      "points": 63,
-      "kosFor": 20,
-      "kosAgainst": 4,
-      "totalDamageDealt": 19263.457866971432,
-      "totalDamageTaken": 5990.343128041731,
+      "points": 51,
+      "kosFor": 17,
+      "kosAgainst": 8,
+      "totalDamageDealt": 16298.656073142856,
+      "totalDamageTaken": 8528.420882502713,
       "totalPartsDetachedFor": 0,
       "totalPartsLost": 0,
-      "totalDuration": 2255.2000000000003
+      "totalDuration": 2142.1000000000004
     },
     {
       "id": "robot5",
       "name": "BlueThunder",
       "role": "Rapid Drum \u00b7 Non-Stop Brawler",
       "matches": 25,
-      "wins": 20,
-      "losses": 5,
+      "wins": 15,
+      "losses": 10,
       "draws": 0,
-      "points": 60,
-      "kosFor": 17,
-      "kosAgainst": 5,
-      "totalDamageDealt": 17454.818431999993,
-      "totalDamageTaken": 8512.542691219875,
+      "points": 45,
+      "kosFor": 15,
+      "kosAgainst": 10,
+      "totalDamageDealt": 16729.043914239996,
+      "totalDamageTaken": 10892.02389954081,
       "totalPartsDetachedFor": 0,
       "totalPartsLost": 0,
-      "totalDuration": 2402.1000000000004
-    },
-    {
-      "id": "robot6",
-      "name": "Vortex",
-      "role": "Mini Speedster \u00b7 Light Damage",
-      "matches": 25,
-      "wins": 16,
-      "losses": 9,
-      "draws": 0,
-      "points": 48,
-      "kosFor": 11,
-      "kosAgainst": 9,
-      "totalDamageDealt": 13661.2189952,
-      "totalDamageTaken": 8241.852709708324,
-      "totalPartsDetachedFor": 0,
-      "totalPartsLost": 0,
-      "totalDuration": 2923.2
-    },
-    {
-      "id": "robot2",
-      "name": "IronClad",
-      "role": "Heavy Armor \u00b7 Juggernaut Tank",
-      "matches": 25,
-      "wins": 13,
-      "losses": 12,
-      "draws": 0,
-      "points": 39,
-      "kosFor": 13,
-      "kosAgainst": 12,
-      "totalDamageDealt": 12975.165840695654,
-      "totalDamageTaken": 16258.035760274282,
-      "totalPartsDetachedFor": 0,
-      "totalPartsLost": 0,
-      "totalDuration": 2932.2999999999993
+      "totalDuration": 1994.5999999999997
     },
     {
       "id": "robot3",
       "name": "KineticBar",
       "role": "Wide Reach \u00b7 Multi-Part Shredder",
       "matches": 25,
-      "wins": 3,
-      "losses": 22,
+      "wins": 12,
+      "losses": 13,
       "draws": 0,
-      "points": 9,
-      "kosFor": 3,
-      "kosAgainst": 19,
-      "totalDamageDealt": 7089.964998399997,
-      "totalDamageTaken": 19564.782868480004,
+      "points": 36,
+      "kosFor": 12,
+      "kosAgainst": 13,
+      "totalDamageDealt": 13254.093201317655,
+      "totalDamageTaken": 12553.819013819622,
       "totalPartsDetachedFor": 0,
       "totalPartsLost": 0,
-      "totalDuration": 2889.8000000000006
+      "totalDuration": 2164.9999999999995
     },
     {
       "id": "robot4",
       "name": "VertForce",
       "role": "Heavy Disc \u00b7 Uppercut Launcher",
       "matches": 25,
-      "wins": 2,
-      "losses": 23,
+      "wins": 12,
+      "losses": 13,
       "draws": 0,
-      "points": 6,
-      "kosFor": 2,
-      "kosAgainst": 17,
-      "totalDamageDealt": 6971.640220891425,
-      "totalDamageTaken": 18848.70919643429,
+      "points": 36,
+      "kosFor": 12,
+      "kosAgainst": 13,
+      "totalDamageDealt": 11990.527902354286,
+      "totalDamageTaken": 13885.05152214939,
       "totalPartsDetachedFor": 0,
       "totalPartsLost": 0,
-      "totalDuration": 3172.5999999999995
+      "totalDuration": 2181.7
+    },
+    {
+      "id": "robot6",
+      "name": "Vortex",
+      "role": "Mini Speedster \u00b7 Light Damage",
+      "matches": 25,
+      "wins": 11,
+      "losses": 14,
+      "draws": 0,
+      "points": 33,
+      "kosFor": 10,
+      "kosAgainst": 14,
+      "totalDamageDealt": 10558.392230399999,
+      "totalDamageTaken": 10933.038730547723,
+      "totalPartsDetachedFor": 0,
+      "totalPartsLost": 0,
+      "totalDuration": 2246.4
+    },
+    {
+      "id": "robot2",
+      "name": "IronClad",
+      "role": "Heavy Armor \u00b7 Juggernaut Tank",
+      "matches": 25,
+      "wins": 8,
+      "losses": 17,
+      "draws": 0,
+      "points": 24,
+      "kosFor": 8,
+      "kosAgainst": 16,
+      "totalDamageDealt": 9237.550408347819,
+      "totalDamageTaken": 21275.909681242356,
+      "totalPartsDetachedFor": 0,
+      "totalPartsLost": 0,
+      "totalDuration": 2971.799999999999
     }
   ],
   "headToHead": {
@@ -119,13 +119,13 @@
         "draws": 0
       },
       "robot3": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot4": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot5": {
@@ -151,13 +151,13 @@
         "draws": 0
       },
       "robot3": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot4": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot5": {
@@ -166,20 +166,20 @@
         "draws": 0
       },
       "robot6": {
-        "wins": 3,
-        "losses": 2,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       }
     },
     "robot3": {
       "robot1": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot2": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot3": {
@@ -193,25 +193,25 @@
         "draws": 0
       },
       "robot5": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot6": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       }
     },
     "robot4": {
       "robot1": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot2": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot3": {
@@ -225,13 +225,13 @@
         "draws": 0
       },
       "robot5": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot6": {
-        "wins": 0,
-        "losses": 5,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       }
     },
@@ -247,13 +247,13 @@
         "draws": 0
       },
       "robot3": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 3,
+        "losses": 2,
         "draws": 0
       },
       "robot4": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot5": {
@@ -274,18 +274,18 @@
         "draws": 0
       },
       "robot2": {
+        "wins": 3,
+        "losses": 2,
+        "draws": 0
+      },
+      "robot3": {
         "wins": 2,
         "losses": 3,
         "draws": 0
       },
-      "robot3": {
-        "wins": 5,
-        "losses": 0,
-        "draws": 0
-      },
       "robot4": {
-        "wins": 5,
-        "losses": 0,
+        "wins": 2,
+        "losses": 3,
         "draws": 0
       },
       "robot5": {
@@ -323,10 +323,10 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 119.5,
+      "duration": 166,
       "pRemainingHp": 0,
-      "eRemainingHp": 406.3232417391305,
-      "pDamageDealt": 493.6767582608695,
+      "eRemainingHp": 370.424260452174,
+      "pDamageDealt": 529.5757395478261,
       "eDamageDealt": 1080
     },
     {
@@ -351,10 +351,10 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 119.5,
+      "duration": 166,
       "pRemainingHp": 0,
-      "eRemainingHp": 406.3232417391305,
-      "pDamageDealt": 493.6767582608695,
+      "eRemainingHp": 370.424260452174,
+      "pDamageDealt": 529.5757395478261,
       "eDamageDealt": 1080
     },
     {
@@ -379,25 +379,25 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 65.4,
-      "pRemainingHp": 888.790208,
+      "duration": 69,
+      "pRemainingHp": 829.0783533176447,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11.209791999999993
+      "eDamageDealt": 70.92164668235534
     },
     {
       "matchId": 7,
       "pBotType": "robot3",
       "eBotType": "robot1",
-      "winner": "enemy",
-      "winningType": "robot1",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 143.2,
-      "pRemainingHp": 0,
-      "eRemainingHp": 559.1336384000002,
-      "pDamageDealt": 340.8663615999998,
-      "eDamageDealt": 870
+      "duration": 101.2,
+      "pRemainingHp": 807.0381714285719,
+      "eRemainingHp": 0,
+      "pDamageDealt": 900,
+      "eDamageDealt": 62.9618285714281
     },
     {
       "matchId": 8,
@@ -407,25 +407,25 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 65.4,
-      "pRemainingHp": 888.790208,
+      "duration": 69,
+      "pRemainingHp": 829.0783533176447,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11.209791999999993
+      "eDamageDealt": 70.92164668235534
     },
     {
       "matchId": 9,
       "pBotType": "robot3",
       "eBotType": "robot1",
-      "winner": "enemy",
-      "winningType": "robot1",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 143.2,
-      "pRemainingHp": 0,
-      "eRemainingHp": 559.1336384000002,
-      "pDamageDealt": 340.8663615999998,
-      "eDamageDealt": 870
+      "duration": 101.4,
+      "pRemainingHp": 806.5968640000006,
+      "eRemainingHp": 0,
+      "pDamageDealt": 900,
+      "eDamageDealt": 63.40313599999945
     },
     {
       "matchId": 10,
@@ -435,11 +435,11 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 65.4,
-      "pRemainingHp": 888.790208,
+      "duration": 69,
+      "pRemainingHp": 829.0783533176447,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11.209791999999993
+      "eDamageDealt": 70.92164668235534
     },
     {
       "matchId": 11,
@@ -449,25 +449,25 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 74.9,
-      "pRemainingHp": 900,
+      "duration": 74.1,
+      "pRemainingHp": 898.2465331200002,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 0
+      "eDamageDealt": 1.7534668799997917
     },
     {
       "matchId": 12,
       "pBotType": "robot4",
       "eBotType": "robot1",
-      "winner": "enemy",
-      "winningType": "robot1",
+      "winner": "player",
+      "winningType": "robot4",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 155.3,
-      "pRemainingHp": 0,
-      "eRemainingHp": 570.122410057143,
-      "pDamageDealt": 329.87758994285696,
-      "eDamageDealt": 930
+      "duration": 100.4,
+      "pRemainingHp": 901.3417782857143,
+      "eRemainingHp": 0,
+      "pDamageDealt": 900,
+      "eDamageDealt": 28.658221714285673
     },
     {
       "matchId": 13,
@@ -477,25 +477,25 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 74.9,
-      "pRemainingHp": 900,
+      "duration": 74.1,
+      "pRemainingHp": 898.2465331200002,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 0
+      "eDamageDealt": 1.7534668799997917
     },
     {
       "matchId": 14,
       "pBotType": "robot4",
       "eBotType": "robot1",
-      "winner": "enemy",
-      "winningType": "robot1",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (66.2% HP vs 22.4% HP)",
-      "duration": 180,
-      "pRemainingHp": 208.6620342857142,
-      "eRemainingHp": 595.3648193828573,
-      "pDamageDealt": 304.63518061714274,
-      "eDamageDealt": 721.3379657142858
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 100.4,
+      "pRemainingHp": 901.3417782857143,
+      "eRemainingHp": 0,
+      "pDamageDealt": 900,
+      "eDamageDealt": 28.658221714285673
     },
     {
       "matchId": 15,
@@ -505,11 +505,11 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 74.9,
-      "pRemainingHp": 900,
+      "duration": 74.1,
+      "pRemainingHp": 898.2465331200002,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 0
+      "eDamageDealt": 1.7534668799997917
     },
     {
       "matchId": 16,
@@ -519,11 +519,11 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 52,
-      "pRemainingHp": 884.2950860800025,
+      "duration": 54.4,
+      "pRemainingHp": 884.6117427200024,
       "eRemainingHp": 0,
       "pDamageDealt": 945,
-      "eDamageDealt": 15.704913919997466
+      "eDamageDealt": 15.38825727999756
     },
     {
       "matchId": 17,
@@ -533,11 +533,11 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 71.9,
-      "pRemainingHp": 916.1710482285715,
+      "duration": 76.5,
+      "pRemainingHp": 906.5126674285715,
       "eRemainingHp": 0,
       "pDamageDealt": 900,
-      "eDamageDealt": 28.82895177142848
+      "eDamageDealt": 38.48733257142851
     },
     {
       "matchId": 18,
@@ -547,11 +547,11 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 52,
-      "pRemainingHp": 884.2950860800025,
+      "duration": 53.5,
+      "pRemainingHp": 885.5324518400023,
       "eRemainingHp": 0,
       "pDamageDealt": 945,
-      "eDamageDealt": 15.704913919997466
+      "eDamageDealt": 14.467548159997705
     },
     {
       "matchId": 19,
@@ -561,11 +561,11 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 71.9,
-      "pRemainingHp": 916.1710482285715,
+      "duration": 76.5,
+      "pRemainingHp": 906.5126674285715,
       "eRemainingHp": 0,
       "pDamageDealt": 900,
-      "eDamageDealt": 28.82895177142848
+      "eDamageDealt": 38.48733257142851
     },
     {
       "matchId": 20,
@@ -575,42 +575,14 @@
       "winningType": "robot1",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 52,
-      "pRemainingHp": 884.2950860800025,
+      "duration": 54.4,
+      "pRemainingHp": 884.6117427200024,
       "eRemainingHp": 0,
       "pDamageDealt": 945,
-      "eDamageDealt": 15.704913919997466
+      "eDamageDealt": 15.38825727999756
     },
     {
       "matchId": 21,
-      "pBotType": "robot1",
-      "eBotType": "robot6",
-      "winner": "player",
-      "winningType": "robot1",
-      "outcomeType": "KO",
-      "winReason": "Referee KO (All Wheels Ripped Off)",
-      "duration": 72.3,
-      "pRemainingHp": 894,
-      "eRemainingHp": 223.53800228571438,
-      "pDamageDealt": 571.4619977142856,
-      "eDamageDealt": 6
-    },
-    {
-      "matchId": 22,
-      "pBotType": "robot6",
-      "eBotType": "robot1",
-      "winner": "player",
-      "winningType": "robot6",
-      "outcomeType": "KO",
-      "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 125.5,
-      "pRemainingHp": 786,
-      "eRemainingHp": 0,
-      "pDamageDealt": 900,
-      "eDamageDealt": 9
-    },
-    {
-      "matchId": 23,
       "pBotType": "robot1",
       "eBotType": "robot6",
       "winner": "player",
@@ -624,6 +596,34 @@
       "eDamageDealt": 0
     },
     {
+      "matchId": 22,
+      "pBotType": "robot6",
+      "eBotType": "robot1",
+      "winner": "player",
+      "winningType": "robot6",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 127.1,
+      "pRemainingHp": 786,
+      "eRemainingHp": 0,
+      "pDamageDealt": 900,
+      "eDamageDealt": 9
+    },
+    {
+      "matchId": 23,
+      "pBotType": "robot1",
+      "eBotType": "robot6",
+      "winner": "player",
+      "winningType": "robot1",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 57.4,
+      "pRemainingHp": 894,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 6
+    },
+    {
       "matchId": 24,
       "pBotType": "robot6",
       "eBotType": "robot1",
@@ -631,7 +631,7 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 125.5,
+      "duration": 127.1,
       "pRemainingHp": 786,
       "eRemainingHp": 0,
       "pDamageDealt": 900,
@@ -659,25 +659,25 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 88,
-      "pRemainingHp": 1070.31008,
+      "duration": 126.3,
+      "pRemainingHp": 545.6578447058823,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 9.68992000000003
+      "eDamageDealt": 534.3421552941177
     },
     {
       "matchId": 27,
       "pBotType": "robot3",
       "eBotType": "robot2",
-      "winner": "enemy",
-      "winningType": "robot2",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 130.4,
-      "pRemainingHp": 0,
-      "eRemainingHp": 568.0046912,
-      "pDamageDealt": 511.9953088,
-      "eDamageDealt": 870
+      "duration": 87.3,
+      "pRemainingHp": 854.744013913047,
+      "eRemainingHp": 0,
+      "pDamageDealt": 1080,
+      "eDamageDealt": 15.255986086953044
     },
     {
       "matchId": 28,
@@ -687,25 +687,25 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 88,
-      "pRemainingHp": 1070.31008,
+      "duration": 126.3,
+      "pRemainingHp": 545.6578447058823,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 9.68992000000003
+      "eDamageDealt": 534.3421552941177
     },
     {
       "matchId": 29,
       "pBotType": "robot3",
       "eBotType": "robot2",
-      "winner": "enemy",
-      "winningType": "robot2",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 130.4,
-      "pRemainingHp": 0,
-      "eRemainingHp": 568.0046912,
-      "pDamageDealt": 511.9953088,
-      "eDamageDealt": 870
+      "duration": 87.3,
+      "pRemainingHp": 854.744013913047,
+      "eRemainingHp": 0,
+      "pDamageDealt": 1080,
+      "eDamageDealt": 15.255986086953044
     },
     {
       "matchId": 30,
@@ -715,11 +715,11 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 88,
-      "pRemainingHp": 1070.31008,
+      "duration": 126.3,
+      "pRemainingHp": 545.6578447058823,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 9.68992000000003
+      "eDamageDealt": 534.3421552941177
     },
     {
       "matchId": 31,
@@ -729,25 +729,25 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 113.6,
-      "pRemainingHp": 929.4979675428575,
+      "duration": 131.4,
+      "pRemainingHp": 641.3421535085713,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 150.5020324571425
+      "eDamageDealt": 438.6578464914287
     },
     {
       "matchId": 32,
       "pBotType": "robot4",
       "eBotType": "robot2",
-      "winner": "enemy",
-      "winningType": "robot2",
+      "winner": "player",
+      "winningType": "robot4",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 134.9,
-      "pRemainingHp": 0,
-      "eRemainingHp": 562.4344261485717,
-      "pDamageDealt": 517.5655738514283,
-      "eDamageDealt": 930
+      "duration": 82.1,
+      "pRemainingHp": 928.7461331478262,
+      "eRemainingHp": 0,
+      "pDamageDealt": 1080,
+      "eDamageDealt": 1.2538668521738146
     },
     {
       "matchId": 33,
@@ -757,25 +757,25 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 113.6,
-      "pRemainingHp": 929.4979675428575,
+      "duration": 131.4,
+      "pRemainingHp": 641.3421535085713,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 150.5020324571425
+      "eDamageDealt": 438.6578464914287
     },
     {
       "matchId": 34,
       "pBotType": "robot4",
       "eBotType": "robot2",
-      "winner": "enemy",
-      "winningType": "robot2",
+      "winner": "player",
+      "winningType": "robot4",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 134.9,
-      "pRemainingHp": 0,
-      "eRemainingHp": 562.4344261485717,
-      "pDamageDealt": 517.5655738514283,
-      "eDamageDealt": 930
+      "duration": 82.1,
+      "pRemainingHp": 928.7461331478262,
+      "eRemainingHp": 0,
+      "pDamageDealt": 1080,
+      "eDamageDealt": 1.2538668521738146
     },
     {
       "matchId": 35,
@@ -785,11 +785,11 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 113.6,
-      "pRemainingHp": 929.4979675428575,
+      "duration": 135.4,
+      "pRemainingHp": 640.892599222857,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 150.5020324571425
+      "eDamageDealt": 439.10740077714297
     },
     {
       "matchId": 36,
@@ -827,10 +827,10 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 149.1,
+      "duration": 138.9,
       "pRemainingHp": 0,
-      "eRemainingHp": 517.949423304348,
-      "pDamageDealt": 427.050576695652,
+      "eRemainingHp": 510.76739784347865,
+      "pDamageDealt": 434.23260215652135,
       "eDamageDealt": 1080
     },
     {
@@ -855,10 +855,10 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 150.8,
+      "duration": 142.2,
       "pRemainingHp": 0,
-      "eRemainingHp": 517.949423304348,
-      "pDamageDealt": 427.050576695652,
+      "eRemainingHp": 565.0401252173915,
+      "pDamageDealt": 379.9598747826085,
       "eDamageDealt": 1080
     },
     {
@@ -893,15 +893,15 @@
       "matchId": 43,
       "pBotType": "robot2",
       "eBotType": "robot6",
-      "winner": "player",
-      "winningType": "robot2",
-      "outcomeType": "KO",
-      "winReason": "Referee KO (All Wheels Ripped Off)",
-      "duration": 166.7,
-      "pRemainingHp": 827.2206208000002,
-      "eRemainingHp": 236.92159777391302,
-      "pDamageDealt": 558.078402226087,
-      "eDamageDealt": 252.77937919999977
+      "winner": "enemy",
+      "winningType": "robot6",
+      "outcomeType": "Decision",
+      "winReason": "Judges' Decision (55.2% HP vs 40.3% HP)",
+      "duration": 180,
+      "pRemainingHp": 435.5076352,
+      "eRemainingHp": 438.97748869565254,
+      "pDamageDealt": 356.02251130434746,
+      "eDamageDealt": 644.4923648
     },
     {
       "matchId": 44,
@@ -925,11 +925,11 @@
       "winningType": "robot2",
       "outcomeType": "KO",
       "winReason": "Referee KO (All Wheels Ripped Off)",
-      "duration": 166.7,
-      "pRemainingHp": 827.2206208000002,
-      "eRemainingHp": 236.92159777391302,
-      "pDamageDealt": 558.078402226087,
-      "eDamageDealt": 252.77937919999977
+      "duration": 138.2,
+      "pRemainingHp": 900.8116223999998,
+      "eRemainingHp": 237.39013119999998,
+      "pDamageDealt": 557.6098688,
+      "eDamageDealt": 179.1883776000002
     },
     {
       "matchId": 46,
@@ -939,11 +939,11 @@
       "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 140,
-      "pRemainingHp": 479.07224064,
+      "duration": 79.3,
+      "pRemainingHp": 836.3851973485712,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 390.92775936
+      "eDamageDealt": 33.61480265142882
     },
     {
       "matchId": 47,
@@ -953,11 +953,11 @@
       "winningType": "robot4",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 93.7,
-      "pRemainingHp": 885.3166528000011,
+      "duration": 67.3,
+      "pRemainingHp": 874.8034206117647,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 44.683347199998934
+      "eDamageDealt": 55.19657938823525
     },
     {
       "matchId": 48,
@@ -967,11 +967,11 @@
       "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 140,
-      "pRemainingHp": 479.07224064,
+      "duration": 79.3,
+      "pRemainingHp": 836.3851973485712,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 390.92775936
+      "eDamageDealt": 33.61480265142882
     },
     {
       "matchId": 49,
@@ -981,11 +981,11 @@
       "winningType": "robot4",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 93.7,
-      "pRemainingHp": 885.3166528000011,
+      "duration": 67.3,
+      "pRemainingHp": 874.8034206117647,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 44.683347199998934
+      "eDamageDealt": 55.19657938823525
     },
     {
       "matchId": 50,
@@ -995,11 +995,11 @@
       "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 140,
-      "pRemainingHp": 479.07224064,
+      "duration": 79.3,
+      "pRemainingHp": 836.3851973485712,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 390.92775936
+      "eDamageDealt": 33.61480265142882
     },
     {
       "matchId": 51,
@@ -1009,10 +1009,10 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 151,
+      "duration": 94.6,
       "pRemainingHp": 0,
-      "eRemainingHp": 511.9264896000007,
-      "pDamageDealt": 433.0735103999993,
+      "eRemainingHp": 484.141704282353,
+      "pDamageDealt": 460.858295717647,
       "eDamageDealt": 870
     },
     {
@@ -1024,24 +1024,24 @@
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
       "duration": 51.2,
-      "pRemainingHp": 934,
+      "pRemainingHp": 933.5681995294118,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11
+      "eDamageDealt": 11.4318004705882
     },
     {
       "matchId": 53,
       "pBotType": "robot3",
       "eBotType": "robot5",
-      "winner": "enemy",
-      "winningType": "robot5",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 151,
-      "pRemainingHp": 0,
-      "eRemainingHp": 511.9264896000007,
-      "pDamageDealt": 433.0735103999993,
-      "eDamageDealt": 870
+      "duration": 82.3,
+      "pRemainingHp": 380.91721984,
+      "eRemainingHp": 0,
+      "pDamageDealt": 945,
+      "eDamageDealt": 489.08278016
     },
     {
       "matchId": 54,
@@ -1052,38 +1052,38 @@
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
       "duration": 51.2,
-      "pRemainingHp": 934,
+      "pRemainingHp": 933.5681995294118,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11
+      "eDamageDealt": 11.4318004705882
     },
     {
       "matchId": 55,
       "pBotType": "robot3",
       "eBotType": "robot5",
-      "winner": "enemy",
-      "winningType": "robot5",
+      "winner": "player",
+      "winningType": "robot3",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 151,
-      "pRemainingHp": 0,
-      "eRemainingHp": 511.9264896000007,
-      "pDamageDealt": 433.0735103999993,
-      "eDamageDealt": 870
+      "duration": 82.3,
+      "pRemainingHp": 380.91721984,
+      "eRemainingHp": 0,
+      "pDamageDealt": 945,
+      "eDamageDealt": 489.08278016
     },
     {
       "matchId": 56,
       "pBotType": "robot3",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (50.1% HP vs 29.2% HP)",
-      "duration": 180,
-      "pRemainingHp": 253.95010559999994,
-      "eRemainingHp": 398.2149823999999,
-      "pDamageDealt": 396.7850176000001,
-      "eDamageDealt": 616.0498944000001
+      "winner": "player",
+      "winningType": "robot3",
+      "outcomeType": "KO",
+      "winReason": "Referee KO (All Wheels Ripped Off)",
+      "duration": 67.8,
+      "pRemainingHp": 866.9727744000004,
+      "eRemainingHp": 202.81326004705886,
+      "pDamageDealt": 592.1867399529411,
+      "eDamageDealt": 3.0272255999996105
     },
     {
       "matchId": 57,
@@ -1093,25 +1093,25 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 89.8,
-      "pRemainingHp": 784,
+      "duration": 93.8,
+      "pRemainingHp": 773,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11
+      "eDamageDealt": 22
     },
     {
       "matchId": 58,
       "pBotType": "robot3",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (55.8% HP vs 28.4% HP)",
-      "duration": 180,
-      "pRemainingHp": 247.02515199999996,
-      "eRemainingHp": 443.9148608,
-      "pDamageDealt": 351.0851392,
-      "eDamageDealt": 622.9748480000001
+      "winner": "player",
+      "winningType": "robot3",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 105.7,
+      "pRemainingHp": 867.3558528000003,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 2.6441471999996793
     },
     {
       "matchId": 59,
@@ -1121,39 +1121,39 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 89.8,
-      "pRemainingHp": 784,
+      "duration": 85,
+      "pRemainingHp": 795,
       "eRemainingHp": 0,
       "pDamageDealt": 870,
-      "eDamageDealt": 11
+      "eDamageDealt": 0
     },
     {
       "matchId": 60,
       "pBotType": "robot3",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (55.8% HP vs 28.4% HP)",
-      "duration": 180,
-      "pRemainingHp": 247.02515199999996,
-      "eRemainingHp": 443.9148608,
-      "pDamageDealt": 351.0851392,
-      "eDamageDealt": 622.9748480000001
+      "winner": "player",
+      "winningType": "robot3",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 115.5,
+      "pRemainingHp": 867.7392640000003,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 2.2607359999997243
     },
     {
       "matchId": 61,
       "pBotType": "robot4",
       "eBotType": "robot5",
-      "winner": "enemy",
-      "winningType": "robot5",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (65.7% HP vs 37.1% HP)",
-      "duration": 180,
-      "pRemainingHp": 345,
-      "eRemainingHp": 621.2726897371429,
-      "pDamageDealt": 323.72731026285715,
-      "eDamageDealt": 585
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Referee KO (All Wheels Ripped Off)",
+      "duration": 137,
+      "pRemainingHp": 275.8072448000001,
+      "eRemainingHp": 378,
+      "pDamageDealt": 567,
+      "eDamageDealt": 654.1927552
     },
     {
       "matchId": 62,
@@ -1173,15 +1173,15 @@
       "matchId": 63,
       "pBotType": "robot4",
       "eBotType": "robot5",
-      "winner": "enemy",
-      "winningType": "robot5",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (58.1% HP vs 46.2% HP)",
-      "duration": 180,
-      "pRemainingHp": 429.9383654400001,
-      "eRemainingHp": 549.1495339885716,
-      "pDamageDealt": 395.85046601142835,
-      "eDamageDealt": 500.0616345599999
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 106.7,
+      "pRemainingHp": 437.8183091199999,
+      "eRemainingHp": 0,
+      "pDamageDealt": 945,
+      "eDamageDealt": 492.1816908800001
     },
     {
       "matchId": 64,
@@ -1201,29 +1201,29 @@
       "matchId": 65,
       "pBotType": "robot4",
       "eBotType": "robot5",
-      "winner": "enemy",
-      "winningType": "robot5",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (58.1% HP vs 46.2% HP)",
-      "duration": 180,
-      "pRemainingHp": 429.9383654400001,
-      "eRemainingHp": 549.1495339885716,
-      "pDamageDealt": 395.85046601142835,
-      "eDamageDealt": 500.0616345599999
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 104.7,
+      "pRemainingHp": 451.54025983999986,
+      "eRemainingHp": 0,
+      "pDamageDealt": 945,
+      "eDamageDealt": 478.45974016000014
     },
     {
       "matchId": 66,
       "pBotType": "robot4",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (54.6% HP vs 37.0% HP)",
-      "duration": 180,
-      "pRemainingHp": 344.490816,
-      "eRemainingHp": 434.1386119314288,
-      "pDamageDealt": 360.8613880685712,
-      "eDamageDealt": 585.509184
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 50.7,
+      "pRemainingHp": 930,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 0
     },
     {
       "matchId": 67,
@@ -1233,25 +1233,25 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 105.2,
-      "pRemainingHp": 785,
+      "duration": 104.4,
+      "pRemainingHp": 782,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 10
+      "eDamageDealt": 13
     },
     {
       "matchId": 68,
       "pBotType": "robot4",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
-      "outcomeType": "Decision",
-      "winReason": "Judges' Decision (71.4% HP vs 45.8% HP)",
-      "duration": 180,
-      "pRemainingHp": 426.3139584,
-      "eRemainingHp": 567.4467737600004,
-      "pDamageDealt": 227.55322623999962,
-      "eDamageDealt": 503.6860416
+      "winner": "player",
+      "winningType": "robot4",
+      "outcomeType": "KO",
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 50.7,
+      "pRemainingHp": 930,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 0
     },
     {
       "matchId": 69,
@@ -1261,25 +1261,25 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 105.2,
-      "pRemainingHp": 785,
+      "duration": 104.4,
+      "pRemainingHp": 782,
       "eRemainingHp": 0,
       "pDamageDealt": 930,
-      "eDamageDealt": 10
+      "eDamageDealt": 13
     },
     {
       "matchId": 70,
       "pBotType": "robot4",
       "eBotType": "robot6",
-      "winner": "enemy",
-      "winningType": "robot6",
+      "winner": "player",
+      "winningType": "robot4",
       "outcomeType": "KO",
-      "winReason": "Referee KO (Flipped / No Drive Traction)",
-      "duration": 169.8,
-      "pRemainingHp": 446.3139584,
-      "eRemainingHp": 581.1359294171431,
-      "pDamageDealt": 213.86407058285693,
-      "eDamageDealt": 483.6860416
+      "winReason": "Destruction (Total Chassis HP Depleted)",
+      "duration": 50.7,
+      "pRemainingHp": 930,
+      "eRemainingHp": 0,
+      "pDamageDealt": 795,
+      "eDamageDealt": 0
     },
     {
       "matchId": 71,
@@ -1289,7 +1289,7 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 44.6,
+      "duration": 48.6,
       "pRemainingHp": 939,
       "eRemainingHp": 0,
       "pDamageDealt": 795,
@@ -1303,11 +1303,11 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 72.9,
-      "pRemainingHp": 781.2097894399997,
+      "duration": 75.1,
+      "pRemainingHp": 782.0999475199997,
       "eRemainingHp": 0,
       "pDamageDealt": 945,
-      "eDamageDealt": 13.790210560000332
+      "eDamageDealt": 12.90005248000034
     },
     {
       "matchId": 73,
@@ -1317,11 +1317,11 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 51.5,
-      "pRemainingHp": 945,
+      "duration": 48.6,
+      "pRemainingHp": 939,
       "eRemainingHp": 0,
       "pDamageDealt": 795,
-      "eDamageDealt": 0
+      "eDamageDealt": 6
     },
     {
       "matchId": 74,
@@ -1331,11 +1331,11 @@
       "winningType": "robot6",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 72.9,
-      "pRemainingHp": 781.2097894399997,
+      "duration": 75.1,
+      "pRemainingHp": 782.0999475199997,
       "eRemainingHp": 0,
       "pDamageDealt": 945,
-      "eDamageDealt": 13.790210560000332
+      "eDamageDealt": 12.90005248000034
     },
     {
       "matchId": 75,
@@ -1345,7 +1345,7 @@
       "winningType": "robot5",
       "outcomeType": "KO",
       "winReason": "Destruction (Total Chassis HP Depleted)",
-      "duration": 68.9,
+      "duration": 44.6,
       "pRemainingHp": 939,
       "eRemainingHp": 0,
       "pDamageDealt": 795,
