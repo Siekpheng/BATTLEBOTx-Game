@@ -116,10 +116,17 @@
       let category = 'chassis';
       let priority = 3;
 
+      // Core Chassis Spine Protection:
+      // The central robot chassis frame NEVER detaches on its own while mobile!
+      // (Only exterior armor panels, wheels, and damaged weapon components enter the detachable pool)
       if (isCore) {
-        category = 'chassis_core';
-        priority = 5; // Innermost structural spine remains until the absolute core
-      } else if (isGenuineWheel) {
+        return;
+      }
+
+      let category = 'chassis';
+      let priority = 3;
+
+      if (isGenuineWheel) {
         category = 'wheel';
         // Protect vital drive wheels behind outer armor & exterior cladding so robots keep mobility longer
         priority = 3;
@@ -156,8 +163,7 @@
       });
     });
 
-    const nonCoreInitial = bot.detachableParts.filter(p => p.category !== 'chassis_core');
-    bot.totalInitialParts = Math.max(1, nonCoreInitial.length > 0 ? nonCoreInitial.length : bot.detachableParts.length);
+    bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
     // Calibrated brisk ~1.5–2 min match duration across all robots
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
@@ -1279,7 +1285,7 @@
 
   function getBotDamagePercent(bot) {
     if (!bot) return 0;
-    const maxHp = bot.maxDriveHealth || 900;
+    const maxHp = bot.maxDriveHealth || (typeof getBotMaxHealth === 'function' ? getBotMaxHealth(bot.type) : 400);
     const hpLoss = Math.max(0, Math.min(100, ((maxHp - (bot.driveHealth ?? maxHp)) / maxHp) * 100));
     let partsLoss = 0;
     if (bot.detachableParts && bot.detachableParts.length > 0) {
@@ -1298,13 +1304,17 @@
     // If bot is destroyed, fire burning MUST stop!
     if (!bot || bot.isEntirelyDestroyed) return false;
 
-    // Per user specification: fire effect starts when 50% of the parts have fallen off!
+    // Fire effect starts when 50% of parts are knocked off OR robot takes >= 50% damage:
+    const maxHp = bot.maxDriveHealth || (typeof getBotMaxHealth === 'function' ? getBotMaxHealth(bot.type) : 400);
+    const hpDamagePct = Math.max(0, Math.min(100, ((maxHp - (bot.driveHealth ?? maxHp)) / maxHp) * 100));
+
     if (bot.detachableParts && bot.detachableParts.length > 0) {
       const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
-      const initialTotal = bot.totalInitialParts || bot.detachableParts.length;
-      return remainingCount <= Math.round(initialTotal * 0.50);
+      const initialTotal = Math.max(1, bot.totalInitialParts || bot.detachableParts.length);
+      const is50PercentPartsLost = remainingCount <= Math.round(initialTotal * 0.50);
+      return is50PercentPartsLost || (hpDamagePct >= 50);
     }
-    return getBotDamagePercent(bot) >= 50;
+    return hpDamagePct >= 50;
   }
 
   function checkAndSpawnBotFlames(bot, fireLight, dt) {
@@ -1509,6 +1519,8 @@
   // Expose inspection & dev testing helpers on window
   window.getBotDamagePercent = getBotDamagePercent;
   window.isBotFlaming = isBotFlaming;
+  window.checkAndSpawnBotFlames = checkAndSpawnBotFlames;
+  window.initBotDetachableParts = initBotDetachableParts;
   window.testDamageBot = (bot = playerBot, hp = 15) => {
     if (bot) {
       bot.driveHealth = hp;
