@@ -230,12 +230,12 @@
   // Robot 1 Reference Specs: Width = 315mm (1.9265 u), Length = 421mm (2.6001 u)
   // Real-World Proportions: 4000mm arena / 315mm bot width = 12.698x ratio
   // ========================================================
-  const ARENA_METERS = 4.0;
-  const UNITS_PER_METER = 1.9265 / 0.315; // ~6.11587 units per meter (calibrated to Robot 1 CAD width 315mm)
-  const ARENA_SIZE = ARENA_METERS * UNITS_PER_METER; // ~24.46 units (4.0m x 4.0m arena)
-  const ARENA_HALF = ARENA_SIZE / 2; // ~12.23 units
-  const ARENA_HEIGHT = 2.35 * UNITS_PER_METER; // ~14.37 units (~2.35m tall enclosure)
-  const wallRadius = ARENA_HALF; // For backward compatibility
+  var ARENA_METERS = 4.0;
+  var UNITS_PER_METER = 1.9265 / 0.315; // ~6.11587 units per meter (calibrated to Robot 1 CAD width 315mm)
+  var ARENA_SIZE = ARENA_METERS * UNITS_PER_METER; // ~24.46 units (4.0m x 4.0m arena)
+  var ARENA_HALF = ARENA_SIZE / 2; // ~12.23 units
+  var ARENA_HEIGHT = 2.35 * UNITS_PER_METER; // ~14.37 units (~2.35m tall enclosure)
+  var wallRadius = ARENA_HALF; // For backward compatibility
 
   function createFloorTexture() {
     const c = document.createElement('canvas');
