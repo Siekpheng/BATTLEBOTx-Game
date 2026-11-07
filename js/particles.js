@@ -113,9 +113,6 @@
       // Priority 3: Mid-chassis structure, secondary brackets, weapon mounts
       // Priority 4: Inner chassis frame & motor mounts
       // Priority 5: Innermost central core chassis spine
-      let category = 'chassis';
-      let priority = 3;
-
       // Core Chassis Spine Protection:
       // The central robot chassis frame NEVER detaches on its own while mobile!
       // (Only exterior armor panels, wheels, and damaged weapon components enter the detachable pool)
