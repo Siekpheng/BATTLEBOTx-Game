@@ -158,10 +158,10 @@
 
     const nonCoreInitial = bot.detachableParts.filter(p => p.category !== 'chassis_core');
     bot.totalInitialParts = Math.max(1, nonCoreInitial.length > 0 ? nonCoreInitial.length : bot.detachableParts.length);
-    // Calibrated ~2-minute match duration (2x baseline HP across all robots)
+    // Calibrated brisk ~1.5–2 min match duration across all robots
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
-      : 600;
+      : 400;
     bot.driveHealth = bot.maxDriveHealth;
   }
   window.initBotDetachableParts = initBotDetachableParts;
