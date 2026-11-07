@@ -953,28 +953,28 @@
         }
 
         // Continuous gradual health wear & part-shearing progress (weapon keeps spinning without stalling!)
-        // Grinding at the side or rear tears off armor panels every ~1.75s (~2.4s for Robot 6)
+        // Grinding damage tuned so robots do not die too fast: ~5.4 DPS, 1 part per ~3.20s (~4.2s for Robot 6)
         if (pSpinningContact) {
           playerBot.weaponStallTimer = 0; // Weapon NEVER stalls while grinding into the opponent!
           const pGrindRate = 0.40 + 0.60 * pRpmRatio;
           playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
-          const pBaseDps = (playerBot.type === 'robot6') ? 5.5 : 9.5;
-          const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.4) : pBaseDps;
+          const pBaseDps = (playerBot.type === 'robot6') ? 2.5 : 4.0;
+          const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.35) : pBaseDps;
           enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 900) - pContinuousDps * pGrindRate * 0.016);
 
           const pGrindInterval = isHitOnEnemySideOrBack
-            ? ((playerBot.type === 'robot6') ? 2.4 : 1.75)
-            : ((playerBot.type === 'robot6') ? 4.2 : 3.0);
+            ? ((playerBot.type === 'robot6') ? 4.20 : 3.20)
+            : ((playerBot.type === 'robot6') ? 6.50 : 5.00);
 
           if (playerBot._grindContactTimer >= pGrindInterval) {
             playerBot._grindContactTimer -= pGrindInterval;
             AudioSys.weaponSliceSound();
             const burstSparksP = (playerBot.type === 'robot6') ? 12 : 20;
             spawnCollisionSparks(midPos, burstSparksP);
-            triggerGamepadRumble(0.35, 120, 0);
+            triggerGamepadRumble(0.30, 100, 0);
             // Subtle grinding vibration jolt (does NOT fling opponent away or stall weapon!)
-            enemyBot.vx += nx * 0.28;
-            enemyBot.vz += nz * 0.28;
+            enemyBot.vx += nx * 0.22;
+            enemyBot.vz += nz * 0.22;
             detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
           }
         }
@@ -983,21 +983,21 @@
           enemyBot.weaponStallTimer = 0; // Opponent weapon NEVER stalls while grinding!
           const eGrindRate = 0.40 + 0.60 * eRpmRatio;
           enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
-          const eBaseDps = (enemyBot.type === 'robot6') ? 5.5 : 9.5;
-          const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.4) : eBaseDps;
+          const eBaseDps = (enemyBot.type === 'robot6') ? 2.5 : 4.0;
+          const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.35) : eBaseDps;
           playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 900) - eContinuousDps * eGrindRate * 0.016);
 
           const eGrindInterval = isHitOnPlayerSideOrBack
-            ? ((enemyBot.type === 'robot6') ? 2.4 : 1.75)
-            : ((enemyBot.type === 'robot6') ? 4.2 : 3.0);
+            ? ((enemyBot.type === 'robot6') ? 4.20 : 3.20)
+            : ((enemyBot.type === 'robot6') ? 6.50 : 5.00);
 
           if (enemyBot._grindContactTimer >= eGrindInterval) {
             enemyBot._grindContactTimer -= eGrindInterval;
             AudioSys.weaponSliceSound();
             const burstSparksE = (enemyBot.type === 'robot6') ? 12 : 20;
             spawnCollisionSparks(midPos, burstSparksE);
-            playerBot.vx -= nx * 0.28;
-            playerBot.vz -= nz * 0.28;
+            playerBot.vx -= nx * 0.22;
+            playerBot.vz -= nz * 0.22;
             triggerDamageVignette();
             detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
           }

@@ -669,6 +669,15 @@
       }
     }
 
+    // In continuous grinding mode, strip away exterior armor/cladding panels before ripping off drive wheels
+    if (suppressExtraSparks && chosen && chosen.category === 'wheel') {
+      const armorPool = remaining.filter(p => p.category !== 'wheel' && p.category !== 'weapon' && p.category !== 'chassis_core');
+      if (armorPool.length > 0) {
+        armorPool.sort((a, b) => a.priority - b.priority);
+        chosen = armorPool[0];
+      }
+    }
+
     // Drive Mobility Protection:
     // Keep the robot's last 2 drive wheels attached while exterior armor and chassis panels remain so matches don't end prematurely!
     if (chosen && chosen.category === 'wheel') {
