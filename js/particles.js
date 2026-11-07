@@ -97,14 +97,14 @@
       );
       const isCore = (
         name === 'Chassis' ||
-        name === 'Chassis_Mesh' ||
-        name === 'Chassis_Mesh_1' ||
-        name === 'Chassis_Core' ||
-        name === 'Chassis_Frame' ||
-        name === 'Frame' ||
+        name.startsWith('Chassis') ||
+        name.startsWith('Frame') ||
+        name.includes('Chassis') ||
         name === 'Main_Chassis' ||
-        name.startsWith('Chassis_Core') ||
-        (bot.type === 'robot5' && (name === 'Chassis' || name === 'Chassis_Mesh'))
+        parentName === 'Chassis' ||
+        parentName.startsWith('Chassis') ||
+        parentName.startsWith('Frame') ||
+        (bot.type === 'robot5' && (name.startsWith('Chassis') || parentName === 'Chassis'))
       );
 
       // Realistic outside-to-inside progression:
@@ -156,7 +156,8 @@
       });
     });
 
-    bot.totalInitialParts = Math.max(1, bot.detachableParts.length);
+    const nonCoreInitial = bot.detachableParts.filter(p => p.category !== 'chassis_core');
+    bot.totalInitialParts = Math.max(1, nonCoreInitial.length > 0 ? nonCoreInitial.length : bot.detachableParts.length);
     // Calibrated ~2-minute match duration (2x baseline HP across all robots)
     bot.maxDriveHealth = (typeof getBotMaxHealth === 'function')
       ? getBotMaxHealth(bot.type)
@@ -671,8 +672,8 @@
     // Core Chassis Spine Protection:
     // The central robot chassis frame NEVER detaches on its own while mobile!
     // (Prevents ghost floating weapon/motor moving without a robot body)
-    if (chosen && (chosen.category === 'chassis_core' || chosen.name === 'Chassis' || chosen.name.startsWith('Chassis_Core'))) {
-      const nonCorePool = remaining.filter(p => p.category !== 'chassis_core' && p.name !== 'Chassis' && !p.name.startsWith('Chassis_Core'));
+    if (chosen && (chosen.category === 'chassis_core' || chosen.name.startsWith('Chassis') || (chosen.parentName && chosen.parentName.startsWith('Chassis')))) {
+      const nonCorePool = remaining.filter(p => p.category !== 'chassis_core' && !p.name.startsWith('Chassis') && (!p.parentName || !p.parentName.startsWith('Chassis')));
       if (nonCorePool.length > 0) {
         nonCorePool.sort((a, b) => a.priority - b.priority);
         chosen = nonCorePool[0];
@@ -851,8 +852,8 @@
       });
     }
 
-    // Update remaining count & driveHealth
-    const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent).length;
+    // Update remaining count & driveHealth (counting only detachable armor, wheels, and weapon — NOT the core chassis!)
+    const remainingCount = bot.detachableParts.filter(p => p.attached && p.mesh && p.mesh.parent && p.category !== 'chassis_core').length;
     // Balanced progressive health depletion using per-robot armor part divisor:
     const botSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(bot.type) : null;
     const baseDivisor = (botSpecs && botSpecs.partDivisor) ? botSpecs.partDivisor : 18;

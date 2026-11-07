@@ -819,4 +819,5 @@
 
     return { root, tiltGroup, weaponMesh: weaponMesh, armorPanels, wheels, cadAttached };
   }
+  window.createRobotMesh = createRobotMesh;
 
