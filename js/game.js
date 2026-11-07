@@ -1556,7 +1556,6 @@
 
   const currentCamLookTargetP2 = new THREE.Vector3(0, 0.75, 0);
   let smoothCamHeadingP2 = 0;
-  let smoothCameraP2Initialized = false;
 
   function updateSingleViewportCamera(camObj, targetBot, otherBot, mode, isP2Cam, dt) {
     if (!camObj || !targetBot) return;
@@ -1718,11 +1717,11 @@
   // 10.5 MENU AI EXHIBITION BATTLE SYSTEM (ANTI-CIRCLING LEAD PURSUIT)
   // ========================================================
   // MENU_ROBOT_ROSTER is globally defined in js/state.js
-  let menuP1Type = 'robot1';
-  let menuP2Type = 'robot2';
-  let menuRespawnCooldown = 0.0;
-  let menuCirclingTimer = 0.0;
-  let menuCircleBreakPhase = 0.0;
+  var menuP1Type = 'robot1';
+  var menuP2Type = 'robot2';
+  var menuRespawnCooldown = 0.0;
+  var menuCirclingTimer = 0.0;
+  var menuCircleBreakPhase = 0.0;
 
   function driveMenuBotAI(bot, target, dt, isP1) {
     if (!bot || !target) return;

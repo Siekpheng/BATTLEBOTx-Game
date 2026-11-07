@@ -1787,7 +1787,6 @@
   // Persistent smoothed camera targets to eliminate violent collision micro-jitter
   const currentCamLookTarget = new THREE.Vector3(0, 0.75, 0);
   let smoothCamHeading = 0;
-  let smoothCameraInitialized = false;
 
 
   function updateBotVisuals(bot, dt) {

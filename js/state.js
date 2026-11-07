@@ -19,6 +19,10 @@ var combatEngageTimer = 0.0;
 var gamepadPlayerMap = { p1: 0, p2: 1 }; // Maps Player 1 & Player 2 to connected controller slot (0, 1, ...) or -1 for Keyboard Only
 var cameraHeight = 19.5;
 var cameraDistance = 12.0;
+var ARENA_SIZE = 24.46;
+var ARENA_HALF = 12.23;
+var smoothCameraInitialized = false;
+var smoothCameraP2Initialized = false;
 
 var playerBot = null;
 var enemyBot = null;

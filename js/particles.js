@@ -7,6 +7,14 @@
   // ========================================================
   const sparks = [];
   const detachedDebris = [];
+  var firePool = [];
+  var smokePool = [];
+  var emberPool = [];
+  var explosionFirePool = [];
+  var explosionSmokePool = [];
+  var playerFireLight = null;
+  var enemyFireLight = null;
+  var explosionFireLight = null;
 
   // Shared GPU geometry and materials for sparks to eliminate per-spark WebGL buffer/shader allocations
   const SHARED_SPARK_GEO = new THREE.BoxGeometry(0.048, 0.048, 0.048);
@@ -903,9 +911,9 @@
   // ========================================================
   // 5.1 TOURNAMENT FLAME & SMOKE PARTICLE SYSTEM (80%+ DAMAGE)
   // ========================================================
-  const playerFireLight = new THREE.PointLight(0xff5500, 0, 10, 1.8);
+  playerFireLight = new THREE.PointLight(0xff5500, 0, 10, 1.8);
   scene.add(playerFireLight);
-  const enemyFireLight = new THREE.PointLight(0xff5500, 0, 10, 1.8);
+  enemyFireLight = new THREE.PointLight(0xff5500, 0, 10, 1.8);
   scene.add(enemyFireLight);
 
   function createProceduralFireTexture() {
@@ -989,17 +997,11 @@
   const SMOKE_POOL_SIZE = 60;
   const EMBER_POOL_SIZE = 40;
 
-  const firePool = [];
-  const smokePool = [];
-  const emberPool = [];
-
   // Dedicated High-Impact Fire Explosion Particle System
   const EXPLOSION_FIRE_POOL_SIZE = 55;
   const EXPLOSION_SMOKE_POOL_SIZE = 40;
-  const explosionFirePool = [];
-  const explosionSmokePool = [];
 
-  const explosionFireLight = new THREE.PointLight(0xff6600, 0, 26, 1.4);
+  explosionFireLight = new THREE.PointLight(0xff6600, 0, 26, 1.4);
   scene.add(explosionFireLight);
 
   for (let i = 0; i < FIRE_POOL_SIZE; i++) {
@@ -1448,11 +1450,17 @@
   }
 
   function clearBotFlames() {
-    for (const p of firePool) { p.active = false; p.sprite.visible = false; }
-    for (const s of smokePool) { s.active = false; s.sprite.visible = false; }
-    for (const e of emberPool) { e.active = false; e.sprite.visible = false; }
-    if (playerFireLight) playerFireLight.intensity = 0;
-    if (enemyFireLight) enemyFireLight.intensity = 0;
+    if (typeof firePool !== 'undefined' && Array.isArray(firePool)) {
+      for (const p of firePool) { p.active = false; if (p.sprite) p.sprite.visible = false; }
+    }
+    if (typeof smokePool !== 'undefined' && Array.isArray(smokePool)) {
+      for (const s of smokePool) { s.active = false; if (s.sprite) s.sprite.visible = false; }
+    }
+    if (typeof emberPool !== 'undefined' && Array.isArray(emberPool)) {
+      for (const e of emberPool) { e.active = false; if (e.sprite) e.sprite.visible = false; }
+    }
+    if (typeof playerFireLight !== 'undefined' && playerFireLight) playerFireLight.intensity = 0;
+    if (typeof enemyFireLight !== 'undefined' && enemyFireLight) enemyFireLight.intensity = 0;
   }
 
   function clearAllFlamesAndExplosions() {
