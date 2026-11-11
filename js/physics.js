@@ -738,6 +738,53 @@
   }
   window.resolveGuestSolidBotCollision = resolveGuestSolidBotCollision;
 
+  const STRIKE_WEAR_TABLE = {
+    robot1: [0.41, 0.34],
+    robot2: [0.42, 0.34],
+    robot3: [0.39, 0.31],
+    robot4: [0.43, 0.34],
+    robot5: [0.40, 0.32],
+    robot6: [0.30, 0.24],
+    robot7: [0.45, 0.35],
+    robot8: [0.45, 0.35]
+  };
+
+  function computeStrikeWear(attackerType, defenderType, wasSpinFast, impactSpeed, canFlip) {
+    const [highWear, lowWear] = STRIKE_WEAR_TABLE[attackerType] || [0.40, 0.33];
+    const isHeavyHit = (attackerType === 'robot6')
+      ? (wasSpinFast && impactSpeed > 6.5)
+      : ((attackerType === 'robot1' || attackerType === 'robot2' || attackerType === 'robot5')
+          ? (canFlip || impactSpeed > 6.0)
+          : (wasSpinFast && (impactSpeed > 5.5 || canFlip)));
+    let wear = isHeavyHit ? highWear : lowWear;
+    if (defenderType === 'robot2') wear *= 0.86;
+    return wear;
+  }
+
+  function getWearThreshold(bot) {
+    if (!bot) return 1.0;
+    const armorCount = bot.detachableParts
+      ? bot.detachableParts.filter(p => p.category === 'armor' || p.category === 'chassis_exterior').length
+      : 6;
+    const wheelCount = bot.wheels ? bot.wheels.length : 4;
+    const spareWheels = Math.max(0, wheelCount - 2);
+    const protectiveLayers = Math.max(3, armorCount + spareWheels);
+    return Math.max(0.88, Math.min(1.80, 8.85 / protectiveLayers));
+  }
+
+  function applyWeaponStrikeWear(targetBot, strikeWear, impactDir, hitPoint, skipDamage = false, dmgScale = 28) {
+    if (!targetBot) return;
+    if (!skipDamage) {
+      targetBot.driveHealth = Math.max(1, (targetBot.driveHealth || 400) - Math.round(dmgScale * strikeWear));
+    }
+    const threshold = getWearThreshold(targetBot);
+    targetBot._weaponPartWear = (targetBot._weaponPartWear || 0) + strikeWear;
+    if (targetBot._weaponPartWear >= threshold) {
+      targetBot._weaponPartWear -= threshold;
+      detachSinglePart(targetBot, impactDir, hitPoint);
+    }
+  }
+
   function handleBotCollision() {
     if (!playerBot || !enemyBot) return;
     const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { mass: 250, weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
@@ -995,9 +1042,10 @@
           const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.35) : pBaseDps;
           enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 400) - pContinuousDps * pGrindRate * 0.016);
 
-          const pGrindInterval = isHitOnEnemySideOrBack
+          const basePGrindInterval = isHitOnEnemySideOrBack
             ? ((playerBot.type === 'robot6') ? 4.20 : 3.20)
             : ((playerBot.type === 'robot6') ? 6.50 : 5.00);
+          const pGrindInterval = basePGrindInterval * Math.max(0.90, Math.min(1.65, getWearThreshold(enemyBot)));
 
           if (playerBot._grindContactTimer >= pGrindInterval) {
             playerBot._grindContactTimer -= pGrindInterval;
@@ -1020,9 +1068,10 @@
           const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.35) : eBaseDps;
           playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 400) - eContinuousDps * eGrindRate * 0.016);
 
-          const eGrindInterval = isHitOnPlayerSideOrBack
+          const baseEGrindInterval = isHitOnPlayerSideOrBack
             ? ((enemyBot.type === 'robot6') ? 4.20 : 3.20)
             : ((enemyBot.type === 'robot6') ? 6.50 : 5.00);
+          const eGrindInterval = baseEGrindInterval * Math.max(0.90, Math.min(1.65, getWearThreshold(playerBot)));
 
           if (enemyBot._grindContactTimer >= eGrindInterval) {
             enemyBot._grindContactTimer -= eGrindInterval;
@@ -1195,29 +1244,12 @@
           }
           triggerDamageVignette();
 
-          // Multi-hit wear & clash damage tuned for 3x longer battles:
-          const pClashWearBase = (playerBot.type === 'robot6') ? 0.22 : ((playerBot.type === 'robot3' || playerBot.type === 'robot4') ? 0.44 : 0.35);
-          const eClashWearBase = (enemyBot.type === 'robot6') ? 0.22 : ((enemyBot.type === 'robot3' || enemyBot.type === 'robot4') ? 0.44 : 0.35);
-
-          let wearOnEnemy = pClashWearBase * (0.55 + 0.45 * pSpinRatio);
-          let wearOnPlayer = eClashWearBase * (0.55 + 0.45 * eSpinRatio);
-          if (enemyBot.type === 'robot2') wearOnEnemy *= 0.85;
-          if (playerBot.type === 'robot2') wearOnPlayer *= 0.85;
-
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 400) - Math.round(22 * wearOnEnemy));
-          enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + wearOnEnemy;
-          if (enemyBot._weaponPartWear >= 1.0) {
-            enemyBot._weaponPartWear -= 1.0;
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          }
-
+          // Multi-hit wear & clash damage balanced uniformly across all 8 robots:
+          const wearOnEnemy = computeStrikeWear(playerBot.type, enemyBot.type, false, impactSpeed, false) * (0.62 + 0.42 * pSpinRatio);
+          const wearOnPlayer = computeStrikeWear(enemyBot.type, playerBot.type, false, impactSpeed, false) * (0.62 + 0.42 * eSpinRatio);
+          applyWeaponStrikeWear(enemyBot, wearOnEnemy, { x: nx, z: nz }, midPos, false, 22);
           if (!isPractice) {
-            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 400) - Math.round(22 * wearOnPlayer));
-            playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + wearOnPlayer;
-            if (playerBot._weaponPartWear >= 1.0) {
-              playerBot._weaponPartWear -= 1.0;
-              detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-            }
+            applyWeaponStrikeWear(playerBot, wearOnPlayer, { x: -nx, z: -nz }, midPos, false, 22);
           }
 
           if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
@@ -1353,27 +1385,9 @@
             enemyBot.weaponStallTimer = 0.20;
           }
 
-          // Multi-hit wear & health damage tuned for 3x longer battles (~3 hits per detached part, ~4-5 for Robot 6):
-          let pStrikeWear = 0.35;
-          if (playerBot.type === 'robot6') {
-            pStrikeWear = (wasPSpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
-          } else if (playerBot.type === 'robot3') {
-            pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.52 : 0.38;
-          } else if (playerBot.type === 'robot4' || playerBot.type === 'robot7' || playerBot.type === 'robot8') {
-            pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.46 : 0.36;
-          } else if (playerBot.type === 'robot2') {
-            pStrikeWear = (canFlipEnemy || impactSpeed > 6.0) ? 0.36 : 0.30;
-          } else {
-            pStrikeWear = (canFlipEnemy || impactSpeed > 6.0) ? 0.40 : 0.33;
-          }
-          if (enemyBot.type === 'robot2') pStrikeWear *= 0.85;
-
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 400) - Math.round(28 * pStrikeWear));
-          enemyBot._weaponPartWear = (enemyBot._weaponPartWear || 0) + pStrikeWear;
-          if (enemyBot._weaponPartWear >= 1.0) {
-            enemyBot._weaponPartWear -= 1.0;
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos);
-          }
+          // Multi-hit wear & health damage balanced uniformly across all chassis layer counts:
+          const pStrikeWear = computeStrikeWear(playerBot.type, enemyBot.type, wasPSpinFast, impactSpeed, canFlipEnemy);
+          applyWeaponStrikeWear(enemyBot, pStrikeWear, { x: nx, z: nz }, midPos, false);
 
           if (enemyBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(true, false, true, true);
@@ -1509,29 +1523,9 @@
 
           triggerDamageVignette();
 
-          // Multi-hit wear & health damage tuned for 3x longer battles (~3 hits per detached part, ~4-5 for Robot 6):
-          let eStrikeWear = 0.35;
-          if (enemyBot.type === 'robot6') {
-            eStrikeWear = (wasESpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
-          } else if (enemyBot.type === 'robot3') {
-            eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.52 : 0.38;
-          } else if (enemyBot.type === 'robot4' || enemyBot.type === 'robot7' || enemyBot.type === 'robot8') {
-            eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.46 : 0.36;
-          } else if (enemyBot.type === 'robot2') {
-            eStrikeWear = (canFlipPlayer || impactSpeed > 6.0) ? 0.36 : 0.30;
-          } else {
-            eStrikeWear = (canFlipPlayer || impactSpeed > 6.0) ? 0.40 : 0.33;
-          }
-          if (playerBot.type === 'robot2') eStrikeWear *= 0.85;
-
-          if (!isPractice) {
-            playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 400) - Math.round(28 * eStrikeWear));
-          }
-          playerBot._weaponPartWear = (playerBot._weaponPartWear || 0) + eStrikeWear;
-          if (playerBot._weaponPartWear >= 1.0) {
-            playerBot._weaponPartWear -= 1.0;
-            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos);
-          }
+          // Multi-hit wear & health damage balanced uniformly across all chassis layer counts:
+          const eStrikeWear = computeStrikeWear(enemyBot.type, playerBot.type, wasESpinFast, impactSpeed, canFlipPlayer);
+          applyWeaponStrikeWear(playerBot, eStrikeWear, { x: -nx, z: -nz }, midPos, isPractice);
 
           if (playerBot.isEntirelyDestroyed) {
             if (typeof matchState !== 'undefined' && matchState === 'playing') endMatch(false, false, true, true);

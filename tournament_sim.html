@@ -106,13 +106,13 @@
   </script>
 
   <!-- Game Scripts -->
-  <script src="js/state.js?v=20261111_v172"></script>
-  <script src="js/audio.js?v=20261111_v172"></script>
-  <script src="js/arena.js?v=20261111_v172"></script>
-  <script src="js/particles.js?v=20261111_v172"></script>
-  <script src="js/robots.js?v=20261111_v172"></script>
-  <script src="js/physics.js?v=20261111_v172"></script>
-  <script src="js/game.js?v=20261111_v172"></script>
+  <script src="js/state.js?v=20261111_v173"></script>
+  <script src="js/audio.js?v=20261111_v173"></script>
+  <script src="js/arena.js?v=20261111_v173"></script>
+  <script src="js/particles.js?v=20261111_v173"></script>
+  <script src="js/robots.js?v=20261111_v173"></script>
+  <script src="js/physics.js?v=20261111_v173"></script>
+  <script src="js/game.js?v=20261111_v173"></script>
 </head>
 <body>
   <h1>BATTLEBOTx &mdash; Automated 8-Robot Round-Robin Tournament</h1>
@@ -200,9 +200,9 @@
 
       const matchLogs = [];
       let matchCount = 0;
-      const totalMatches = 15 * ROUNDS_PER_MATCHUP;
+      const totalMatches = ((BOT_ROSTER.length * (BOT_ROSTER.length - 1)) / 2) * ROUNDS_PER_MATCHUP;
 
-      // 15 Pairwise Matchups
+      // 28 Pairwise Matchups
       for (let i = 0; i < BOT_ROSTER.length; i++) {
         for (let j = i + 1; j < BOT_ROSTER.length; j++) {
           const typeA = BOT_ROSTER[i];

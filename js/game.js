@@ -16,7 +16,7 @@
       name: 'Razor',
       role: 'Fast Spin · Wedge Lifter',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 400,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 410,        // Calibrated brisk ~1.5–2 min match duration
       maxSpeed: 15.8,
       turnRate: 3.65,
       accel: 50.0,
@@ -44,13 +44,13 @@
       name: 'IronClad',
       role: 'Heavy Armor · Juggernaut Tank',
       mass: 250,             // Standard 250 lb combat heavyweight (equal physical weight to Robots 1, 3, 4, 5)
-      maxHealth: 480,        // +20% reinforced tank hull durability
-      maxSpeed: 13.8,        // Heavier armored chassis
+      maxHealth: 475,        // +20% reinforced tank hull durability
+      maxSpeed: 14.0,        // Heavier armored chassis
       turnRate: 3.15,
       accel: 42.0,
       maxWeaponRpm: 92.0,
-      windUpRate: 36.0,
-      attackStall: 0.75,
+      windUpRate: 38.0,
+      attackStall: 0.72,
       defendStall: 0.90,
       weaponReach: 0.34,
       weaponWidth: 0.55,     // Narrow 0.55m central heavy drum (corners are armored plow!)
@@ -72,7 +72,7 @@
       name: 'KineticBar',
       role: 'Wide Reach · Multi-Part Shredder',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 390,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 368,        // Calibrated brisk ~1.5–2 min match duration
       maxSpeed: 15.0,
       turnRate: 3.75,
       accel: 48.0,
@@ -80,7 +80,7 @@
       windUpRate: 41.0,      // Faster wind-up (~2.5s) to stay competitive against rushers
       attackStall: 0.70,     // Reduced stall on attack (was 0.95)
       defendStall: 0.75,     // Faster recovery from defense impacts (was 1.25)
-      weaponReach: 0.15,     // Wide 150-degree horizontal bar arc
+      weaponReach: 0.24,     // Wide 150-degree horizontal bar arc
       weaponWidth: 1.35,     // Wide 1.35m horizontal spinning bar
       weaponHalfWidth: 0.675,
       flingBase: 7.4,        // Devastating horizontal slap knockback (was 6.2)
@@ -127,13 +127,13 @@
       name: 'BlueThunder',
       role: 'Rapid Drum · Non-Stop Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 420,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 395,        // Calibrated brisk ~1.5–2 min match duration
       maxSpeed: 15.6,
       turnRate: 3.85,        // Snappy 2WD pivot turning
       accel: 52.0,
       maxWeaponRpm: 110.0,   // High-RPM compact eggbeater drum
-      windUpRate: 78.0,      // Spins up in ~1.4s and recovers almost instantly!
-      attackStall: 0.45,     // Drum barely stalls on impact — relentless rapid-fire brawling
+      windUpRate: 58.0,      // Spins up in ~1.4s and recovers almost instantly!
+      attackStall: 0.56,     // Drum barely stalls on impact — relentless rapid-fire brawling
       defendStall: 0.80,
       weaponReach: 0.33,
       weaponWidth: 0.78,     // Wide billet eggbeater drum
@@ -183,13 +183,13 @@
       name: 'Vai',
       role: 'Hook Disc · Forked Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 425,        // Calibrated brisk ~1.5–2 min match duration
-      maxSpeed: 15.4,
+      maxHealth: 408,        // Calibrated brisk ~1.5–2 min match duration
+      maxSpeed: 15.2,
       turnRate: 3.60,
       accel: 49.0,
-      maxWeaponRpm: 106.0,   // High-torque asymmetric single-tooth hooked vertical spinner
-      windUpRate: 48.0,      // ~2.2s wind-up
-      attackStall: 0.52,
+      maxWeaponRpm: 104.0,   // High-torque asymmetric single-tooth hooked vertical spinner
+      windUpRate: 46.0,      // ~2.2s wind-up
+      attackStall: 0.57,
       defendStall: 0.80,
       weaponReach: 0.34,
       weaponWidth: 0.42,     // Heavy central vertical hooked bar + dual pulley hubs
@@ -205,21 +205,21 @@
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 1.15,      // Strong vertical spinner gyroscopic precession
-      wedgeRating: 1.15      // Twin low front forks + slanted lime-green wedgelets
+      wedgeRating: 1.11      // Twin low front forks + slanted lime-green wedgelets
     },
     robot8: {
       name: 'KK',
       role: 'Pocket Drum · Quad-Fork Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 435,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 440,        // Calibrated brisk ~1.5–2 min match duration
       maxSpeed: 15.1,
       turnRate: 3.55,
       accel: 48.5,
       maxWeaponRpm: 104.0,   // Heavy wide pocket scoop vertical drum spinner
-      windUpRate: 46.0,      // ~2.25s wind-up
+      windUpRate: 48.0,      // ~2.25s wind-up
       attackStall: 0.56,
       defendStall: 0.78,
-      weaponReach: 0.35,
+      weaponReach: 0.33,
       weaponWidth: 0.66,     // Wide 0.66m pocket hammer-drum rotor
       weaponHalfWidth: 0.330,
       flingBase: 6.9,        // Massive uppercut pocket launch
