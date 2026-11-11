@@ -19,6 +19,11 @@
     lastInputSendTime: 0,
     lastSentT: null,
     lastSentS: null,
+    inputSeqCounter: 0,
+    lastGuestInputSeq: 0,
+    stateSeq: 0,
+    lastAppliedStateSeq: -1,
+    pendingInputs: [],
     hostReady: false,
     guestReady: false,
     isRematchActive: false,
@@ -46,12 +51,24 @@
       }
     },
 
+    resetSyncCounters() {
+      this.queuedEvents = [];
+      this.lastSentT = null;
+      this.lastSentS = null;
+      this.lastInputSendTime = 0;
+      this.inputSeqCounter = 0;
+      this.lastGuestInputSeq = 0;
+      this.stateSeq = 0;
+      this.lastAppliedStateSeq = -1;
+      this.pendingInputs = [];
+    },
+
     createRoom(botType, onReady, onError) {
       this.isOnline = true;
       this.isHost = true;
       this.hostReady = false;
       this.guestReady = false;
-      this.queuedEvents = [];
+      this.resetSyncCounters();
       this.selectedBot = botType;
       this.roomCode = String(Math.floor(1000 + Math.random() * 9000));
       const peerId = this.PEER_PREFIX + this.roomCode;
@@ -154,6 +171,8 @@
             this.launchSynchronizedMatch();
           }
         } else if (data.type === 'guest_input') {
+          if (typeof data.seq === 'number' && data.seq <= this.lastGuestInputSeq) return;
+          if (typeof data.seq === 'number') this.lastGuestInputSeq = data.seq;
           if (enemyBot && !enemyBot.isEntirelyDestroyed) {
             const eHasWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.some(w => w.attached !== false)) ||
               (enemyBot.detachableParts && enemyBot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
@@ -189,6 +208,7 @@
 
     launchSynchronizedMatch() {
       console.log('[Network] Both players ready! Launching synchronized match countdown...');
+      this.resetSyncCounters();
       if (this.conn && this.conn.open) {
         this.conn.send({
           type: 'start_countdown',
@@ -206,7 +226,7 @@
       this.isHost = false;
       this.hostReady = false;
       this.guestReady = false;
-      this.queuedEvents = [];
+      this.resetSyncCounters();
       this.selectedBot = botType;
       this.roomCode = code.trim().replace(/^bbx2026-room-/i, '').replace(/^bbx-/i, '');
       const targetPeerId = this.PEER_PREFIX + this.roomCode;
@@ -276,10 +296,21 @@
               if (loadingStatus) loadingStatus.textContent = '✓ Ready! Waiting for Host countdown trigger...';
             } else if (data.type === 'start_countdown') {
               console.log('[Network] Received start_countdown from Host!');
+              this.resetSyncCounters();
               this.closeRematchModal();
               const loadingOverlay = document.getElementById('match-loading-overlay');
               if (loadingOverlay) loadingOverlay.classList.add('hidden');
               if (typeof window.startMatchSequence === 'function') window.startMatchSequence(); else if (typeof startMatchSequence === 'function') startMatchSequence();
+            } else if (data.type === 'start_play') {
+              if (typeof activeCountdownInterval !== 'undefined' && activeCountdownInterval) {
+                clearInterval(activeCountdownInterval);
+                activeCountdownInterval = null;
+              }
+              const cdOverlay = document.getElementById('countdown-overlay');
+              if (cdOverlay) cdOverlay.classList.add('hidden');
+              if (typeof matchState !== 'undefined' && matchState === 'countdown') {
+                matchState = 'playing';
+              }
             } else if (data.type === 'start_match') {
               console.log('[Network] Received start_match fallback from Host!');
               if (data.hostBot) this.opponentBot = data.hostBot;
@@ -359,16 +390,26 @@
       updateDisplay();
     },
 
-    sendInput(t, s) {
+    sendInput(t, s, dt = 0.016) {
       if (this.conn && this.conn.open && !this.isHost) {
         try {
           const now = performance.now();
           const changed = (t !== this.lastSentT || s !== this.lastSentS);
-          if (changed || (now - this.lastInputSendTime >= 33)) {
+          const needKeepalive = (now - this.lastInputSendTime >= 25);
+          if (changed || needKeepalive) {
+            const seq = ++this.inputSeqCounter;
             this.lastSentT = t;
             this.lastSentS = s;
             this.lastInputSendTime = now;
-            this.conn.send({ type: 'guest_input', t, s });
+            this.pendingInputs.push({ seq, t, s, dt: Math.min(0.05, Math.max(0.005, dt || 0.016)) });
+            if (this.pendingInputs.length > 45) this.pendingInputs.shift();
+            this.conn.send({ type: 'guest_input', seq, t, s });
+          } else if (this.pendingInputs.length > 0) {
+            // Accumulate elapsed frame dt onto latest pending input so prediction replay stays time-accurate
+            this.pendingInputs[this.pendingInputs.length - 1].dt = Math.min(
+              0.08,
+              this.pendingInputs[this.pendingInputs.length - 1].dt + Math.min(0.05, dt || 0.016)
+            );
           }
         } catch (e) {
           console.warn('[Network] sendInput error:', e);
@@ -382,6 +423,8 @@
 
       const now = performance.now();
       if (now - this.lastSendTime < 28 && this.queuedEvents.length === 0) return; // ~35 FPS broadcast, immediate flush on damage events
+      // Backpressure guard: prevent WebRTC SCTP buffer bloat from queuing stale states on jittery connections
+      if (this.conn.dataChannel && this.conn.dataChannel.bufferedAmount > 32768 && this.queuedEvents.length === 0) return;
       this.lastSendTime = now;
 
       if ((!playerBot.detachableParts || playerBot.detachableParts.length === 0) && typeof initBotDetachableParts === 'function') {
@@ -408,9 +451,12 @@
         ? enemyBot.detachableParts.filter(p => !p.attached).map(p => p.partIdx)
         : [];
 
+      const seq = ++this.stateSeq;
       try {
         this.conn.send({
           type: 'state',
+          seq: seq,
+          ack: this.lastGuestInputSeq || 0,
           ms: typeof matchState !== 'undefined' ? matchState : 'playing',
           tm: typeof matchTimeRemaining === 'number' ? matchTimeRemaining : 180,
           bt: typeof bothCantFightTimer === 'number' ? bothCantFightTimer : 0,
@@ -432,6 +478,7 @@
             spin: enemyBot.weaponSpinSpeed, hp: enemyBot.driveHealth, fp: enemyBot.flipped,
             wa: enemyBot.weaponActive !== false, wd: !!enemyBot.weaponDestroyed, ws: enemyBot.weaponStallTimer || 0,
             ed: !!enemyBot.isEntirelyDestroyed, st: enemyBot.stoppedTimer || 0,
+            rl: enemyBot.recoilLockTimer || 0,
             rc: p2Parts, dp: p2Detached
           },
           events: evs
@@ -443,6 +490,10 @@
 
     applyRemoteState(data) {
       if (!playerBot || !enemyBot) return;
+      if (typeof data.seq === 'number') {
+        if (data.seq <= this.lastAppliedStateSeq) return;
+        this.lastAppliedStateSeq = data.seq;
+      }
 
       // If Host has already transitioned from countdown to playing, synchronize Guest immediately
       if (typeof matchState !== 'undefined' && matchState === 'countdown' && (data.ms === 'playing' || data.ms === 'celebrating')) {
@@ -470,15 +521,22 @@
         initBotDetachableParts(enemyBot);
       }
 
-      // Host robot (p1 -> playerBot at -7.5 on both Host and Guest)
-      playerBot.x = data.p1.x;
-      playerBot.z = data.p1.z;
+      // Host robot (p1 -> playerBot on both Host and Guest)
+      const p1dx = data.p1.x - playerBot.x;
+      const p1dz = data.p1.z - playerBot.z;
+      if (p1dx * p1dx + p1dz * p1dz > 4.0) {
+        playerBot.x = data.p1.x;
+        playerBot.z = data.p1.z;
+      } else {
+        playerBot.x += p1dx * 0.55;
+        playerBot.z += p1dz * 0.55;
+      }
       playerBot.airY = data.p1.ay || 0;
       playerBot.wheelTilt = data.p1.wt || 0;
       playerBot.vx = data.p1.vx || 0;
       playerBot.vz = data.p1.vz || 0;
-      playerBot.root.position.x = data.p1.x;
-      playerBot.root.position.z = data.p1.z;
+      playerBot.root.position.x = playerBot.x;
+      playerBot.root.position.z = playerBot.z;
       playerBot.root.position.y = (data.p1.y || 0);
       playerBot.yaw = data.p1.yaw;
       playerBot.pitch = data.p1.pitch;
@@ -494,31 +552,107 @@
       playerBot.weaponStallTimer = data.p1.ws || 0;
       playerBot.stoppedTimer = data.p1.st || 0;
 
-      // Guest robot (p2 -> enemyBot at +7.5 on both Host and Guest)
-      // Smooth reconciliation with Client-Side Prediction:
+      // Guest robot (p2 -> enemyBot on both Host and Guest)
+      // Authoritative reconciliation using input sequence ack + unacked input prediction replay:
+      const ackSeq = typeof data.ack === 'number' ? data.ack : 0;
+      if (ackSeq > 0 && this.pendingInputs.length > 0) {
+        this.pendingInputs = this.pendingInputs.filter(inp => inp.seq > ackSeq);
+      }
+
+      const hostForcedMotion = !!(data.p2.fp || data.p2.ed || (data.p2.rl && data.p2.rl > 0));
       if (!enemyBot.isEntirelyDestroyed) {
-        const dx = data.p2.x - enemyBot.x;
-        const dz = data.p2.z - enemyBot.z;
+        let rx = data.p2.x;
+        let rz = data.p2.z;
+        let rvx = data.p2.vx || 0;
+        let rvz = data.p2.vz || 0;
+        let ryaw = data.p2.yaw;
+
+        // Forward-replay unacknowledged Guest inputs when actively driving so normal latency never snaps back!
+        if (!hostForcedMotion && (enemyBot.drivePower || 0) > 0 && this.pendingInputs.length > 0) {
+          const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { maxSpeed: 15.0, turnRate: 3.4, accel: 46.0, collisionRadius: 1.12, wallRadius: 1.32 };
+          const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { collisionRadius: 1.12 };
+          const dp = enemyBot.drivePower || 1.0;
+          const mSpd = eSpecs.maxSpeed * (0.35 + 0.65 * dp);
+          const tRate = eSpecs.turnRate * (0.35 + 0.65 * dp);
+          const acc = eSpecs.accel * dp;
+          const minBotDist = (pSpecs.collisionRadius || 1.12) + (eSpecs.collisionRadius || 1.12);
+          const maxWall = (typeof ARENA_HALF !== 'undefined' ? ARENA_HALF : 12.23) - (eSpecs.wallRadius || 1.32);
+
+          let replayedTime = 0;
+          for (let i = 0; i < this.pendingInputs.length && replayedTime < 0.35; i++) {
+            const inp = this.pendingInputs[i];
+            const idt = inp.dt;
+            replayedTime += idt;
+            ryaw -= (inp.s || 0) * tRate * idt;
+            const fx = Math.sin(ryaw);
+            const fz = Math.cos(ryaw);
+            rvx += fx * (inp.t || 0) * acc * idt;
+            rvz += fz * (inp.t || 0) * acc * idt;
+            const drag = (Math.abs(inp.t || 0) > 0.05) ? Math.pow(0.06, idt) : Math.pow(0.002, idt);
+            rvx *= drag;
+            rvz *= drag;
+            const sp = Math.hypot(rvx, rvz);
+            if (sp > mSpd) {
+              rvx = (rvx / sp) * mSpd;
+              rvz = (rvz / sp) * mSpd;
+            }
+            rx = Math.max(-maxWall, Math.min(maxWall, rx + rvx * idt));
+            rz = Math.max(-maxWall, Math.min(maxWall, rz + rvz * idt));
+
+            const cdx = rx - playerBot.x;
+            const cdz = rz - playerBot.z;
+            const cdist = Math.hypot(cdx, cdz);
+            if (cdist < minBotDist && cdist > 0.0001) {
+              const cnx = cdx / cdist;
+              const cnz = cdz / cdist;
+              rx += cnx * (minBotDist - cdist);
+              rz += cnz * (minBotDist - cdist);
+              const closing = -(rvx * cnx + rvz * cnz);
+              if (closing > 0) {
+                rvx += cnx * closing;
+                rvz += cnz * closing;
+              }
+            }
+          }
+        }
+
+        const dx = rx - enemyBot.x;
+        const dz = rz - enemyBot.z;
         const distSq = dx * dx + dz * dz;
-        if (distSq > 1.2) {
-          enemyBot.x = data.p2.x;
-          enemyBot.z = data.p2.z;
+        if (hostForcedMotion || distSq > 12.25) {
+          // Only hard-snap on true major desync (> 3.5m) or authoritative collision/flip launch
+          enemyBot.x = rx;
+          enemyBot.z = rz;
+          enemyBot.vx = rvx;
+          enemyBot.vz = rvz;
+          enemyBot.yaw = ryaw;
         } else {
-          enemyBot.x += dx * 0.65;
-          enemyBot.z += dz * 0.65;
+          if (distSq > 0.006) {
+            enemyBot.x += dx * 0.24;
+            enemyBot.z += dz * 0.24;
+          }
+          let yawDiff = ryaw - enemyBot.yaw;
+          while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+          while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+          if (Math.abs(yawDiff) > 0.45) {
+            enemyBot.yaw = ryaw;
+          } else {
+            enemyBot.yaw += yawDiff * 0.20;
+          }
         }
         enemyBot.root.position.x = enemyBot.x;
         enemyBot.root.position.z = enemyBot.z;
+      } else {
+        enemyBot.vx = data.p2.vx || 0;
+        enemyBot.vz = data.p2.vz || 0;
+        enemyBot.yaw = data.p2.yaw;
       }
       enemyBot.airY = data.p2.ay || 0;
       enemyBot.wheelTilt = data.p2.wt || 0;
-      enemyBot.vx = data.p2.vx || 0;
-      enemyBot.vz = data.p2.vz || 0;
       enemyBot.root.position.y = (data.p2.y || 0);
-      enemyBot.yaw = data.p2.yaw;
       enemyBot.pitch = data.p2.pitch;
       enemyBot.roll = data.p2.roll;
-      enemyBot.root.rotation.y = data.p2.yaw;
+      enemyBot.root.rotation.y = enemyBot.yaw;
       enemyBot.tiltGroup.rotation.x = data.p2.pitch;
       enemyBot.tiltGroup.rotation.z = data.p2.roll + (enemyBot.wheelTilt || 0);
       enemyBot.weaponSpinSpeed = data.p2.spin;

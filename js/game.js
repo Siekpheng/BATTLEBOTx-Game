@@ -1292,8 +1292,23 @@
       } else {
         clearInterval(activeCountdownInterval);
         activeCountdownInterval = null;
-        countdownOverlay.classList.add('hidden');
-        matchState = 'playing';
+        if (NetworkSys.isOnline && !NetworkSys.isHost) {
+          // Guest waits for Host's authoritative 'start_play' signal so Guest never drives during Host countdown
+          countdownText.textContent = 'FIGHT!';
+          setTimeout(() => {
+            if (typeof matchState !== 'undefined' && matchState === 'countdown') {
+              countdownOverlay.classList.add('hidden');
+              matchState = 'playing';
+            }
+          }, 1800);
+        } else {
+          countdownOverlay.classList.add('hidden');
+          matchState = 'playing';
+          if (NetworkSys.isOnline && NetworkSys.isHost && NetworkSys.conn && NetworkSys.conn.open) {
+            try { NetworkSys.conn.send({ type: 'start_play' }); } catch (e) {}
+            NetworkSys.broadcastState();
+          }
+        }
       }
     }, 850);
   }
@@ -2321,9 +2336,17 @@
         if (throttleKnobEl) throttleKnobEl.style.transform = `translateY(${-t * 42}px)`;
         if (steerKnobEl) steerKnobEl.style.transform = `translateX(${s * 46}px)`;
 
-        NetworkSys.sendInput(t, s);
+        NetworkSys.sendInput(t, s, simDt);
 
-        // Guest Controls enemyBot: apply client prediction so Guest drives immediately without waiting for round-trip!
+        // Smoothly extrapolate Host's robot velocity between 35Hz state snapshots so collision checks match rendered position
+        if (playerBot && !playerBot.isEntirelyDestroyed && !playerBot.flipped) {
+          const pSpecsG = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { wallRadius: 1.32 };
+          const pMaxW = (typeof ARENA_HALF !== 'undefined' ? ARENA_HALF : 12.23) - (pSpecsG.wallRadius || 1.32);
+          playerBot.x = Math.max(-pMaxW, Math.min(pMaxW, playerBot.x + (playerBot.vx || 0) * simDt));
+          playerBot.z = Math.max(-pMaxW, Math.min(pMaxW, playerBot.z + (playerBot.vz || 0) * simDt));
+        }
+
+        // Guest Controls enemyBot: apply client prediction + solid collision separation so Guest never passes through Host!
         if (enemyBot && !enemyBot.isEntirelyDestroyed) {
           const eHasWheels = (enemyBot.wheels && enemyBot.wheels.length > 0 && enemyBot.wheels.some(w => w.attached !== false)) ||
             (enemyBot.detachableParts && enemyBot.detachableParts.some(p => p.category === 'wheel' && p.attached && p.mesh && p.mesh.parent));
@@ -2337,6 +2360,9 @@
             enemyBot.steerInput = s;
           }
           updateBotPhysics(enemyBot, simDt);
+          if (matchState === 'playing' && typeof resolveGuestSolidBotCollision === 'function') {
+            resolveGuestSolidBotCollision();
+          }
         }
 
         updateBotVisuals(playerBot, dt);

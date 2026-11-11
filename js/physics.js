@@ -705,6 +705,39 @@
     }
   }
 
+  // Lightweight client-side solid collision for Online 1v1 Guest prediction so the Guest's bot
+  // collides solidly against the Host's bot instead of passing through it between state updates.
+  // (Host remains 100% authoritative for HP damage, part detachment, sparks, and KO!)
+  function resolveGuestSolidBotCollision() {
+    if (!playerBot || !enemyBot || playerBot.isEntirelyDestroyed || enemyBot.isEntirelyDestroyed) return;
+    const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { collisionRadius: 1.12 };
+    const eSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(enemyBot.type) : { collisionRadius: 1.12, wallRadius: 1.32 };
+
+    const dx = enemyBot.x - playerBot.x;
+    const dz = enemyBot.z - playerBot.z;
+    const dist = Math.hypot(dx, dz);
+    const minDist = (pSpecs.collisionRadius || 1.12) + (eSpecs.collisionRadius || 1.12);
+
+    if (dist < minDist && dist > 0.0001) {
+      const nx = dx / dist;
+      const nz = dz / dist;
+      const overlap = minDist - dist;
+      enemyBot.x += nx * overlap;
+      enemyBot.z += nz * overlap;
+
+      const maxPos = (typeof ARENA_HALF !== 'undefined' ? ARENA_HALF : 12.23) - (eSpecs.wallRadius || 1.32);
+      enemyBot.x = Math.max(-maxPos, Math.min(maxPos, enemyBot.x));
+      enemyBot.z = Math.max(-maxPos, Math.min(maxPos, enemyBot.z));
+
+      const relClosing = -((enemyBot.vx || 0) - (playerBot.vx || 0)) * nx - ((enemyBot.vz || 0) - (playerBot.vz || 0)) * nz;
+      if (relClosing > 0) {
+        enemyBot.vx += nx * relClosing * 1.18;
+        enemyBot.vz += nz * relClosing * 1.18;
+      }
+    }
+  }
+  window.resolveGuestSolidBotCollision = resolveGuestSolidBotCollision;
+
   function handleBotCollision() {
     if (!playerBot || !enemyBot) return;
     const pSpecs = (typeof getBotCombatSpecs === 'function') ? getBotCombatSpecs(playerBot.type) : { mass: 250, weaponReach: 0.35, weaponWidth: 0.90, weaponHalfWidth: 0.45, pushTractionMult: 1.0, maxWeaponRpm: 95, attackStall: 0.8, defendStall: 1.2, flingBase: 4.0, flingSpeedMult: 0.45, flipChance: 0.24, flipResistance: 1.0, partDamageChance: 0.50, partDamageHigh: 1, collisionRadius: 1.12, wedgeRating: 1.0 };
