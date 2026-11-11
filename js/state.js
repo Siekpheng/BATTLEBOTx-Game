@@ -1,7 +1,7 @@
 // ========================================================
 // BATTLEBOTx - CORE GAME STATE & SHARED REFERENCES
 // ========================================================
-var GAME_VERSION = 'v1.6.9';
+var GAME_VERSION = 'v1.7.0';
 var gameMode = 'bot'; // 'bot', '1v1', 'practice'
 var selectedBotType = 'robot1';
 var matchState = 'menu'; // 'menu', 'countdown', 'playing', 'paused', 'gameover'
@@ -26,7 +26,7 @@ var smoothCameraP2Initialized = false;
 
 var playerBot = null;
 var enemyBot = null;
-var MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
+var MENU_ROBOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7'];
 
 window.startMatchSequence = null;
 window.startMatch = () => (typeof window.startMatchSequence === 'function' ? window.startMatchSequence() : null);

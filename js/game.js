@@ -178,6 +178,34 @@
       wallRadius: 0.95,
       gyroFactor: 0.45,      // Small blade has minimal gyro lift, keeping cornering flat and agile
       wedgeRating: 0.85
+    },
+    robot7: {
+      name: 'Vai',
+      role: 'Hook Disc · Forked Brawler',
+      mass: 250,             // Standard 250 lb combat heavyweight
+      maxHealth: 425,        // Calibrated brisk ~1.5–2 min match duration
+      maxSpeed: 15.4,
+      turnRate: 3.60,
+      accel: 49.0,
+      maxWeaponRpm: 106.0,   // High-torque asymmetric single-tooth hooked vertical spinner
+      windUpRate: 48.0,      // ~2.2s wind-up
+      attackStall: 0.52,
+      defendStall: 0.80,
+      weaponReach: 0.34,
+      weaponWidth: 0.42,     // Heavy central vertical hooked bar + dual pulley hubs
+      weaponHalfWidth: 0.210,
+      flingBase: 6.8,        // Strong upward-biting vertical hook uppercut
+      flingSpeedMult: 0.50,
+      flipChance: 0.36,      // Low ground-scraping front forks + upward spinner bite lift opponents cleanly
+      flipResistance: 0.85,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
+      partDamageChance: 0.44,
+      partDamageHigh: 1,
+      partDivisor: 15,
+      collisionRadius: 1.12,
+      wallRadius: 1.32,
+      gyroFactor: 1.15,      // Strong vertical spinner gyroscopic precession
+      wedgeRating: 1.15      // Twin low front forks + slanted lime-green wedgelets
     }
   };
   window.ROBOT_COMBAT_SPECS = ROBOT_COMBAT_SPECS;
@@ -1121,7 +1149,7 @@
     } catch (e) {}
 
     let botTypeChoice = selectedBotType || 'robot1';
-    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6'];
+    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
 
     let enemyType;
@@ -1185,6 +1213,7 @@
     if (playerBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(playerBot);
     if (playerBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(playerBot);
     if (playerBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(playerBot);
+    if (playerBot.type === 'robot7' && typeof attachCadToRobot7 === 'function') attachCadToRobot7(playerBot);
 
     if (enemyBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(enemyBot);
     if (enemyBot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(enemyBot);
@@ -1192,6 +1221,7 @@
     if (enemyBot.type === 'robot4' && typeof attachCadToRobot4 === 'function') attachCadToRobot4(enemyBot);
     if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
     if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
+    if (enemyBot.type === 'robot7' && typeof attachCadToRobot7 === 'function') attachCadToRobot7(enemyBot);
 
     if (typeof initBotDetachableParts === 'function') {
       if (!playerBot.detachableParts || playerBot.detachableParts.length === 0) initBotDetachableParts(playerBot);
@@ -2655,7 +2685,8 @@
       { id: 'robot3', label: 'Robot 3 · KineticBar CAD Model' },
       { id: 'robot4', label: 'Robot 4 · VertForce CAD Model' },
       { id: 'robot5', label: 'Robot 5 · BlueThunder CAD Model' },
-      { id: 'robot6', label: 'Robot 6 · Vortex CAD Model' }
+      { id: 'robot6', label: 'Robot 6 · Vortex CAD Model' },
+      { id: 'robot7', label: 'Robot 7 · Vai CAD Model' }
     ];
 
     setProgress(4, 'Initializing 3D Combat Arena...');

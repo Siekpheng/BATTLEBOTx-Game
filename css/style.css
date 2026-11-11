@@ -381,13 +381,13 @@
     }
     .mini-bot-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 7px;
       margin-bottom: 16px;
     }
     @media (max-width: 600px) {
       .mini-bot-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
       }
     }
     .mini-bot-card {
@@ -418,7 +418,7 @@
 
     .modal-box {
       width: 100%;
-      max-width: 890px;
+      max-width: 1020px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 20px;
@@ -469,11 +469,11 @@
 
     .bot-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 10px;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 9px;
     }
 
-    @media (max-width: 760px) {
+    @media (max-width: 820px) {
       .bot-grid {
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       }
