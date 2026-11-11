@@ -180,7 +180,7 @@
 
     const hasSpinningWeapon = (bot.weaponMesh && !bot.weaponDestroyed && (bot.weaponSpinSpeed || 0) > 15.0);
     const spinFactor = hasSpinningWeapon ? Math.min(1.0, bot.weaponSpinSpeed / (botSpecs.maxWeaponRpm || 95.0)) : 0;
-    const isVertSpinner = (bot.type === 'robot1' || bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6' || bot.type === 'robot7');
+    const isVertSpinner = (bot.type === 'robot1' || bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6' || bot.type === 'robot7' || bot.type === 'robot8');
     const gyroMult = botSpecs.gyroFactor || 1.0;
 
     // Realistic BattleBots Gyroscopic Turn Resistance:
@@ -501,7 +501,7 @@
         }
       }
 
-      if (bot.type === 'robot2' || bot.type === 'robot7') {
+      if (bot.type === 'robot2' || bot.type === 'robot7' || bot.type === 'robot8') {
         bot.weaponMesh.rotation.x -= bot.weaponSpinSpeed * dt;
       } else if (bot.type === 'robot1') {
         // Robot 1 weapon is natively modeled at 10-degree tilt in CAD geometry.
@@ -551,7 +551,7 @@
         const w = bot.wheels[i];
         if (w.attached && w.mesh) {
           const isSmallWheel = (bot.type === 'robot1') && w.name.includes('Front');
-          const wRadius = isSmallWheel ? 0.099 : (bot.type === 'robot7' ? 0.224 : 0.244);
+          const wRadius = isSmallWheel ? 0.099 : (bot.type === 'robot7' ? 0.224 : (bot.type === 'robot8' ? 0.211 : 0.244));
           const omega = ((w.side === 'left') ? leftV : rightV) / wRadius;
           w.mesh.rotation.x += omega * dt;
         }
@@ -928,8 +928,8 @@
         }
 
         // Wheel traction: normalized to attached wheel ratio so 2-wheel and 4-wheel bots push with equal traction when intact
-        const pMaxWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.length : ((playerBot.type === 'robot2' || playerBot.type === 'robot4' || playerBot.type === 'robot6' || playerBot.type === 'robot7') ? 4 : 2);
-        const eMaxWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.length : ((enemyBot.type === 'robot2' || enemyBot.type === 'robot4' || enemyBot.type === 'robot6' || enemyBot.type === 'robot7') ? 4 : 2);
+        const pMaxWheels = (playerBot.wheels && playerBot.wheels.length > 0) ? playerBot.wheels.length : ((playerBot.type === 'robot2' || playerBot.type === 'robot4' || playerBot.type === 'robot6' || playerBot.type === 'robot7' || playerBot.type === 'robot8') ? 4 : 2);
+        const eMaxWheels = (enemyBot.wheels && enemyBot.wheels.length > 0) ? enemyBot.wheels.length : ((enemyBot.type === 'robot2' || enemyBot.type === 'robot4' || enemyBot.type === 'robot6' || enemyBot.type === 'robot7' || enemyBot.type === 'robot8') ? 4 : 2);
         const pWheelHealth = Math.min(1.0, Math.max(0.0, pWheels / pMaxWheels));
         const eWheelHealth = Math.min(1.0, Math.max(0.0, eWheels / eMaxWheels));
 
@@ -1359,7 +1359,7 @@
             pStrikeWear = (wasPSpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
           } else if (playerBot.type === 'robot3') {
             pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.52 : 0.38;
-          } else if (playerBot.type === 'robot4' || playerBot.type === 'robot7') {
+          } else if (playerBot.type === 'robot4' || playerBot.type === 'robot7' || playerBot.type === 'robot8') {
             pStrikeWear = (wasPSpinFast && (impactSpeed > 5.5 || canFlipEnemy)) ? 0.46 : 0.36;
           } else if (playerBot.type === 'robot2') {
             pStrikeWear = (canFlipEnemy || impactSpeed > 6.0) ? 0.36 : 0.30;
@@ -1515,7 +1515,7 @@
             eStrikeWear = (wasESpinFast && impactSpeed > 6.5) ? 0.28 : 0.22;
           } else if (enemyBot.type === 'robot3') {
             eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.52 : 0.38;
-          } else if (enemyBot.type === 'robot4' || enemyBot.type === 'robot7') {
+          } else if (enemyBot.type === 'robot4' || enemyBot.type === 'robot7' || enemyBot.type === 'robot8') {
             eStrikeWear = (wasESpinFast && (impactSpeed > 5.5 || canFlipPlayer)) ? 0.46 : 0.36;
           } else if (enemyBot.type === 'robot2') {
             eStrikeWear = (canFlipPlayer || impactSpeed > 6.0) ? 0.36 : 0.30;
@@ -1908,7 +1908,7 @@
         const robot1SpindleAxis = new THREE.Vector3(0, Math.cos((10.0 * Math.PI) / 180), Math.sin((10.0 * Math.PI) / 180)).normalize();
         bot.weaponAngle = ((bot.weaponAngle || 0) + bot.weaponSpinSpeed * dt) % (Math.PI * 2);
         bot.weaponMesh.quaternion.setFromAxisAngle(robot1SpindleAxis, bot.weaponAngle);
-      } else if (bot.type === 'robot2' || bot.type === 'robot7') {
+      } else if (bot.type === 'robot2' || bot.type === 'robot7' || bot.type === 'robot8') {
         bot.weaponMesh.rotation.x -= bot.weaponSpinSpeed * dt;
       } else if (bot.type === 'robot3') {
         bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
@@ -1931,6 +1931,7 @@
       if (bot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(bot);
       if (bot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(bot);
       if (bot.type === 'robot7' && typeof attachCadToRobot7 === 'function') attachCadToRobot7(bot);
+      if (bot.type === 'robot8' && typeof attachCadToRobot8 === 'function') attachCadToRobot8(bot);
     }
   }
 

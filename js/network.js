@@ -827,7 +827,7 @@
     },
 
     selectRematchBot(botId) {
-      const validBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7'];
+      const validBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7', 'robot8'];
       if (!validBots.includes(botId)) return;
       this.selectedBot = botId;
       this.myRematchReady = false;
@@ -982,7 +982,8 @@
         robot4: 'Robot 4 (Twin Blade)',
         robot5: 'Robot 5 (Drum Spinner)',
         robot6: 'Robot 6 (Heavy Disc)',
-        robot7: 'Robot 7 (Vai Hook Disc)'
+        robot7: 'Robot 7 (Vai Hook Disc)',
+        robot8: 'Robot 8 (KK Pocket Spinner)'
       };
       return map[botKey] || botKey || 'Robot 1';
     },

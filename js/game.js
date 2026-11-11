@@ -206,6 +206,34 @@
       wallRadius: 1.32,
       gyroFactor: 1.15,      // Strong vertical spinner gyroscopic precession
       wedgeRating: 1.15      // Twin low front forks + slanted lime-green wedgelets
+    },
+    robot8: {
+      name: 'KK',
+      role: 'Pocket Drum · Quad-Fork Brawler',
+      mass: 250,             // Standard 250 lb combat heavyweight
+      maxHealth: 435,        // Calibrated brisk ~1.5–2 min match duration
+      maxSpeed: 15.1,
+      turnRate: 3.55,
+      accel: 48.5,
+      maxWeaponRpm: 104.0,   // Heavy wide pocket scoop vertical drum spinner
+      windUpRate: 46.0,      // ~2.25s wind-up
+      attackStall: 0.56,
+      defendStall: 0.78,
+      weaponReach: 0.35,
+      weaponWidth: 0.66,     // Wide 0.66m pocket hammer-drum rotor
+      weaponHalfWidth: 0.330,
+      flingBase: 6.9,        // Massive uppercut pocket launch
+      flingSpeedMult: 0.50,
+      flipChance: 0.38,      // Quad low front forks feed opponents straight into the pocket drum
+      flipResistance: 0.84,
+      pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
+      partDamageChance: 0.43,
+      partDamageHigh: 1,
+      partDivisor: 15,
+      collisionRadius: 1.12,
+      wallRadius: 1.32,
+      gyroFactor: 1.20,      // Wide heavy vertical drum gyro feel
+      wedgeRating: 1.18      // 4-fork front feeder wedge geometry
     }
   };
   window.ROBOT_COMBAT_SPECS = ROBOT_COMBAT_SPECS;
@@ -1149,7 +1177,7 @@
     } catch (e) {}
 
     let botTypeChoice = selectedBotType || 'robot1';
-    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7'];
+    const allBots = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7', 'robot8'];
     if (!allBots.includes(botTypeChoice)) botTypeChoice = 'robot1';
 
     let enemyType;
@@ -1214,6 +1242,7 @@
     if (playerBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(playerBot);
     if (playerBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(playerBot);
     if (playerBot.type === 'robot7' && typeof attachCadToRobot7 === 'function') attachCadToRobot7(playerBot);
+    if (playerBot.type === 'robot8' && typeof attachCadToRobot8 === 'function') attachCadToRobot8(playerBot);
 
     if (enemyBot.type === 'robot1' && typeof attachCadToRobot1 === 'function') attachCadToRobot1(enemyBot);
     if (enemyBot.type === 'robot2' && typeof attachCadToRobot2 === 'function') attachCadToRobot2(enemyBot);
@@ -1222,6 +1251,7 @@
     if (enemyBot.type === 'robot5' && typeof attachCadToRobot5 === 'function') attachCadToRobot5(enemyBot);
     if (enemyBot.type === 'robot6' && typeof attachCadToRobot6 === 'function') attachCadToRobot6(enemyBot);
     if (enemyBot.type === 'robot7' && typeof attachCadToRobot7 === 'function') attachCadToRobot7(enemyBot);
+    if (enemyBot.type === 'robot8' && typeof attachCadToRobot8 === 'function') attachCadToRobot8(enemyBot);
 
     if (typeof initBotDetachableParts === 'function') {
       if (!playerBot.detachableParts || playerBot.detachableParts.length === 0) initBotDetachableParts(playerBot);
@@ -2712,7 +2742,8 @@
       { id: 'robot4', label: 'Robot 4 · VertForce CAD Model' },
       { id: 'robot5', label: 'Robot 5 · BlueThunder CAD Model' },
       { id: 'robot6', label: 'Robot 6 · Vortex CAD Model' },
-      { id: 'robot7', label: 'Robot 7 · Vai CAD Model' }
+      { id: 'robot7', label: 'Robot 7 · Vai CAD Model' },
+      { id: 'robot8', label: 'Robot 8 · KK CAD Model' }
     ];
 
     setProgress(4, 'Initializing 3D Combat Arena...');

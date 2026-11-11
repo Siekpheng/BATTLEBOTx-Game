@@ -106,16 +106,16 @@
   </script>
 
   <!-- Game Scripts -->
-  <script src="js/state.js?v=20261111_v170"></script>
-  <script src="js/audio.js?v=20261111_v170"></script>
-  <script src="js/arena.js?v=20261111_v170"></script>
-  <script src="js/particles.js?v=20261111_v170"></script>
-  <script src="js/robots.js?v=20261111_v170"></script>
-  <script src="js/physics.js?v=20261111_v170"></script>
-  <script src="js/game.js?v=20261111_v170"></script>
+  <script src="js/state.js?v=20261111_v172"></script>
+  <script src="js/audio.js?v=20261111_v172"></script>
+  <script src="js/arena.js?v=20261111_v172"></script>
+  <script src="js/particles.js?v=20261111_v172"></script>
+  <script src="js/robots.js?v=20261111_v172"></script>
+  <script src="js/physics.js?v=20261111_v172"></script>
+  <script src="js/game.js?v=20261111_v172"></script>
 </head>
 <body>
-  <h1>BATTLEBOTx &mdash; Automated 7-Robot Round-Robin Tournament</h1>
+  <h1>BATTLEBOTx &mdash; Automated 8-Robot Round-Robin Tournament</h1>
   <div id="status-banner">Initializing simulation engine and loading 3D CAD bot models...</div>
 
   <div id="tournament-container" style="display:none;">
@@ -155,20 +155,20 @@
     window.gameMode = 'bot';
     window.matchState = 'playing';
 
-    const BOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7'];
-    const ROUNDS_PER_MATCHUP = 5; // 5 rounds per pair = 105 matches total!
+    const BOT_ROSTER = ['robot1', 'robot2', 'robot3', 'robot4', 'robot5', 'robot6', 'robot7', 'robot8'];
+    const ROUNDS_PER_MATCHUP = 5; // 5 rounds per pair = 140 matches total!
 
     async function runTournament() {
       const banner = document.getElementById('status-banner');
-      banner.textContent = 'Loading all 7 3D CAD robot models into physics memory...';
+      banner.textContent = 'Loading all 8 3D CAD robot models into physics memory...';
 
-      // Load all 7 models
+      // Load all 8 models
       for (const botType of BOT_ROSTER) {
         banner.textContent = `Loading CAD model for ${botType}...`;
         await ensureBotModelLoaded(botType);
       }
 
-      banner.textContent = 'All models loaded! Running 105-match Round-Robin Tournament...';
+      banner.textContent = 'All models loaded! Running 140-match Round-Robin Tournament...';
 
       const botStats = {};
       const headToHead = {};

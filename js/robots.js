@@ -436,6 +436,7 @@
   let robot5ModelScene = null;
   let robot6ModelScene = null;
   let robot7ModelScene = null;
+  let robot8ModelScene = null;
 
   function attachCadToRobot2(bot) {
     if (!robot2ModelScene || !bot || !bot.tiltGroup || bot.cadAttached) return;
@@ -549,7 +550,8 @@
     robot4: null,
     robot5: null,
     robot6: null,
-    robot7: null
+    robot7: null,
+    robot8: null
   };
   const botLoadingPromises = {};
 
@@ -593,6 +595,7 @@
         else if (type === 'robot5') robot5ModelScene = scene;
         else if (type === 'robot6') robot6ModelScene = scene;
         else if (type === 'robot7') robot7ModelScene = scene;
+        else if (type === 'robot8') robot8ModelScene = scene;
         botModelScenes[type] = scene;
 
         console.log(`✅ High-Resolution Autodesk Fusion Robot ${botNum} loaded successfully!`);
@@ -691,6 +694,7 @@
   function loadRobot5HighRes() { return ensureBotModelLoaded('robot5'); }
   function loadRobot6HighRes() { return ensureBotModelLoaded('robot6'); }
   function loadRobot7HighRes() { return ensureBotModelLoaded('robot7'); }
+  function loadRobot8HighRes() { return ensureBotModelLoaded('robot8'); }
 
   function getBotScene(type) {
     if (type === 'robot1') return robot1ModelScene;
@@ -700,6 +704,7 @@
     if (type === 'robot5') return robot5ModelScene;
     if (type === 'robot6') return robot6ModelScene;
     if (type === 'robot7') return robot7ModelScene;
+    if (type === 'robot8') return robot8ModelScene;
     return null;
   }
 
@@ -766,6 +771,7 @@
   function attachCadToRobot5(bot) { attachCadToBot(bot, 'robot5'); }
   function attachCadToRobot6(bot) { attachCadToBot(bot, 'robot6'); }
   function attachCadToRobot7(bot) { attachCadToBot(bot, 'robot7'); }
+  function attachCadToRobot8(bot) { attachCadToBot(bot, 'robot8'); }
 
   // ========================================================
   // 4. ROBOT BUILDER & DETACHABLE ARMOR PLATES
