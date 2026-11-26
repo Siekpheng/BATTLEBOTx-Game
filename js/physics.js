@@ -396,7 +396,9 @@
       }
     }
 
-    bot.flipped = (Math.abs(bot.pitch) > Math.PI * 0.48) || (Math.abs(bot.roll) > Math.PI * 0.48);
+    if (!inAir) {
+      bot.flipped = (Math.abs(bot.pitch) > Math.PI * 0.48) || (Math.abs(bot.roll) > Math.PI * 0.48);
+    }
 
     const wheelDiff = (rightWheels - leftWheels);
     const wheelTilt = Math.max(-0.10, Math.min(0.10, wheelDiff * 0.045));
@@ -419,18 +421,18 @@
         bot.weaponStallTimer = Math.max(0, bot.weaponStallTimer - dt);
       }
 
-      // 2. >70% DAMAGE WEAPON MOTOR & BELT BREAKDOWN + TOTAL DEMOLITION SHUTDOWN:
-      // Once a robot suffers over 70% damage (<= 30% HP or <= 30% parts remaining), its weapon belt and motor break
+      // 2. >78% DAMAGE WEAPON MOTOR & BELT BREAKDOWN + TOTAL DEMOLITION SHUTDOWN:
+      // Once a robot suffers severe damage (<= 22% HP or <= 25% parts remaining), its weapon belt and motor break
       // permanently so the weapon can no longer spin!
-      const maxHpWeaponCheck = bot.maxDriveHealth || 400;
-      const threshold30Parts = (bot.totalInitialParts && bot.totalInitialParts > 0)
-        ? Math.max(1, Math.floor(bot.totalInitialParts * 0.30))
+      const maxHpWeaponCheck = bot.maxDriveHealth || 306;
+      const threshold25Parts = (bot.totalInitialParts && bot.totalInitialParts > 0)
+        ? Math.max(1, Math.floor(bot.totalInitialParts * 0.25))
         : 2;
-      const isOver70PercentDamage = (remainingParts <= threshold30Parts) ||
-        (bot.driveHealth < maxHpWeaponCheck * 0.30) ||
-        (typeof getBotDamagePercent === 'function' && getBotDamagePercent(bot) > 70);
+      const isOver78PercentDamage = (remainingParts <= threshold25Parts) ||
+        (bot.driveHealth < maxHpWeaponCheck * 0.22) ||
+        (typeof getBotDamagePercent === 'function' && getBotDamagePercent(bot) > 78);
 
-      if (!bot.weaponDestroyed && (isOver70PercentDamage || bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
+      if (!bot.weaponDestroyed && (isOver78PercentDamage || bot.driveHealth <= 0 || bot.isEntirelyDestroyed)) {
         bot.weaponDestroyed = true;
         bot.weaponMotorBroken = true;
         bot.weaponActive = false;
@@ -739,49 +741,89 @@
   window.resolveGuestSolidBotCollision = resolveGuestSolidBotCollision;
 
   const STRIKE_WEAR_TABLE = {
-    robot1: [0.41, 0.34],
-    robot2: [0.42, 0.34],
-    robot3: [0.39, 0.31],
-    robot4: [0.43, 0.34],
-    robot5: [0.40, 0.32],
-    robot6: [0.30, 0.24],
-    robot7: [0.45, 0.35],
-    robot8: [0.45, 0.35]
+    robot1: [0.37, 0.29], // Fast Spin · Wedge Lifter: balanced reliable blade hits
+    robot2: [0.43, 0.34], // Heavy Armor · Juggernaut Tank: steady heavy drum punch
+    robot3: [0.54, 0.43], // Wide Reach · Glass Cannon Shredder: highest part/HP shred per hit
+    robot4: [0.49, 0.39], // Heavy Disc · Uppercut Launcher: devastating vertical flywheel bite
+    robot5: [0.46, 0.37], // Rapid Drum · Non-Stop Brawler: relentless drum hits
+    robot6: [0.36, 0.29], // Mini Speedster · Light Damage: nimble chip damage
+    robot7: [0.45, 0.36], // Hook Disc · Forked Brawler: high-torque hooked disc
+    robot8: [0.41, 0.32]  // Pocket Drum · Quad-Fork Brawler: wide pocket drum
   };
 
   function computeStrikeWear(attackerType, defenderType, wasSpinFast, impactSpeed, canFlip) {
     const [highWear, lowWear] = STRIKE_WEAR_TABLE[attackerType] || [0.40, 0.33];
-    const isHeavyHit = (attackerType === 'robot6')
-      ? (wasSpinFast && impactSpeed > 6.5)
-      : ((attackerType === 'robot1' || attackerType === 'robot2' || attackerType === 'robot5')
-          ? (canFlip || impactSpeed > 6.0)
-          : (wasSpinFast && (impactSpeed > 5.5 || canFlip)));
+    // Uniform physical rule across all robots: high-energy spun-up impacts or flips deal heavy wear
+    const isHeavyHit = canFlip || (wasSpinFast && impactSpeed > 5.0);
     let wear = isHeavyHit ? highWear : lowWear;
-    if (defenderType === 'robot2') wear *= 0.86;
+    // IronClad (robot2) reinforced tank hull absorbs 17% incoming strike wear
+    if (defenderType === 'robot2') wear *= 0.83;
     return wear;
   }
 
   function getWearThreshold(bot) {
     if (!bot) return 1.0;
-    const armorCount = bot.detachableParts
-      ? bot.detachableParts.filter(p => p.category === 'armor' || p.category === 'chassis_exterior').length
-      : 6;
-    const wheelCount = bot.wheels ? bot.wheels.length : 4;
-    const spareWheels = Math.max(0, wheelCount - 2);
-    const protectiveLayers = Math.max(3, armorCount + spareWheels);
-    return Math.max(0.88, Math.min(1.80, 8.85 / protectiveLayers));
+    const nonWheelParts = bot.detachableParts
+      ? bot.detachableParts.filter(p => p.category !== 'wheel' && p.category !== 'chassis_core').length
+      : 8;
+    const wheelGroups = (bot.wheels && bot.wheels.length > 0) ? bot.wheels.length : 2;
+    const threshold20 = Math.max(1, Math.round((bot.totalInitialParts || (nonWheelParts + wheelGroups)) * 0.20));
+    const eventsToStrip = Math.max(4, nonWheelParts + wheelGroups - Math.min(2, Math.floor(threshold20 * 0.5)));
+    const hpScale = (bot.maxDriveHealth || 306) / 306;
+    const targetDurability = 9.0 * hpScale;
+    return Math.max(0.65, Math.min(1.60, targetDurability / eventsToStrip));
   }
 
-  function applyWeaponStrikeWear(targetBot, strikeWear, impactDir, hitPoint, skipDamage = false, dmgScale = 28) {
+  function applyWeaponStrikeWear(targetBot, strikeWear, impactDir, hitPoint, skipDamage = false, dmgScale = 24) {
     if (!targetBot) return;
     if (!skipDamage) {
-      targetBot.driveHealth = Math.max(1, (targetBot.driveHealth || 400) - Math.round(dmgScale * strikeWear));
+      targetBot.driveHealth = Math.max(0, (targetBot.driveHealth || 306) - Math.round(dmgScale * strikeWear));
     }
     const threshold = getWearThreshold(targetBot);
     targetBot._weaponPartWear = (targetBot._weaponPartWear || 0) + strikeWear;
     if (targetBot._weaponPartWear >= threshold) {
       targetBot._weaponPartWear -= threshold;
       detachSinglePart(targetBot, impactDir, hitPoint);
+    }
+  }
+
+  const GRIND_PROFILE_TABLE = {
+    robot1: { dps: 4.1, intervalMult: 1.00 },
+    robot2: { dps: 4.1, intervalMult: 1.00 },
+    robot3: { dps: 5.4, intervalMult: 0.80 },
+    robot4: { dps: 4.3, intervalMult: 0.95 },
+    robot5: { dps: 4.8, intervalMult: 0.88 },
+    robot6: { dps: 3.4, intervalMult: 1.08 },
+    robot7: { dps: 4.3, intervalMult: 0.95 },
+    robot8: { dps: 4.3, intervalMult: 0.95 }
+  };
+
+  function applyContinuousGrinding(attacker, defender, rpmRatio, isSideOrRear, dirX, dirZ, midPos, isDefenderPlayer) {
+    attacker.weaponStallTimer = 0; // Weapon NEVER stalls while grinding into the opponent!
+    const grindRate = 0.40 + 0.60 * rpmRatio;
+    attacker._grindContactTimer = (attacker._grindContactTimer || 0) + 0.016 * grindRate;
+
+    const profile = GRIND_PROFILE_TABLE[attacker.type] || { dps: 4.2, intervalMult: 1.0 };
+    const tankReduction = (defender.type === 'robot2') ? 0.92 : 1.0;
+    const continuousDps = (isSideOrRear ? profile.dps * 1.35 : profile.dps) * tankReduction;
+    defender.driveHealth = Math.max(0, (defender.driveHealth || 306) - continuousDps * grindRate * 0.016);
+
+    const baseInterval = (isSideOrRear ? 3.20 : 5.00) * profile.intervalMult;
+    const grindInterval = baseInterval * Math.max(0.75, Math.min(1.50, getWearThreshold(defender)));
+
+    if (attacker._grindContactTimer >= grindInterval) {
+      attacker._grindContactTimer -= grindInterval;
+      AudioSys.weaponSliceSound();
+      spawnCollisionSparks(midPos, attacker.type === 'robot6' ? 12 : 20);
+      if (isDefenderPlayer) {
+        triggerDamageVignette();
+      } else {
+        triggerGamepadRumble(0.30, 100, 0);
+      }
+      // Subtle grinding vibration jolt (does NOT fling opponent away or stall weapon!)
+      defender.vx += dirX * 0.22;
+      defender.vz += dirZ * 0.22;
+      detachSinglePart(defender, { x: dirX, z: dirZ }, midPos, null, true);
     }
   }
 
@@ -1033,56 +1075,11 @@
         }
 
         // Continuous gradual health wear & part-shearing progress (weapon keeps spinning without stalling!)
-        // Grinding damage tuned so robots do not die too fast: ~5.4 DPS, 1 part per ~3.20s (~4.2s for Robot 6)
         if (pSpinningContact) {
-          playerBot.weaponStallTimer = 0; // Weapon NEVER stalls while grinding into the opponent!
-          const pGrindRate = 0.40 + 0.60 * pRpmRatio;
-          playerBot._grindContactTimer = (playerBot._grindContactTimer || 0) + 0.016 * pGrindRate;
-          const pBaseDps = (playerBot.type === 'robot6') ? 2.5 : 4.0;
-          const pContinuousDps = isHitOnEnemySideOrBack ? (pBaseDps * 1.35) : pBaseDps;
-          enemyBot.driveHealth = Math.max(1, (enemyBot.driveHealth || 400) - pContinuousDps * pGrindRate * 0.016);
-
-          const basePGrindInterval = isHitOnEnemySideOrBack
-            ? ((playerBot.type === 'robot6') ? 4.20 : 3.20)
-            : ((playerBot.type === 'robot6') ? 6.50 : 5.00);
-          const pGrindInterval = basePGrindInterval * Math.max(0.90, Math.min(1.65, getWearThreshold(enemyBot)));
-
-          if (playerBot._grindContactTimer >= pGrindInterval) {
-            playerBot._grindContactTimer -= pGrindInterval;
-            AudioSys.weaponSliceSound();
-            const burstSparksP = (playerBot.type === 'robot6') ? 12 : 20;
-            spawnCollisionSparks(midPos, burstSparksP);
-            triggerGamepadRumble(0.30, 100, 0);
-            // Subtle grinding vibration jolt (does NOT fling opponent away or stall weapon!)
-            enemyBot.vx += nx * 0.22;
-            enemyBot.vz += nz * 0.22;
-            detachSinglePart(enemyBot, { x: nx, z: nz }, midPos, null, true);
-          }
+          applyContinuousGrinding(playerBot, enemyBot, pRpmRatio, isHitOnEnemySideOrBack, nx, nz, midPos, false);
         }
-
         if (eSpinningContact) {
-          enemyBot.weaponStallTimer = 0; // Opponent weapon NEVER stalls while grinding!
-          const eGrindRate = 0.40 + 0.60 * eRpmRatio;
-          enemyBot._grindContactTimer = (enemyBot._grindContactTimer || 0) + 0.016 * eGrindRate;
-          const eBaseDps = (enemyBot.type === 'robot6') ? 2.5 : 4.0;
-          const eContinuousDps = isHitOnPlayerSideOrBack ? (eBaseDps * 1.35) : eBaseDps;
-          playerBot.driveHealth = Math.max(1, (playerBot.driveHealth || 400) - eContinuousDps * eGrindRate * 0.016);
-
-          const baseEGrindInterval = isHitOnPlayerSideOrBack
-            ? ((enemyBot.type === 'robot6') ? 4.20 : 3.20)
-            : ((enemyBot.type === 'robot6') ? 6.50 : 5.00);
-          const eGrindInterval = baseEGrindInterval * Math.max(0.90, Math.min(1.65, getWearThreshold(playerBot)));
-
-          if (enemyBot._grindContactTimer >= eGrindInterval) {
-            enemyBot._grindContactTimer -= eGrindInterval;
-            AudioSys.weaponSliceSound();
-            const burstSparksE = (enemyBot.type === 'robot6') ? 12 : 20;
-            spawnCollisionSparks(midPos, burstSparksE);
-            playerBot.vx -= nx * 0.22;
-            playerBot.vz -= nz * 0.22;
-            triggerDamageVignette();
-            detachSinglePart(playerBot, { x: -nx, z: -nz }, midPos, null, true);
-          }
+          applyContinuousGrinding(enemyBot, playerBot, eRpmRatio, isHitOnPlayerSideOrBack, -nx, -nz, midPos, true);
         }
 
         if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
@@ -1234,7 +1231,7 @@
           if (enemyBot.type === 'robot3') {
             const tangKick = 3.2;
             playerBot.vx -= (-nz) * tangKick;
-            playerBot.vz += nx * tangKick;
+            playerBot.vz -= nx * tangKick;
             playerBot.yaw += 0.28;
           }
 
@@ -1247,9 +1244,9 @@
           // Multi-hit wear & clash damage balanced uniformly across all 8 robots:
           const wearOnEnemy = computeStrikeWear(playerBot.type, enemyBot.type, false, impactSpeed, false) * (0.62 + 0.42 * pSpinRatio);
           const wearOnPlayer = computeStrikeWear(enemyBot.type, playerBot.type, false, impactSpeed, false) * (0.62 + 0.42 * eSpinRatio);
-          applyWeaponStrikeWear(enemyBot, wearOnEnemy, { x: nx, z: nz }, midPos, false, 22);
+          applyWeaponStrikeWear(enemyBot, wearOnEnemy, { x: nx, z: nz }, midPos, false, 16);
           if (!isPractice) {
-            applyWeaponStrikeWear(playerBot, wearOnPlayer, { x: -nx, z: -nz }, midPos, false, 22);
+            applyWeaponStrikeWear(playerBot, wearOnPlayer, { x: -nx, z: -nz }, midPos, false, 16);
           }
 
           if (!isPractice && playerBot.isEntirelyDestroyed && enemyBot.isEntirelyDestroyed) {
@@ -1266,9 +1263,9 @@
           // ========================================================
           const isFrontalOrRear = Math.abs(eHitForward) >= 0.25 || Math.abs(eHitForward) >= Math.abs(eHitRight);
 
-          const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.90);
-          const wasPSpinFast = (playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.78);
-          const isPTravelFast = (pSpeedBefore >= 6.2 && (pApproach >= 4.2 || impactSpeed >= 7.6));
+          const isPWeaponMax = (playerBot.weaponActive !== false && playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.80);
+          const wasPSpinFast = (playerBot.weaponSpinSpeed >= pSpecs.maxWeaponRpm * 0.72);
+          const isPTravelFast = (pSpeedBefore >= 5.0 && (pApproach >= 3.0 || impactSpeed >= 6.2));
           const isVerticalBiteP = isFrontalOrRear || (playerBot.vy > 0.35);
           const isHardVerticalHitP = isPWeaponMax && isPTravelFast && isVerticalBiteP;
           const effectiveFlipChanceP = pSpecs.flipChance * (eSpecs.flipResistance || 1.0);
@@ -1300,17 +1297,17 @@
           }
 
           if (canFlipEnemy) {
-            // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
-            enemyBot.vy = 2.1 + Math.random() * 0.35;
+            // WEIGHTY, CONTROLLED, REALISTIC FLIP (enough airtime & rotation to clear 90 deg and settle inverted)
+            enemyBot.vy = 3.6 + Math.random() * 0.45;
             enemyBot.airY = 0.15;
             enemyBot.vx += nx * (5.5 + impactSpeed * 0.40);
             enemyBot.vz += nz * (5.5 + impactSpeed * 0.40);
 
             if (isFrontalOrRear) {
-              enemyBot.pitchVel = (eHitForward > 0 ? -8.5 : 8.5);
+              enemyBot.pitchVel = (eHitForward > 0 ? -11.5 : 11.5);
               enemyBot.rollVel = (Math.random() - 0.5) * 2.5;
             } else {
-              enemyBot.rollVel = (eHitRight > 0 ? -8.5 : 8.5);
+              enemyBot.rollVel = (eHitRight > 0 ? -11.5 : 11.5);
               enemyBot.pitchVel = (Math.random() - 0.5) * 2.5;
             }
             enemyBot.flipped = true;
@@ -1402,9 +1399,9 @@
           // ========================================================
           const isFrontalOrRear = Math.abs(pHitForward) >= 0.25 || Math.abs(pHitForward) >= Math.abs(pHitRight);
 
-          const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.90);
-          const wasESpinFast = (enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.78);
-          const isETravelFast = (eSpeedBefore >= 6.2 && (eApproach >= 4.2 || impactSpeed >= 7.6));
+          const isEWeaponMax = (enemyBot.weaponActive !== false && enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.80);
+          const wasESpinFast = (enemyBot.weaponSpinSpeed >= eSpecs.maxWeaponRpm * 0.72);
+          const isETravelFast = (eSpeedBefore >= 5.0 && (eApproach >= 3.0 || impactSpeed >= 6.2));
           const isVerticalBiteE = isFrontalOrRear || (enemyBot.vy > 0.35);
           const isHardVerticalHitE = isEWeaponMax && isETravelFast && isVerticalBiteE;
           const effectiveFlipChanceE = eSpecs.flipChance * (pSpecs.flipResistance || 1.0);
@@ -1436,17 +1433,17 @@
           }
 
           if (canFlipPlayer) {
-            // WEIGHTY, CONTROLLED, REALISTIC FLIP (NO dramatic catapulting into the ceiling!)
-            playerBot.vy = 2.1 + Math.random() * 0.35;
+            // WEIGHTY, CONTROLLED, REALISTIC FLIP (enough airtime & rotation to clear 90 deg and settle inverted)
+            playerBot.vy = 3.6 + Math.random() * 0.45;
             playerBot.airY = 0.15;
             playerBot.vx -= nx * (5.5 + impactSpeed * 0.40);
             playerBot.vz -= nz * (5.5 + impactSpeed * 0.40);
 
             if (isFrontalOrRear) {
-              playerBot.pitchVel = (pHitForward > 0 ? -8.5 : 8.5);
+              playerBot.pitchVel = (pHitForward > 0 ? -11.5 : 11.5);
               playerBot.rollVel = (Math.random() - 0.5) * 2.5;
             } else {
-              playerBot.rollVel = (pHitRight > 0 ? -8.5 : 8.5);
+              playerBot.rollVel = (pHitRight > 0 ? -11.5 : 11.5);
               playerBot.pitchVel = (Math.random() - 0.5) * 2.5;
             }
             playerBot.flipped = true;

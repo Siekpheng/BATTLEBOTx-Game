@@ -982,8 +982,8 @@
         robot4: 'Robot 4 (Twin Blade)',
         robot5: 'Robot 5 (Drum Spinner)',
         robot6: 'Robot 6 (Heavy Disc)',
-        robot7: 'Robot 7 (Vai Hook Disc)',
-        robot8: 'Robot 8 (KK Pocket Spinner)'
+        robot7: 'Robot 7 (DragonBot Hook Disc)',
+        robot8: 'Robot 8 (KhmerTitanX3 Pocket Spinner)'
       };
       return map[botKey] || botKey || 'Robot 1';
     },

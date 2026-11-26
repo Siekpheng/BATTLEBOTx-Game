@@ -16,20 +16,20 @@
       name: 'Razor',
       role: 'Fast Spin · Wedge Lifter',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 410,        // Calibrated brisk ~1.5–2 min match duration
-      maxSpeed: 15.8,
+      maxHealth: 308,        // Reduced by 25% (was 410) for faster, less tanky matches
+      maxSpeed: 15.6,
       turnRate: 3.65,
       accel: 50.0,
       maxWeaponRpm: 98.0,
-      windUpRate: 56.0,      // Spins up in ~1.75s (fastest among full-size bots)
-      attackStall: 0.60,     // Quick recovery after hitting
+      windUpRate: 52.0,      // Fast wind-up (~1.88s)
+      attackStall: 0.65,     // Balanced recovery after frontal impacts
       defendStall: 1.00,
       weaponReach: 0.30,
-      weaponWidth: 0.95,     // Accurate CAD weapon mesh width
-      weaponHalfWidth: 0.475,
+      weaponWidth: 0.88,     // Wide overhead angled blade
+      weaponHalfWidth: 0.440,
       flingBase: 4.4,
       flingSpeedMult: 0.46,
-      flipChance: 0.32,      // Front ramp wedges + angled blade lift opponents more easily
+      flipChance: 0.26,      // Front ramp wedges + angled blade lift opponents
       flipResistance: 1.0,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
       partDamageChance: 0.35,
@@ -38,27 +38,27 @@
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 0.95,
-      wedgeRating: 1.10      // Angled front wedge forks (normalized from 1.25)
+      wedgeRating: 1.08      // Angled front wedge forks
     },
     robot2: {
       name: 'IronClad',
       role: 'Heavy Armor · Juggernaut Tank',
       mass: 250,             // Standard 250 lb combat heavyweight (equal physical weight to Robots 1, 3, 4, 5)
-      maxHealth: 475,        // +20% reinforced tank hull durability
+      maxHealth: 356,        // Reduced by 25% (was 475); +20% reinforced tank hull durability
       maxSpeed: 14.0,        // Heavier armored chassis
       turnRate: 3.15,
       accel: 42.0,
       maxWeaponRpm: 92.0,
-      windUpRate: 38.0,
-      attackStall: 0.72,
-      defendStall: 0.90,
+      windUpRate: 42.5,
+      attackStall: 0.65,
+      defendStall: 0.85,
       weaponReach: 0.34,
       weaponWidth: 0.55,     // Narrow 0.55m central heavy drum (corners are armored plow!)
       weaponHalfWidth: 0.275,
       flingBase: 4.6,
       flingSpeedMult: 0.48,
       flipChance: 0.22,
-      flipResistance: 0.60,  // Low center-of-gravity resists getting flipped
+      flipResistance: 0.55,  // Low center-of-gravity tank hull resists getting flipped
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots (no longer bulldozes)
       partDamageChance: 0.32,
       partDamageHigh: 1,
@@ -66,75 +66,75 @@
       collisionRadius: 1.14,
       wallRadius: 1.35,
       gyroFactor: 0.75,
-      wedgeRating: 1.20      // Heavy armored front plow
+      wedgeRating: 1.22      // Heavy armored front plow
     },
     robot3: {
       name: 'KineticBar',
       role: 'Wide Reach · Multi-Part Shredder',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 368,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 276,        // Reduced by 25% (was 368); true glass cannon HP
       maxSpeed: 15.0,
       turnRate: 3.75,
       accel: 48.0,
       maxWeaponRpm: 102.0,
-      windUpRate: 41.0,      // Faster wind-up (~2.5s) to stay competitive against rushers
-      attackStall: 0.70,     // Reduced stall on attack (was 0.95)
-      defendStall: 0.75,     // Faster recovery from defense impacts (was 1.25)
+      windUpRate: 48.0,      // ~2.12s wind-up so glass cannon stays threatening after stalls
+      attackStall: 0.62,     // Reduced stall on attack (glass cannon trades armor for lethal bar power)
+      defendStall: 0.72,
       weaponReach: 0.24,     // Wide 150-degree horizontal bar arc
       weaponWidth: 1.35,     // Wide 1.35m horizontal spinning bar
       weaponHalfWidth: 0.675,
-      flingBase: 7.4,        // Devastating horizontal slap knockback (was 6.2)
+      flingBase: 7.4,        // Devastating horizontal slap knockback
       flingSpeedMult: 0.55,
       flipChance: 0.18,
       flipResistance: 1.0,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
-      partDamageChance: 0.65,// Shreds armor pieces on contact (was 0.45)
+      partDamageChance: 0.65,// Shreds armor pieces on contact (glass cannon specialty)
       partDamageHigh: 1,
       partDivisor: 14,
       collisionRadius: 1.15,
       wallRadius: 1.35,
       gyroFactor: 1.20,      // High horizontal rotational inertia
-      wedgeRating: 0.65
+      wedgeRating: 0.68
     },
     robot4: {
       name: 'VertForce',
       role: 'Heavy Disc · Uppercut Launcher',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 415,        // Calibrated brisk ~1.5–2 min match duration
-      maxSpeed: 14.8,
-      turnRate: 3.40,
-      accel: 46.0,
+      maxHealth: 311,        // Reduced by 25% (was 415) for faster, less tanky matches
+      maxSpeed: 15.2,
+      turnRate: 3.85,
+      accel: 49.0,
       maxWeaponRpm: 105.0,   // Heavy high-inertia vertical disc
-      windUpRate: 44.0,      // ~2.4s wind-up (was 31.0 / 3.4s) to hit full lethal punch quicker
-      attackStall: 0.55,     // Quick disc recovery after landing hits (was 0.85)
-      defendStall: 0.80,     // Better resistance against defense stalling (was 1.15)
-      weaponReach: 0.34,
-      weaponWidth: 0.38,     // Central vertical flywheel disc
-      weaponHalfWidth: 0.190,
-      flingBase: 7.2,        // Terrifying uppercut launcher knockback (was 6.4)
-      flipChance: 0.38,      // Highest uppercut flip probability on solid vertical hits
+      windUpRate: 51.0,      // ~2.05s wind-up to hit full uppercut punch
+      attackStall: 0.54,     // Quick disc recovery after landing hits
+      defendStall: 0.78,
+      weaponReach: 0.30,
+      weaponWidth: 0.50,     // Central vertical flywheel disc bite zone
+      weaponHalfWidth: 0.250,
+      flingBase: 7.5,        // Terrifying uppercut launcher knockback
+      flipChance: 0.46,      // Premier uppercut launcher flip probability
       flipResistance: 0.85,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
-      partDamageChance: 0.42,
+      partDamageChance: 0.48,
       partDamageHigh: 1,
       partDivisor: 15,
       collisionRadius: 1.12,
       wallRadius: 1.32,
-      gyroFactor: 1.35,      // Strongest vertical gyroscopic precession ("gyro dance") on sharp turns
+      gyroFactor: 1.15,      // Strong vertical gyroscopic precession ("gyro dance") without crippling turns
       wedgeRating: 1.10
     },
     robot5: {
       name: 'BlueThunder',
       role: 'Rapid Drum · Non-Stop Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 395,        // Calibrated brisk ~1.5–2 min match duration
-      maxSpeed: 15.6,
-      turnRate: 3.85,        // Snappy 2WD pivot turning
+      maxHealth: 296,        // Reduced by 25% (was 395) for faster, less tanky matches
+      maxSpeed: 15.7,
+      turnRate: 3.90,        // Snappy 2WD pivot turning
       accel: 52.0,
       maxWeaponRpm: 110.0,   // High-RPM compact eggbeater drum
-      windUpRate: 58.0,      // Spins up in ~1.4s and recovers almost instantly!
-      attackStall: 0.56,     // Drum barely stalls on impact — relentless rapid-fire brawling
-      defendStall: 0.80,
+      windUpRate: 60.0,      // Spins up fastest among heavyweights and recovers almost instantly
+      attackStall: 0.50,     // Drum barely stalls on impact — relentless rapid-fire brawling
+      defendStall: 0.72,
       weaponReach: 0.33,
       weaponWidth: 0.78,     // Wide billet eggbeater drum
       weaponHalfWidth: 0.390,
@@ -143,53 +143,53 @@
       flipChance: 0.26,
       flipResistance: 0.90,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
-      partDamageChance: 0.38,// Consistent relentless part grinding
+      partDamageChance: 0.42,// Consistent relentless part grinding
       partDamageHigh: 1,
       partDivisor: 15,
       collisionRadius: 1.10,
       wallRadius: 1.30,
       gyroFactor: 1.05,
-      wedgeRating: 0.95
+      wedgeRating: 1.00
     },
     robot6: {
       name: 'Vortex',
       role: 'Mini Speedster · Light Damage',
       mass: 160,             // Compact lightweight frame (only lightweight bot at 160 lb)
-      maxHealth: 350,        // Compact lightweight frame
+      maxHealth: 263,        // Reduced by 25% (was 350); compact lightweight frame
       maxSpeed: 19.5,        // Fastest robot in the arena
       turnRate: 4.60,        // Ultra-nimble cornering
       accel: 68.0,           // Instantaneous acceleration
-      maxWeaponRpm: 90.0,    // Small compact disc
-      windUpRate: 65.0,      // Fast wind-up due to small low-mass blade
-      attackStall: 0.55,
-      defendStall: 1.10,
-      weaponReach: 0.38,     // Narrower compact weapon reach
-      weaponWidth: 0.24,     // Compact narrow 0.24m vertical disc
-      weaponHalfWidth: 0.120,
-      flingBase: 2.3,        // Least knockback force (small weapon)
+      maxWeaponRpm: 95.0,    // High-speed compact disc
+      windUpRate: 72.0,      // Ultra-fast wind-up due to small low-mass blade
+      attackStall: 0.38,     // Rapid hit-and-run recovery
+      defendStall: 0.75,
+      weaponReach: 0.31,     // Compact nose disc reach
+      weaponWidth: 0.33,     // Compact vertical disc effective bite width
+      weaponHalfWidth: 0.165,
+      flingBase: 2.6,        // Least knockback force (small weapon)
       flingSpeedMult: 0.25,
       flipChance: 0.08,      // Rarely flips heavy full-size robots (8% only on max-speed charge)
       flipResistance: 1.15,  // Lighter chassis is easier for big bots to toss
       pushTractionMult: 0.72,// Light weight means less shoving force in slow pushing contests
-      partDamageChance: 0.22,// Deals the least damage per hit
+      partDamageChance: 0.26,// Light damage per hit, relies on rapid hit-and-run
       partDamageHigh: 1,
       partDivisor: 13,
       collisionRadius: 0.78, // Compact footprint matches Robot 6's smaller CAD chassis & weapon
       wallRadius: 0.95,
       gyroFactor: 0.45,      // Small blade has minimal gyro lift, keeping cornering flat and agile
-      wedgeRating: 0.85
+      wedgeRating: 0.92
     },
     robot7: {
-      name: 'Vai',
+      name: 'DragonBot',
       role: 'Hook Disc · Forked Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 408,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 306,        // Reduced by 25% (was 408) for faster, less tanky matches
       maxSpeed: 15.2,
       turnRate: 3.60,
       accel: 49.0,
       maxWeaponRpm: 104.0,   // High-torque asymmetric single-tooth hooked vertical spinner
-      windUpRate: 46.0,      // ~2.2s wind-up
-      attackStall: 0.57,
+      windUpRate: 48.0,      // ~2.16s wind-up
+      attackStall: 0.56,
       defendStall: 0.80,
       weaponReach: 0.34,
       weaponWidth: 0.42,     // Heavy central vertical hooked bar + dual pulley hubs
@@ -205,35 +205,35 @@
       collisionRadius: 1.12,
       wallRadius: 1.32,
       gyroFactor: 1.15,      // Strong vertical spinner gyroscopic precession
-      wedgeRating: 1.11      // Twin low front forks + slanted lime-green wedgelets
+      wedgeRating: 1.12      // Twin low front forks + slanted lime-green wedgelets
     },
     robot8: {
-      name: 'KK',
+      name: 'KhmerTitanX3',
       role: 'Pocket Drum · Quad-Fork Brawler',
       mass: 250,             // Standard 250 lb combat heavyweight
-      maxHealth: 440,        // Calibrated brisk ~1.5–2 min match duration
+      maxHealth: 330,        // Reduced by 25% (was 440) for faster, less tanky matches
       maxSpeed: 15.1,
-      turnRate: 3.55,
-      accel: 48.5,
+      turnRate: 3.64,
+      accel: 48.6,
       maxWeaponRpm: 104.0,   // Heavy wide pocket scoop vertical drum spinner
-      windUpRate: 48.0,      // ~2.25s wind-up
-      attackStall: 0.56,
+      windUpRate: 47.2,      // ~2.20s wind-up
+      attackStall: 0.57,
       defendStall: 0.78,
       weaponReach: 0.33,
       weaponWidth: 0.66,     // Wide 0.66m pocket hammer-drum rotor
       weaponHalfWidth: 0.330,
-      flingBase: 6.9,        // Massive uppercut pocket launch
+      flingBase: 6.8,        // Strong uppercut pocket launch
       flingSpeedMult: 0.50,
-      flipChance: 0.38,      // Quad low front forks feed opponents straight into the pocket drum
+      flipChance: 0.36,      // Quad low front forks feed opponents straight into the pocket drum
       flipResistance: 0.84,
       pushTractionMult: 1.0, // Equal pushing traction across all 250 lb bots
-      partDamageChance: 0.43,
+      partDamageChance: 0.42,
       partDamageHigh: 1,
       partDivisor: 15,
       collisionRadius: 1.12,
       wallRadius: 1.32,
-      gyroFactor: 1.20,      // Wide heavy vertical drum gyro feel
-      wedgeRating: 1.18      // 4-fork front feeder wedge geometry
+      gyroFactor: 1.05,      // Wide heavy vertical drum gyro feel
+      wedgeRating: 1.16      // 4-fork front feeder wedge geometry
     }
   };
   window.ROBOT_COMBAT_SPECS = ROBOT_COMBAT_SPECS;
@@ -2742,8 +2742,8 @@
       { id: 'robot4', label: 'Robot 4 · VertForce CAD Model' },
       { id: 'robot5', label: 'Robot 5 · BlueThunder CAD Model' },
       { id: 'robot6', label: 'Robot 6 · Vortex CAD Model' },
-      { id: 'robot7', label: 'Robot 7 · Vai CAD Model' },
-      { id: 'robot8', label: 'Robot 8 · KK CAD Model' }
+      { id: 'robot7', label: 'Robot 7 · DragonBot CAD Model' },
+      { id: 'robot8', label: 'Robot 8 · KhmerTitanX3 CAD Model' }
     ];
 
     setProgress(4, 'Initializing 3D Combat Arena...');
