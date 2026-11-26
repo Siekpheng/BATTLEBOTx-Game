@@ -503,7 +503,7 @@
         }
       }
 
-      if (bot.type === 'robot2' || bot.type === 'robot7' || bot.type === 'robot8') {
+      if (bot.type === 'robot2') {
         bot.weaponMesh.rotation.x -= bot.weaponSpinSpeed * dt;
       } else if (bot.type === 'robot1') {
         // Robot 1 weapon is natively modeled at 10-degree tilt in CAD geometry.
@@ -514,8 +514,8 @@
       } else if (bot.type === 'robot3') {
         // Robot 3: Horizontal blade spinner rotates around vertical Y axis
         bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
-      } else if (bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6') {
-        // Robot 4 & 5: Vertical drum / disc spinner rotates around horizontal X axis
+      } else if (bot.type === 'robot4' || bot.type === 'robot5' || bot.type === 'robot6' || bot.type === 'robot7' || bot.type === 'robot8') {
+        // Vertical drum / disc spinner rotates around horizontal X axis
         bot.weaponMesh.rotation.x += bot.weaponSpinSpeed * dt;
       } else {
         bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
@@ -1899,7 +1899,7 @@
         const robot1SpindleAxis = new THREE.Vector3(0, Math.cos((10.0 * Math.PI) / 180), Math.sin((10.0 * Math.PI) / 180)).normalize();
         bot.weaponAngle = ((bot.weaponAngle || 0) + bot.weaponSpinSpeed * dt) % (Math.PI * 2);
         bot.weaponMesh.quaternion.setFromAxisAngle(robot1SpindleAxis, bot.weaponAngle);
-      } else if (bot.type === 'robot2' || bot.type === 'robot7' || bot.type === 'robot8') {
+      } else if (bot.type === 'robot2') {
         bot.weaponMesh.rotation.x -= bot.weaponSpinSpeed * dt;
       } else if (bot.type === 'robot3') {
         bot.weaponMesh.rotation.y += bot.weaponSpinSpeed * dt;
